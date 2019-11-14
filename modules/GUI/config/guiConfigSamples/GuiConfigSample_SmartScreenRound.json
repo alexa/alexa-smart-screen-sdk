@@ -1,0 +1,144 @@
+{
+    "gui": {
+        "appConfig": {
+            "description": "Smart Screen Round Device",
+            "mode": "HUB",
+            "emulateDisplayDimensions": true,
+            "scaleToFill": false,
+            "audioInputInitiator": "TAP",
+            "windows": [
+                {
+                    "id": "smartScreenRound",
+                    "templateId": "smartScreenRound",
+                    "sizeConfigurationId": "fullscreen",
+                    "interactionMode": "smart_screen"
+                }
+            ],
+            "defaultWindowId": "smartScreenRound",
+            "deviceKeys": {
+                "talkKey": {
+                    "code": "KeyA",
+                    "keyCode": 65,
+                    "key": "a"
+                },
+                "backKey": {
+                    "code": "KeyB",
+                    "keyCode": 66,
+                    "key": "b"
+                },
+                "exitKey": {
+                    "code": "Escape",
+                    "keyCode": 27,
+                    "key": "Escape"
+                }
+            }
+        },
+        "visualCharacteristics": [
+            {
+                "type": "AlexaInterface",
+                "interface": "Alexa.InteractionMode",
+                "version": "1.0",
+                "configurations": {
+                    "interactionModes": [
+                        {
+                            "id": "smart_screen",
+                            "uiMode": "HUB",
+                            "interactionDistance": {
+                                "unit": "INCHES",
+                                "value": 84
+                            },
+                            "touch": "SUPPORTED",
+                            "keyboard": "UNSUPPORTED",
+                            "video": "SUPPORTED"
+                        }
+                    ]
+                }
+            },
+            {
+                "type": "AlexaInterface",
+                "interface": "Alexa.Presentation.APL.Video",
+                "version": "1.0",
+                "configurations": {
+                    "video": {
+                        "codecs": [
+                            "H_264_42",
+                            "H_264_41"
+                        ]
+                    }
+                }
+            },
+            {
+                "type": "AlexaInterface",
+                "interface": "Alexa.Display.Window",
+                "version": "1.0",
+                "configurations": {
+                    "templates": [
+                        {
+                            "id": "smartScreenRound",
+                            "type": "STANDARD",
+                            "configuration": {
+                                "sizes": [
+                                    {
+                                        "type": "DISCRETE",
+                                        "id": "fullscreen",
+                                        "value": {
+                                            "unit": "PIXEL",
+                                            "value": {
+                                                "width": 480,
+                                                "height": 480
+                                            }
+                                        }
+                                    }
+                                ],
+                                "interactionModes": [
+                                    "smart_screen"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "type": "AlexaInterface",
+                "interface": "Alexa.Display",
+                "version": "1.0",
+                "configurations": {
+                    "display": {
+                        "type": "PIXEL",
+                        "touch": [
+                            "SINGLE"
+                        ],
+                        "shape": "ROUND",
+                        "dimensions": {
+                            "resolution": {
+                                "unit": "PIXEL",
+                                "value": {
+                                    "width": 480,
+                                    "height": 480
+                                }
+                            },
+                            "physicalSize": {
+                                "unit": "INCHES",
+                                "value": {
+                                    "width": 8.6,
+                                    "height": 8.6
+                                }
+                            },
+                            "pixelDensity": {
+                                "unit": "DPI",
+                                "value": 160
+                            },
+                            "densityIndependentResolution": {
+                                "unit": "DP",
+                                "value": {
+                                    "width": 480,
+                                    "height": 480
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+}

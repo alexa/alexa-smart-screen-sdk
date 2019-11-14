@@ -1,0 +1,20 @@
+#voiceChromeScrim {
+    position: absolute;
+    height: 144px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    transition: visibility 0.5s, opacity 0.5s ease-in-out; 
+    justify-content: flex-end;
+}
+
+#voiceChromeState {
+    width: 98%;
+    display: flex;
+    flex-flow: row nowrap;
+    justify-content: flex-end;
+    font-size: 20px;
+    font-family: sans-serif;
+    color: lightgray;
+    padding-bottom: 1vh;
+}

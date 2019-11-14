@@ -1,0 +1,201 @@
+{
+  "sampleApp": {
+    // The interface which the websocket server will bind to.
+    // Note: For security reasons, it is strongly recommended that the loopback interface is used.
+    // When using interfaces, other than loopback, additional security measures should be taken to ensure
+    // the security and integrity of data between the client and server.
+    //"websocketInterface":"127.0.0.1"
+    // The port which the websocket server will listen to.
+    // Note: The port should be a positive integer in the range [1-65535], It is strongly recommended that
+    // a port number > 1023 is used
+    //"websocketPort":8933
+    // The Certificate Authority file to verify client certificate
+    // "websocketCertificateAuthority":"ca.cert"
+    // The certificate file the websocket server should use when SSL is enabled
+    // "websocketCertificate":"server.chain"
+    // The private key file the websocket server should use when SSL is enabled
+    // "websocketPrivateKey":"server.key"
+  },
+  "gui": {
+    "appConfig": {
+      "description": "TV PTT Device - Fullscreen + Lower Third Panel",
+      "mode": "TV",
+      "emulateDisplayDimensions": true,
+      "scaleToFill": true,
+      "audioInputInitiator": "PRESS_AND_HOLD",
+      "windows": [
+        {
+          "id": "tvFullscreen",
+          "templateId": "tvFullscreen",
+          "sizeConfigurationId": "fullscreen",
+          "interactionMode": "tv"
+        },
+        {
+          "id": "tvOverlayLandscape",
+          "templateId": "tvOverlayLandscape",
+          "windowPosition": "bottom",
+          "sizeConfigurationId": "landscapePanel",
+          "interactionMode": "tv_overlay"
+        }
+      ],
+      "defaultWindowId": "tvFullscreen",
+      "deviceKeys": {
+        "talkKey": {
+          "code": "KeyA",
+          "keyCode": 65,
+          "key": "a"
+        },
+        "backKey": {
+          "code": "KeyB",
+          "keyCode": 66,
+          "key": "b"
+        },
+        "exitKey": {
+          "code": "Escape",
+          "keyCode": 27,
+          "key": "Escape"
+        }
+      }
+    },
+    "visualCharacteristics": [
+      {
+        "type": "AlexaInterface",
+        "interface": "Alexa.InteractionMode",
+        "version": "1.0",
+        "configurations": {
+          "interactionModes": [
+            {
+              "id": "tv",
+              "uiMode": "TV",
+              "interactionDistance": {
+                "unit": "INCHES",
+                "value": 130
+              },
+              "touch": "UNSUPPORTED",
+              "keyboard": "SUPPORTED",
+              "video": "SUPPORTED"
+            },
+            {
+              "id": "tv_overlay",
+              "uiMode": "TV",
+              "interactionDistance": {
+                "unit": "INCHES",
+                "value": 130
+              },
+              "touch": "UNSUPPORTED",
+              "keyboard": "SUPPORTED",
+              "video": "UNSUPPORTED"
+            }
+          ]
+        }
+      },
+      {
+        "type": "AlexaInterface",
+        "interface": "Alexa.Presentation.APL.Video",
+        "version": "1.0",
+        "configurations": {
+          "video": {
+            "codecs": [
+              "H_264_42",
+              "H_264_41"
+            ]
+          }
+        }
+      },
+      {
+        "type": "AlexaInterface",
+        "interface": "Alexa.Display.Window",
+        "version": "1.0",
+        "configurations": {
+          "templates": [
+            {
+              "id": "tvFullscreen",
+              "type": "STANDARD",
+              "configuration": {
+                "sizes": [
+                  {
+                    "type": "DISCRETE",
+                    "id": "fullscreen",
+                    "value": {
+                      "unit": "PIXEL",
+                      "value": {
+                        "width": 1920,
+                        "height": 1080
+                      }
+                    }
+                  }
+                ],
+                "interactionModes": [
+                  "tv"
+                ]
+              }
+            },
+            {
+              "id": "tvOverlayLandscape",
+              "type": "OVERLAY",
+              "configuration": {
+                "sizes": [
+                  {
+                    "type": "DISCRETE",
+                    "id": "landscapePanel",
+                    "value": {
+                      "unit": "PIXEL",
+                      "value": {
+                        "width": 1920,
+                        "height": 400
+                      }
+                    }
+                  }
+                ],
+                "interactionModes": [
+                  "tv_overlay"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      {
+        "type": "AlexaInterface",
+        "interface": "Alexa.Display",
+        "version": "1.0",
+        "configurations": {
+          "display": {
+            "type": "PIXEL",
+            "touch": [
+              "UNSUPPORTED"
+            ],
+            "shape": "RECTANGLE",
+            "dimensions": {
+              "resolution": {
+                "unit": "PIXEL",
+                "value": {
+                  "width": 1920,
+                  "height": 1080
+                }
+              },
+              "physicalSize": {
+                "unit": "INCHES",
+                "value": {
+                  "width": 56.7,
+                  "height": 31.9
+                }
+              },
+              "pixelDensity": {
+                "unit": "DPI",
+                "value": 320
+              },
+              "densityIndependentResolution": {
+                "unit": "DP",
+                "value": {
+                  "width": 960,
+                  "height": 540
+                }
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

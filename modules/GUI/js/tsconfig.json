@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "sourceMap": true,
+    "outDir": "./dist/",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "charset": "utf-8",
+    "inlineSources": false,
+    "alwaysStrict": true,
+    "declaration": true,
+    "pretty": true,
+    "removeComments": false,
+    "target": "es6",
+    "lib": [
+      "es2015",
+      "es2016",
+      "es2017",
+      "dom"
+    ],
+    "noImplicitAny": true,
+    "jsx": "react",
+    "types": [
+      "node"
+    ]
+  },
+  "exclude": [
+    "node_modules",
+    "offline-module-cache",
+    "build",
+    "coverage",
+    "dist"
+  ],
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ]
+}

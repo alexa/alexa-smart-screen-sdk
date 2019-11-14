@@ -1,0 +1,62 @@
+# -*-perl-*-
+
+package.Alexa-smart-screen-sdk-for-linux = {
+    interfaces = (1.0);
+
+    deploy = {
+        generic = true;
+    };
+
+    build-environment = {
+        chroot = basic;
+        network-access = blocked;
+    };
+
+    build-system = no-op;
+    # build-system = happy-npm;
+
+    build-tools = {
+        1.0 = {
+            NoOpBuild = 1.0;
+            # NodeJS = 8.x;
+            # HappyNpm = 1.0;
+        };
+    };
+
+    dependencies = {
+        1.0 = {
+        };
+    };
+
+    # Use runtime-dependencies for when you want to bring in additional
+    # packages when deploying.
+    # Use dependencies instead if you intend for these dependencies to
+    # be exported to other packages that build against you.
+    test-dependencies = {
+        1.0 = {
+            NodeJS-types-node = 10.9.x;
+            NodeJS-types-react = 16.4.x;
+            NodeJS-types-react-dom = 16.0.x;
+            NodeJS-file-loader = 1.1.x;
+            NodeJS-react = 16.4.x;
+            NodeJS-react-dom = 16.4.x;
+            NodeJS-source-map-loader = 0.2.x;
+            NodeJS-style-loader = 0.21.x;
+            NodeJS-ts-loader = 4.4.x;
+            NodeJS-tslint = 5.11.x;
+            NodeJS-tslint-loader = 3.6.x;
+            NodeJS-typescript = 2.9.x;
+            NodeJS-webpack = 4.14.x;
+            NodeJS-css-loader = 0.28.x;
+            NodeJS-html-webpack-plugin = 3.2.x;
+            NodeJS-webpack-cli = 3.0.x;
+        };
+    };
+
+    runtime-dependencies = {
+        1.0 = {
+            NodeJS = 8.x;
+        };
+    };
+
+};

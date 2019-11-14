@@ -1,0 +1,18 @@
+{
+    "type": "APL",
+    "version": "1.1",
+    "import": [
+      {
+        "name": "avs-display-cards",
+        "version": "1.1.0"
+      }
+    ],
+    "mainTemplate": {
+      "parameters": [
+        "payload"
+      ],
+      "item": {
+        "type": "AVSDisplayCards"
+      }
+    }
+  }
