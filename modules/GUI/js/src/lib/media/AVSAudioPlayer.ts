@@ -19,6 +19,7 @@ export class AVSAudioPlayer extends AudioPlayer {
     private activityTracker : ActivityTracker;
     private activityToken : number;
     private audioContextProvider : IAudioContextProvider = new DefaultAudioContextProvider();
+    private playing : boolean = false;
 
     public constructor(
       focusManager : FocusManager,
@@ -37,6 +38,7 @@ export class AVSAudioPlayer extends AudioPlayer {
         Promise.all([this.audioContextProvider.getAudioContext(), this.acquireFocus()]).then((values) => {
             this.activityToken = this.activityTracker.recordActive('AVSAudioPlayer');
             const audioContext = values[0];
+            this.playing = true;
             this.playWithContext(id, audioContext);
         }).catch((reason? : any) => {
           console.log('AVSAudioPlayer:play failed with reason: ' + reason);
@@ -50,6 +52,7 @@ export class AVSAudioPlayer extends AudioPlayer {
      * @param id a uuid
      */
     public onPlaybackFinished(id : string) : void {
+        this.playing = false;
         super.onPlaybackFinished(id);
         this.releaseFocus();
         if (this.activityToken !== undefined) {
@@ -65,6 +68,7 @@ export class AVSAudioPlayer extends AudioPlayer {
      * @param reason an arbitrary string
      */
     public onError(id : string, reason : string) : void {
+        this.playing = false;
         super.onError(id, reason);
         this.releaseFocus();
         if (this.activityToken !== undefined) {
@@ -73,7 +77,19 @@ export class AVSAudioPlayer extends AudioPlayer {
         }
     }
 
+    /**
+     * Called to stop currently playing audio and flush any pending decodes
+     */
+    public flush() : void {
+        this.playing = false;
+        super.flush();
+    }
+
     private acquireFocus() : Promise<void> {
+        if (this.playbackFocusResolver) {
+            // We already had a focus token, if a promise exists reject the previous promise immediately
+            this.playbackFocusResolver.reject();
+        }
         return new Promise<void>(((resolve, reject) => {
             this.playbackFocusResolver = { resolve, reject };
             this.focusToken = this.focusManager.acquireFocus(ChannelName.DIALOG, {
@@ -85,16 +101,22 @@ export class AVSAudioPlayer extends AudioPlayer {
     private releaseFocus() {
         if (this.focusToken !== undefined) {
             this.focusManager.releaseFocus(this.focusToken);
+            this.focusToken = undefined;
         }
     }
 
-    private processFocusChanged(focusState : FocusState) {
+    private processFocusChanged(focusState : FocusState, token : number) {
+        if (this.focusToken !== token) {
+            // This was not the focus token we were expecting, ignore it
+            return;
+        }
+
         // For dialog we do not allow background audio playback and will stop speech if this happens
         if (focusState !== FocusState.FOREGROUND) {
             if (this.playbackFocusResolver) {
                 this.playbackFocusResolver.reject();
                 this.playbackFocusResolver = undefined;
-            } else {
+            } else if (this.playing) {
                 this.flush();
             }
 

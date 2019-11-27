@@ -106,6 +106,10 @@ export class AVSVideo extends Video {
     }
 
     private acquireFocus(channel : ChannelName) : Promise<void> {
+        if (this.playbackFocusResolver) {
+            // We already had a focus token, if a promise exists reject the previous promise immediately
+            this.playbackFocusResolver.reject();
+        }
         return new Promise<void>(((resolve, reject) => {
             this.playbackFocusResolver = {
                 resolve : () => {
@@ -129,7 +133,12 @@ export class AVSVideo extends Video {
         }
     }
 
-    private processFocusChanged(focusState : FocusState) {
+    private processFocusChanged(focusState : FocusState, token : number) {
+        if (token !== this.focusToken) {
+            // This was not the focus token we were expecting, ignore it
+            return;
+        }
+
         switch (focusState) {
             case FocusState.NONE:
                 if (this.playbackFocusResolver) {

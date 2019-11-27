@@ -15,6 +15,7 @@ The Alexa Smart Screen SDK depends on the following additional GitHub repos:
 
 You can set up the Alexa Smart Screen SDK by using the following Quick Start Guides:
 * [MacOS Quick Start Guide](https://github.com/alexa/alexa-smart-screen-sdk/wiki/MacOS-Quick-Start-Guide)
+* [Ubuntu Quick Start Guide](https://github.com/alexa/alexa-smart-screen-sdk/wiki/Ubuntu-Quick-Start-Guide)
 * [Raspberry Pi Quick Start Guide](https://github.com/alexa/alexa-smart-screen-sdk/wiki/Raspberry-Pi-Quick-Start-Guide) (Raspbian Stretch)
 
 You can also create your device prototype by using an [Amazon-qualified development kit](https://developer.amazon.com/en-US/alexa/alexa-voice-service/dev-kits) that supports the Smart Screen SDK, such as:
@@ -76,3 +77,7 @@ Exit and back remote control functionality is minimally supported by the Smart S
 * Release the focus management - Release any focus management that might be held.
 
 Using the predefined device visual characteristics, Esc and B are mapped to Exit and Back respectively.
+
+## Release Notes and Known Issues
+
+For a list of enhancements, bug fixes, and known issues, refer to [CHANGELOG.md](https://github.com/alexa/alexa-smart-screen-sdk/blob/master/CHANGELOG.md).

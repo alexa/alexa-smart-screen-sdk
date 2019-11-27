@@ -100,7 +100,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: acorn
-Version: 6.2.1
+Version: 6.3.0
 Description: ECMAScript parser
 License: MIT
 Copyright (C) 2012-2018 by various contributors (see AUTHORS)
@@ -1722,7 +1722,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ================================================================================
 Package: bluebird
-Version: 3.5.5
+Version: 3.7.1
 Description: Full featured Promises/A+ implementation with exceptionally good performance
 License: MIT
 The MIT License (MIT)
@@ -2100,7 +2100,7 @@ IN THE SOFTWARE.
 
 ================================================================================
 Package: buffer
-Version: 4.9.1
+Version: 4.9.2
 Description: Node.js Buffer API, for the browser
 License: MIT
 The MIT License (MIT)
@@ -2264,7 +2264,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: cacache
-Version: 12.0.2
+Version: 12.0.3
 Description: Fast, fault-tolerant, cross-platform, disk-based, data-agnostic, content-addressable cache.
 License: ISC
 ISC License
@@ -2481,7 +2481,7 @@ SOFTWARE.
 
 ================================================================================
 Package: chokidar
-Version: 2.1.6
+Version: 2.1.8
 Description: A neat wrapper around node.js fs.watch / fs.watchFile / fsevents.
 License: MIT
 Copied from: https://en.wikipedia.org/wiki/MIT_License
@@ -2508,7 +2508,7 @@ SOFTWARE.
 
 ================================================================================
 Package: chownr
-Version: 1.1.2
+Version: 1.1.3
 Description: like `chown -R`
 License: ISC
 The ISC License
@@ -2779,7 +2779,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: commander
-Version: 2.20.0
+Version: 2.20.3
 Description: the complete solution for node.js command-line programs
 License: MIT
 (The MIT License)
@@ -2919,7 +2919,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ================================================================================
 Package: console-browserify
-Version: 1.1.0
+Version: 1.2.0
 Description: Emulate console for all the browsers
 License: MIT
 Copied from: https://en.wikipedia.org/wiki/MIT_License
@@ -3048,7 +3048,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: convert-source-map
-Version: 1.6.0
+Version: 1.7.0
 Description: Converts a source-map from/to  different formats and allows adding/changing properties.
 License: MIT
 Copyright 2013 Thorsten Lorenz. 
@@ -3181,7 +3181,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: copy-dir
-Version: 1.1.0
+Version: 1.2.0
 Description: copy-dir
 License: MIT
 The MIT License (MIT)
@@ -3208,7 +3208,7 @@ SOFTWARE.
 
 ================================================================================
 Package: copy-webpack-plugin
-Version: 5.0.4
+Version: 5.0.5
 Description: Copy files && directories with webpack
 License: MIT
 Copyright JS Foundation and other contributors
@@ -3234,7 +3234,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: core-js
-Version: 2.6.9
+Version: 2.6.10
 Description: Standard library
 License: MIT
 Copyright (c) 2014-2019 Denis Pushkarev
@@ -3365,7 +3365,7 @@ SOFTWARE.
 
 ================================================================================
 Package: cross-env
-Version: 5.2.0
+Version: 5.2.1
 Description: Run scripts that set and use environment variables across platforms
 License: MIT
 The MIT License (MIT)
@@ -3526,12 +3526,12 @@ THE SOFTWARE.
 
 ================================================================================
 Package: cyclist
-Version: 0.2.2
+Version: 1.0.1
 Description: Cyclist is an efficient cyclic list implemention.
 License: MIT
-Copied from: https://en.wikipedia.org/wiki/MIT_License
+The MIT License (MIT)
 
-Copyright (c) <year> <copyright holders>
+Copyright (c) 2015 Mathias Buus
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -3540,16 +3540,16 @@ to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 ================================================================================
 Package: dashdash
@@ -3580,33 +3580,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-
-================================================================================
-Package: date-now
-Version: 0.1.4
-Description: A requirable version of Date.now()
-License: MIT
-Copied from: https://en.wikipedia.org/wiki/MIT_License
-
-Copyright (c) <year> <copyright holders>
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 
 ================================================================================
 Package: debug
@@ -3874,7 +3847,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: des.js
-Version: 1.0.0
+Version: 1.0.1
 Description: DES implementation
 License: MIT
 Copied from: https://en.wikipedia.org/wiki/MIT_License
@@ -4189,7 +4162,7 @@ License: Apache-2.0
 
 ================================================================================
 Package: diff
-Version: 3.5.0
+Version: 4.0.1
 Description: A javascript text diff implementation.
 License: BSD
 Software License Agreement (BSD License)
@@ -4401,7 +4374,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: ejs
-Version: 2.6.2
+Version: 2.7.4
 Description: Embedded JavaScript templates
 License: Apache-2.0
 
@@ -4609,7 +4582,7 @@ License: Apache-2.0
 
 ================================================================================
 Package: electron
-Version: 4.2.9
+Version: 4.2.12
 Description: Build cross platform desktop apps with JavaScript, HTML, and CSS
 License: MIT
 Copyright (c) 2013-2018 GitHub Inc.
@@ -4722,7 +4695,7 @@ SOFTWARE.
 
 ================================================================================
 Package: elliptic
-Version: 6.5.0
+Version: 6.5.1
 Description: EC cryptography
 License: MIT
 Copied from: https://en.wikipedia.org/wiki/MIT_License
@@ -4818,7 +4791,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: end-of-stream
-Version: 1.4.1
+Version: 1.4.4
 Description: Call a callback when a readable/writable/duplex stream has completed or failed.
 License: MIT
 The MIT License (MIT)
@@ -4844,7 +4817,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ================================================================================
 Package: enhanced-resolve
-Version: 4.1.0
+Version: 4.1.1
 Description: Offers a async require.resolve function. It's highly configurable.
 License: MIT
 Copyright JS Foundation and other contributors
@@ -5104,7 +5077,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 ================================================================================
 Package: estraverse
-Version: 4.2.0
+Version: 4.3.0
 Description: ECMAScript JS AST traversal functions
 License: BSD-2-Clause
 Redistribution and use in source and binary forms, with or without
@@ -6048,7 +6021,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 
 ================================================================================
 Package: fs-minipass
-Version: 1.2.6
+Version: 1.2.7
 Description: fs read and write streams based on minipass
 License: ISC
 The ISC License
@@ -6316,7 +6289,7 @@ IN THE SOFTWARE.
 
 ================================================================================
 Package: glob
-Version: 7.1.4
+Version: 7.1.6
 Description: a little globber
 License: ISC
 The ISC License
@@ -6460,7 +6433,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ================================================================================
 Package: graceful-fs
-Version: 4.2.1
+Version: 4.2.3
 Description: A drop-in replacement for fs, making various improvements.
 License: ISC
 The ISC License
@@ -6523,7 +6496,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ================================================================================
 Package: handlebars
-Version: 4.1.2
+Version: 4.5.3
 Description: Handlebars provides the power necessary to let you build semantic templates effectively with no frustration
 License: MIT
 Copyright (C) 2011-2017 by Yehuda Katz
@@ -6927,7 +6900,7 @@ SOFTWARE.
 
 ================================================================================
 Package: hosted-git-info
-Version: 2.8.2
+Version: 2.8.5
 Description: Provides metadata and conversions from repository urls for Github, Bitbucket and Gitlab
 License: ISC
 Copyright (c) 2015, Rebecca Turner
@@ -7134,7 +7107,7 @@ SOFTWARE.
 
 ================================================================================
 Package: ignore-walk
-Version: 3.0.1
+Version: 3.0.3
 Description: Nested/recursive `.gitignore`/`.npmignore` parsing and filtering.
 License: ISC
 The ISC License
@@ -8981,7 +8954,7 @@ terms above.
 
 ================================================================================
 Package: loglevel
-Version: 1.6.4
+Version: 1.6.6
 Description: Minimal lightweight logging for JavaScript, adding reliable log level methods to any available console.log methods
 License: MIT
 Copyright (c) 2013 Tim Perry
@@ -9571,7 +9544,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: mime-db
-Version: 1.40.0
+Version: 1.42.0
 Description: Media Type Database
 License: MIT
 
@@ -9599,7 +9572,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: mime-types
-Version: 2.1.24
+Version: 2.1.25
 Description: The ultimate javascript content-type utility.
 License: MIT
 (The MIT License)
@@ -9733,7 +9706,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: minipass
-Version: 2.3.5
+Version: 2.9.0
 Description: minimal implementation of a PassThrough stream
 License: ISC
 The ISC License
@@ -9754,7 +9727,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ================================================================================
 Package: minizlib
-Version: 1.2.1
+Version: 1.3.3
 Description: A small fast zlib stream built on [minipass](http://npm.im/minipass) and Node.js's zlib binding.
 License: MIT
 Minizlib was created by Isaac Z. Schlueter.
@@ -10271,7 +10244,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ================================================================================
 Package: npm-packlist
-Version: 1.4.4
+Version: 1.4.6
 Description: Get a list of the files to add from a folder into an npm package
 License: ISC
 The ISC License
@@ -10711,7 +10684,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: optionator
-Version: 0.8.2
+Version: 0.8.3
 Description: option parsing and help generation
 License: MIT
 Copyright (c) George Zahariev
@@ -10925,7 +10898,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ================================================================================
 Package: p-limit
-Version: 2.2.0
+Version: 2.2.1
 Description: Run multiple promise-returning & async functions with limited concurrency
 License: MIT
 MIT License
@@ -10997,7 +10970,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: parallel-transform
-Version: 1.1.0
+Version: 1.2.0
 Description: Transform stream that allows you to run your transforms in parallel without changing the order
 License: MIT
 Copyright 2013 Mathias Buus
@@ -11023,7 +10996,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: parse-asn1
-Version: 5.1.4
+Version: 5.1.5
 Description: utility library for parsing asn1 files for use with browserify-sign.
 License: ISC
 Copyright (c) 2017, crypto-browserify contributors
@@ -11593,7 +11566,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: postcss
-Version: 7.0.17
+Version: 7.0.23
 Description: Tool for transforming styles with JS plugins
 License: MIT
 The MIT License (MIT)
@@ -11967,7 +11940,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ================================================================================
 Package: psl
-Version: 1.3.0
+Version: 1.4.0
 Description: Domain name parser based on the Public Suffix List
 License: MIT
 The MIT License (MIT)
@@ -12909,7 +12882,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: rimraf
-Version: 2.6.3
+Version: 2.7.1
 Description: A deep deletion module for node (like `rm -rf`)
 License: ISC
 The ISC License
@@ -13121,7 +13094,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: semver
-Version: 5.7.0
+Version: 5.7.1
 Description: The semantic version parser used by npm.
 License: ISC
 The ISC License
@@ -13171,7 +13144,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: serialize-javascript
-Version: 1.7.0
+Version: 1.9.1
 Description: Serialize JavaScript to a superset of JSON that includes regular expressions and functions.
 License: BSD-3-Clause
 Copyright 2014 Yahoo! Inc.
@@ -13725,7 +13698,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: source-map-support
-Version: 0.5.13
+Version: 0.5.16
 Description: Fixes stack traces for files with source maps
 License: MIT
 The MIT License (MIT)
@@ -15167,7 +15140,7 @@ THE SOFTWARE.
 
 ================================================================================
 Package: tar
-Version: 4.4.10
+Version: 4.4.13
 Description: tar for node
 License: ISC
 The ISC License
@@ -15188,7 +15161,7 @@ IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ================================================================================
 Package: terser
-Version: 4.1.3
+Version: 4.4.0
 Description: JavaScript parser, mangler/compressor and beautifier toolkit for ES6+
 License: BSD-2-Clause
 UglifyJS is released under the BSD license:
@@ -15291,9 +15264,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ================================================================================
 Package: timers-browserify
-Version: 2.0.10
+Version: 2.0.11
 Description: timers module for browserify
-License: [{"type":"MIT","url":"https://github.com/jryans/timers-browserify/blob/master/LICENSE.md"}]
+License: MIT
 # timers-browserify
 
 This project uses the [MIT](http://jryans.mit-license.org/) license:
@@ -15635,7 +15608,7 @@ SOFTWARE.
 
 ================================================================================
 Package: ts-node
-Version: 8.3.0
+Version: 8.5.2
 Description: TypeScript execution environment and REPL for node.js, with source map support
 License: MIT
 The MIT License (MIT)
@@ -15723,7 +15696,7 @@ END OF TERMS AND CONDITIONS
 
 ================================================================================
 Package: tslint
-Version: 5.18.0
+Version: 5.20.1
 Description: An extensible static analysis linter for the TypeScript language
 License: Apache-2.0
                                  Apache License
@@ -16221,7 +16194,7 @@ License: MIT
 
 ================================================================================
 Package: typedoc
-Version: 0.15.0
+Version: 0.15.2
 Description: Create api documentation for TypeScript projects.
 License: Apache-2.0
 Apache License
@@ -16427,7 +16400,7 @@ Apache License
    limitations under the License.
 ================================================================================
 Package: typedoc-default-themes
-Version: 0.6.0
+Version: 0.6.1
 Description: Default themes for TypeDoc.
 License: Apache-2.0
 Apache License
@@ -16694,7 +16667,7 @@ END OF TERMS AND CONDITIONS
 
 ================================================================================
 Package: uglify-js
-Version: 3.6.0
+Version: 3.6.9
 Description: JavaScript parser, mangler/compressor and beautifier toolkit
 License: BSD-2-Clause
 UglifyJS is released under the BSD license:
@@ -16952,10 +16925,10 @@ THE SOFTWARE.
 
 ================================================================================
 Package: upath
-Version: 1.1.2
+Version: 1.2.0
 Description: A proxy to `path`, replacing `\` with `/` for all results & new methods to normalize & join keeping leading `./` and add, change, default, trim file extensions.
 License: MIT
-Copyright(c) 2014-2017 Angelos Pikoulas (agelos.pikoulas@gmail.com)
+Copyright(c) 2014-2019 Angelos Pikoulas (agelos.pikoulas@gmail.com)
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
@@ -17377,7 +17350,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: uuid
-Version: 3.3.2
+Version: 3.3.3
 Description: RFC4122 (v1, v4, and v5) UUIDs
 License: MIT
 The MIT License (MIT)
@@ -17692,10 +17665,10 @@ THE SOFTWARE
 
 ================================================================================
 Package: vm-browserify
-Version: 1.1.0
+Version: 1.1.2
 Description: vm module for the browser
 License: MIT
-This software is released under the MIT license:
+MIT License
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -17924,7 +17897,7 @@ License: Apache-2.0
 
 ================================================================================
 Package: webpack
-Version: 4.39.1
+Version: 4.41.2
 Description: Packs CommonJs/AMD modules for the browser. Allows to split your codebase into multiple bundles, which can be loaded on demand. Support loaders to preprocess files, i.e. json, jsx, es7, css, less, ... and your custom stuff.
 License: MIT
 Copyright JS Foundation and other contributors
@@ -17950,7 +17923,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: webpack-bundle-analyzer
-Version: 3.4.1
+Version: 3.6.0
 Description: Webpack plugin and CLI utility that represents bundle content as convenient interactive zoomable treemap
 License: MIT
 Copyright JS Foundation and other contributors
@@ -17976,7 +17949,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ================================================================================
 Package: webpack-cli
-Version: 3.3.6
+Version: 3.3.10
 Description: CLI for webpack & friends
 License: MIT
 Copyright JS Foundation and other contributors
@@ -18028,7 +18001,7 @@ SOFTWARE.
 
 ================================================================================
 Package: webpack-merge
-Version: 4.2.1
+Version: 4.2.2
 Description: Variant of merge that's useful for webpack configuration
 License: MIT
 Copyright (c) 2015 Juho Vepsalainen
@@ -18138,6 +18111,33 @@ WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+
+================================================================================
+Package: word-wrap
+Version: 1.2.3
+Description: Wrap words to a specified length.
+License: MIT
+The MIT License (MIT)
+
+Copyright (c) 2014-2017, Jon Schlinkert
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 ================================================================================
 Package: wordwrap
@@ -18292,7 +18292,7 @@ THIS SOFTWARE.
 
 ================================================================================
 Package: yallist
-Version: 3.0.3
+Version: 3.1.1
 Description: Yet Another Linked List
 License: ISC
 The ISC License

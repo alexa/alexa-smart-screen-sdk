@@ -13,5 +13,5 @@ import { FocusState } from './FocusState';
  * @exports
  */
 export interface IChannelObserver {
-    focusChanged(focusState : FocusState) : void;
+    focusChanged(focusState : FocusState, token : number) : void;
 }

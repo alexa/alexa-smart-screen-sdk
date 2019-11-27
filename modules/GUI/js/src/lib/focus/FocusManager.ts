@@ -61,7 +61,7 @@ export class FocusManager {
      *
      * @param token Requestor token received while acquiring channel.
      */
-    public async releaseFocus(token : number) {
+    public releaseFocus(token : number) {
         const requesterInfo : IRequesterInfo = this.tokenToInfoMap.get(token);
         if (requesterInfo) {
             this.focusBridge.releaseFocus(requesterInfo.channelName, token);
@@ -92,7 +92,7 @@ export class FocusManager {
         const focusState : FocusState = FocusState[focusStateString as keyof typeof FocusState];
         const requesterInfo = this.tokenToInfoMap.get(token);
         if (requesterInfo) {
-            requesterInfo.channelObserver.focusChanged(focusState);
+            requesterInfo.channelObserver.focusChanged(focusState, token);
 
             // If NONE, then it was released. Clean up info here.
             if (FocusState.NONE === focusState) {

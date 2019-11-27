@@ -618,6 +618,11 @@ bool SampleApplication::initialize(
 
     m_guiClient = gui::GUIClient::create(webSocketServer, miscStorage);
 
+    if (!m_guiClient) {
+        ACSDK_CRITICAL(LX("Creation of GUIClient failed!"));
+        return false;
+    }
+
     auto aplCoreConnectionManager = std::make_shared<AplCoreConnectionManager>(m_guiClient);
     auto aplCoreGuiRenderer =
         std::make_shared<AplCoreGuiRenderer>(aplCoreConnectionManager, httpContentFetcherFactory);

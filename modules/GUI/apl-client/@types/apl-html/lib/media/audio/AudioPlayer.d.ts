@@ -8,6 +8,7 @@ export declare abstract class AudioPlayer {
     private resourceMap;
     private currentSource;
     private decodePromise;
+    private static logger;
     constructor(eventListener: IAudioEventListener);
     prepare(url: string, decodeMarkers: boolean): string;
     protected onPlaybackFinished(id: string): void;

@@ -2,7 +2,7 @@
   "name": "apl-client",
   "version": "1.2.0",
   "description": "this version supports APL 1.2",
-  "repository": "hash:aad8d70",
+  "repository": "hash:9892a5f4",
   "main": "index.js",
   "types": "./index.d.ts"
 }
