@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -98,7 +98,9 @@ public:
 
     /// @name ChannelObserverInterface Functions
     /// @{
-    void onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState newFocus) override;
+    void onFocusChanged(
+        alexaClientSDK::avsCommon::avs::FocusState newFocus,
+        alexaClientSDK::avsCommon::avs::MixingBehavior behavior) override;
     /// @}
 
     /// @name RenderPlayerInfoCardsObserverInterface Functions
@@ -274,7 +276,8 @@ private:
      *
      * @param clearedNonPlayerInfoDisplayType The @c NonPlayerInfoDisplayType of the cleared non player info card.
      */
-    void executeNonPlayerInfoCardCleared(smartScreenSDKInterfaces::NonPlayerInfoDisplayType clearedNonPlayerInfoDisplayType);
+    void executeNonPlayerInfoCardCleared(
+        smartScreenSDKInterfaces::NonPlayerInfoDisplayType clearedNonPlayerInfoDisplayType);
 
     /**
      * This is an internal function that handles updating the @c m_audioItemInExecution when the @c AudioPlayer

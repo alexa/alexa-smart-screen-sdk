@@ -3,12 +3,12 @@ set(SampleApp_SOURCES)
 list(APPEND SampleApp_SOURCES
     AplCoreConnectionManager.cpp
     AplCoreEngineSDKLogBridge.cpp
+    AplCoreGuiContentDownloadManager.cpp
     AplCoreGuiRenderer.cpp
     AplCoreMetrics.cpp
     AplCoreTextMeasurement.cpp
     ConnectionObserver.cpp
     ConsolePrinter.cpp
-    FocusBridge.cpp
     GUILogBridge.cpp
     GUI/GUIClient.cpp
     GUI/GUIManager.cpp
@@ -40,8 +40,8 @@ ENDIF()
 
 add_executable(SampleApp ${SampleApp_SOURCES})
 target_include_directories(SampleApp PUBLIC
-    "${ASDK_INCLUDE_DIRS}"
     "${SampleApp_SOURCE_DIR}/include"
+    "${ASDK_INCLUDE_DIRS}"
     "${AudioResources_SOURCE_DIR}/include"
     "${RegistrationManager_SOURCE_DIR}/include"
     "${ESP_SOURCE_DIR}/include"
@@ -129,7 +129,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         "-framework Carbon")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     target_link_libraries(SampleApp
-      rt m pthread asound
+      rt m pthread asound atomic
       "-Wl,-rpath,${ASDK_LIBRARY_DIRS}")
 endif()
 

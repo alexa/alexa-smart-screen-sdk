@@ -70,6 +70,13 @@ public:
         const std::shared_ptr<alexaClientSDK::capabilityAgents::doNotDisturb::DoNotDisturbCapabilityAgent>& dndCA);
 
     /**
+     * Configures alarm volume ramp setting.
+     *
+     * @return This builder to allow nested calls.
+     */
+    DeviceSettingsManagerBuilder& withAlarmVolumeRampSetting();
+
+    /**
      * Configures wake word confirmation setting.
      *
      * @return This builder to allow nested calls.

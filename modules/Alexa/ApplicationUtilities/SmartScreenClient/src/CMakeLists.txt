@@ -24,6 +24,10 @@ if (COMMS)
     target_link_libraries(SmartScreenClient CallManager)
 endif()
 
+if (CAPTIONS)
+    target_link_libraries(SmartScreenClient CaptionsLib)
+endif()
+
 if (PCC)
     target_link_libraries(SmartScreenClient PhoneCallController)
 endif()
@@ -36,6 +40,10 @@ if (MRM AND MRM_STANDALONE_APP)
     target_link_libraries(SmartScreenClient MRM MRMHandlerProxy)
 elseif (MRM)
     target_link_libraries(SmartScreenClient MRM MRMHandler)
+endif()
+
+if (METRICS)
+    target_link_libraries(SmartScreenClient SampleMetricSink MetricRecorder)
 endif()
 
 if (OPUS)

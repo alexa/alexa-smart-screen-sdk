@@ -33,7 +33,7 @@ macro(discover_unit_tests includes libraries)
             if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
                 target_link_libraries(${testname} "-rpath ${ASDK_LIBRARY_DIRS}")
             elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-                target_link_libraries(${testname} "-Wl,-rpath,${ASDK_LIBRARY_DIRS}")
+                target_link_libraries(${testname} "-Wl,-rpath,${ASDK_LIBRARY_DIRS}" atomic)
             endif()
 
             configure_test_command(${testname} "${inputs}" ${testsourcefile})

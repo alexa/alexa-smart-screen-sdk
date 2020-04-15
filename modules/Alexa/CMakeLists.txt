@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 project(AlexaModule LANGUAGES CXX)
 
 find_package(PkgConfig)
-pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.15.0)
+pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.19.0)
 
 include(build/BuildDefaults.cmake)
 include(tools/Testing.cmake)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2018-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -310,12 +310,12 @@ private:
     /**
      * Should be called after a user wishes to modify the volume.
      */
-    void adjustVolume(alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface::Type type, int8_t delta);
+    void adjustVolume(alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type, int8_t delta);
 
     /**
      * Should be called after a user wishes to set mute.
      */
-    void setMute(alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface::Type type, bool mute);
+    void setMute(alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type type, bool mute);
 
     /**
      * Reset the device and remove any customer data.

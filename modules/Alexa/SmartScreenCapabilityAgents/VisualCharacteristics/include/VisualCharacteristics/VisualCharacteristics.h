@@ -25,6 +25,7 @@
 #include <AVSCommon/SDKInterfaces/CapabilityConfigurationInterface.h>
 #include <AVSCommon/SDKInterfaces/ContextManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/StateProviderInterface.h>
+#include <AVSCommon/Utils/RequiresShutdown.h>
 #include <AVSCommon/Utils/Threading/Executor.h>
 
 namespace alexaSmartScreenSDK {
@@ -43,7 +44,8 @@ namespace visualCharacteristics {
 class VisualCharacteristics
         : public alexaClientSDK::avsCommon::sdkInterfaces::CapabilityConfigurationInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::StateProviderInterface
-        , public std::enable_shared_from_this<VisualCharacteristics> {
+        , public std::enable_shared_from_this<VisualCharacteristics>
+        , public alexaClientSDK::avsCommon::utils::RequiresShutdown {
 public:
     /**
      * Create an instance of @c VisualCharacteristics.
@@ -88,6 +90,11 @@ private:
      */
     void getVisualCharacteristicsCapabilityConfiguration();
 
+    // @name RequiresShutdown Functions
+    /// @{
+    void doShutdown() override;
+    /// @}
+
     /// Set of capability configurations that will get published using the Capabilities API
     std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityConfiguration>>
         m_capabilityConfigurations;
@@ -97,6 +104,9 @@ private:
 
     /// The payload for device window state received from client
     std::string m_deviceWindowState;
+
+    /// This is the worker thread for the @c VisualCharacteristics CA.
+    alexaClientSDK::avsCommon::utils::threading::Executor m_executor;
 };
 
 }  // namespace visualCharacteristics

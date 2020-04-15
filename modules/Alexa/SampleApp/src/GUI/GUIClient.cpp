@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -244,70 +244,106 @@ GUIClient::GUIClient(
         m_shouldRestart{false},
         m_miscStorage{miscStorage} {
     m_messageHandlers.emplace(
-        MESSAGE_TYPE_TAP_TO_TALK, [this](rapidjson::Document& payload) { handleTapToTalk(payload); });
+        MESSAGE_TYPE_TAP_TO_TALK, [this](rapidjson::Document& payload) { executeHandleTapToTalk(payload); });
     m_messageHandlers.emplace(
-        MESSAGE_TYPE_HOLD_TO_TALK, [this](rapidjson::Document& payload) { handleHoldToTalk(payload); });
+        MESSAGE_TYPE_HOLD_TO_TALK, [this](rapidjson::Document& payload) { executeHandleHoldToTalk(payload); });
     m_messageHandlers.emplace(MESSAGE_TYPE_FOCUS_ACQUIRE_REQUEST, [this](rapidjson::Document& payload) {
-        handleFocusAcquireRequest(payload);
+        executeHandleFocusAcquireRequest(payload);
     });
     m_messageHandlers.emplace(MESSAGE_TYPE_FOCUS_RELEASE_REQUEST, [this](rapidjson::Document& payload) {
-        handleFocusReleaseRequest(payload);
+        executeHandleFocusReleaseRequest(payload);
     });
     m_messageHandlers.emplace(
         MESSAGE_TYPE_ON_FOCUS_CHANGED_RECEIVED_CONFIRMATION,
-        [this](rapidjson::Document& payload) { handleOnFocusChangedReceivedConfirmation(payload); });
+        [this](rapidjson::Document& payload) { executeHandleOnFocusChangedReceivedConfirmation(payload); });
     m_messageHandlers.emplace(MESSAGE_TYPE_RENDER_STATIC_DOCUMENT, [this](rapidjson::Document& payload) {
-        handleRenderStaticDocument(payload);
+        executeHandleRenderStaticDocument(payload);
     });
     m_messageHandlers.emplace(
-        MESSAGE_TYPE_EXECUTE_COMMANDS, [this](rapidjson::Document& payload) { handleExecuteCommands(payload); });
+        MESSAGE_TYPE_EXECUTE_COMMANDS, [this](rapidjson::Document& payload) { executeHandleExecuteCommands(payload); });
     m_messageHandlers.emplace(
-        MESSAGE_TYPE_ACTIVITY_EVENT, [this](rapidjson::Document& payload) { handleActivityEvent(payload); });
+        MESSAGE_TYPE_ACTIVITY_EVENT, [this](rapidjson::Document& payload) { executeHandleActivityEvent(payload); });
     m_messageHandlers.emplace(
-        MESSAGE_TYPE_NAVIGATION_EVENT, [this](rapidjson::Document& payload) { handleNavigationEvent(payload); });
+        MESSAGE_TYPE_NAVIGATION_EVENT, [this](rapidjson::Document& payload) { executeHandleNavigationEvent(payload); });
     m_messageHandlers.emplace(
-        MESSAGE_TYPE_APL_EVENT, [this](rapidjson::Document& payload) { handleAplEvent(payload); });
+        MESSAGE_TYPE_APL_EVENT, [this](rapidjson::Document& payload) { executeHandleAplEvent(payload); });
     m_messageHandlers.emplace(
-        MESSAGE_TYPE_LOG_EVENT, [this](rapidjson::Document& payload) { handleLogEvent(payload); });
-    m_messageHandlers.emplace(
-        MESSAGE_TYPE_DEVICE_WINDOW_STATE, [this](rapidjson::Document& payload) { handleDeviceWindowState(payload); });
+        MESSAGE_TYPE_LOG_EVENT, [this](rapidjson::Document& payload) { executeHandleLogEvent(payload); });
+    m_messageHandlers.emplace(MESSAGE_TYPE_DEVICE_WINDOW_STATE, [this](rapidjson::Document& payload) {
+        executeHandleDeviceWindowState(payload);
+    });
 }
 
 void GUIClient::doShutdown() {
+    ACSDK_DEBUG3(LX(__func__));
     stop();
     m_executor.shutdown();
+    m_guiManager.reset();
+    m_aplCoreConnectionManager.reset();
+    m_aplCoreGuiRenderer.reset();
+    m_messageListener.reset();
+    m_observer.reset();
+    m_miscStorage.reset();
+    m_serverImplementation.reset();
+
+    std::lock_guard<std::mutex> lock{m_mapMutex};
+    m_focusObservers.clear();
 }
 
 void GUIClient::setGUIManager(
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIServerInterface> guiManager) {
-    m_guiManager = guiManager;
-    if (!m_aplCoreConnectionManager) {
-        ACSDK_ERROR(LX("setGUIManagerFailed").d("reason", "nullAplCoreConnectionManager"));
-        return;
-    }
-    if (!m_aplCoreGuiRenderer) {
-        ACSDK_ERROR(LX("setGUIManagerFailed").d("reason", "nullAplCoreGuiRenderer"));
-        return;
-    }
-    m_aplCoreConnectionManager->setGuiManager(guiManager);
-    m_aplCoreGuiRenderer->setGuiManager(guiManager);
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this, guiManager]() {
+        if (!m_aplCoreConnectionManager) {
+            ACSDK_ERROR(LX("setGUIManagerFailed").d("reason", "nullAplCoreConnectionManager"));
+            return;
+        }
+        if (!m_aplCoreGuiRenderer) {
+            ACSDK_ERROR(LX("setGUIManagerFailed").d("reason", "nullAplCoreGuiRenderer"));
+            return;
+        }
+        m_guiManager = guiManager;
+        m_aplCoreConnectionManager->setGuiManager(guiManager);
+        m_aplCoreGuiRenderer->setGuiManager(guiManager);
+    });
 }
 
 void GUIClient::setAplCoreConnectionManager(std::shared_ptr<AplCoreConnectionManager> aplCoreConnectionManager) {
-    m_aplCoreConnectionManager = aplCoreConnectionManager;
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this, aplCoreConnectionManager]() { m_aplCoreConnectionManager = aplCoreConnectionManager; });
 }
 
 void GUIClient::setAplCoreGuiRenderer(std::shared_ptr<AplCoreGuiRenderer> aplCoreGuiRenderer) {
-    m_aplCoreGuiRenderer = aplCoreGuiRenderer;
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this, aplCoreGuiRenderer]() { m_aplCoreGuiRenderer = aplCoreGuiRenderer; });
 }
 
 bool GUIClient::acquireFocus(
     std::string channelName,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
-    return m_guiManager->handleFocusAcquireRequest(channelName, channelObserver);
+    ACSDK_DEBUG5(LX(__func__));
+
+    return m_executor
+        .submit([this, channelName, channelObserver]() { return executeAcquireFocus(channelName, channelObserver); })
+        .get();
 }
 
 bool GUIClient::releaseFocus(
+    std::string channelName,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
+    ACSDK_DEBUG5(LX(__func__));
+    return m_executor
+        .submit([this, channelName, channelObserver]() { return executeReleaseFocus(channelName, channelObserver); })
+        .get();
+}
+
+bool GUIClient::executeAcquireFocus(
+    std::string channelName,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
+    return m_guiManager->handleFocusAcquireRequest(channelName, channelObserver);
+}
+
+bool GUIClient::executeReleaseFocus(
     std::string channelName,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
     return m_guiManager->handleFocusReleaseRequest(channelName, channelObserver);
@@ -318,70 +354,82 @@ bool GUIClient::isReady() {
 }
 
 void GUIClient::setMessageListener(std::shared_ptr<MessageListenerInterface> messageListener) {
-    std::lock_guard<std::mutex> lock(m_mutex);
-
-    m_messageListener = messageListener;
+    m_executor.submit([this, messageListener]() {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        m_messageListener = messageListener;
+    });
 }
 
 bool GUIClient::start() {
-    // start the server asynchronously.
-    m_serverThread = std::thread(&GUIClient::serverThread, this);
+    m_executor.submit([this]() {
+        // start the server asynchronously.
+        m_serverThread = std::thread(&GUIClient::serverThread, this);
+        m_serverThread.detach();
+    });
 
     return true;
 };
 
 void GUIClient::serverThread() {
-    ACSDK_DEBUG9(LX("serverThread"));
+    ACSDK_DEBUG3(LX("serverThread"));
+    if (m_serverImplementation) {
+        m_serverImplementation->setMessageListener(shared_from_this());
+        m_serverImplementation->setObserver(shared_from_this());
 
-    m_serverImplementation->setMessageListener(shared_from_this());
-    m_serverImplementation->setObserver(shared_from_this());
+        m_hasServerStarted = true;
 
-    m_hasServerStarted = true;
-
-    if (!m_serverImplementation->start()) {
-        m_hasServerStarted = false;
-        m_errorState = true;
-        ACSDK_ERROR(LX("serverThreadFailed").d("reason", "start failed"));
-        return;
+        if (!m_serverImplementation->start()) {
+            m_hasServerStarted = false;
+            m_errorState = true;
+            ACSDK_ERROR(LX("serverThreadFailed").d("reason", "start failed"));
+            return;
+        }
+    } else {
+        ACSDK_ERROR(LX("serverThreadFailed").d("reason", "noServerImplementation"));
     }
 }
 
 void GUIClient::stop() {
-    if (m_hasServerStarted) {
-        m_serverImplementation->stop();
-    }
-    m_hasServerStarted = m_initMessageReceived = m_errorState = false;
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this]() {
+        if (m_hasServerStarted) {
+            m_serverImplementation->stop();
+        }
+        m_hasServerStarted = m_initMessageReceived = m_errorState = false;
+    });
 }
 
 void GUIClient::onMessage(const std::string& jsonPayload) {
-    ACSDK_DEBUG9(LX(__func__).d("payload", jsonPayload));
-    rapidjson::Document message;
-    rapidjson::ParseResult result = message.Parse(jsonPayload);
-    if (!result) {
-        ACSDK_ERROR(LX("onMessageFailed").d("reason", "parsingPayloadFailed").d("message", jsonPayload));
-        return;
-    }
-
-    if (m_messageListener) {
-        m_messageListener->onMessage(jsonPayload);
-    }
-
-    std::string messageType;
-    if (!jsonUtils::retrieveValue(message, TYPE_TAG, &messageType)) {
-        ACSDK_ERROR(LX("onMessageFailed").d("reason", "typeNotFound").sensitive("message", jsonPayload));
-        return;
-    }
-
-    if (MESSAGE_TYPE_INIT_RESPONSE == messageType) {
-        processInitResponse(message);
-    } else {
-        auto messageHandler = m_messageHandlers.find(messageType);
-        if (messageHandler != m_messageHandlers.end()) {
-            messageHandler->second(message);
-        } else {
-            ACSDK_WARN(LX("onMessageFailed").d("reason", "unknownType").d("type", messageType));
+    m_executor.submit([this, jsonPayload]() {
+        ACSDK_DEBUG9(LX("onMessageInExector").d("payload", jsonPayload));
+        rapidjson::Document message;
+        rapidjson::ParseResult result = message.Parse(jsonPayload);
+        if (!result) {
+            ACSDK_ERROR(LX("onMessageFailed").d("reason", "parsingPayloadFailed").d("message", jsonPayload));
+            return;
         }
-    }
+
+        if (m_messageListener) {
+            m_messageListener->onMessage(jsonPayload);
+        }
+
+        std::string messageType;
+        if (!jsonUtils::retrieveValue(message, TYPE_TAG, &messageType)) {
+            ACSDK_ERROR(LX("onMessageFailed").d("reason", "typeNotFound").sensitive("message", jsonPayload));
+            return;
+        }
+
+        if (MESSAGE_TYPE_INIT_RESPONSE == messageType) {
+            executeProcessInitResponse(message);
+        } else {
+            auto messageHandler = m_messageHandlers.find(messageType);
+            if (messageHandler != m_messageHandlers.end()) {
+                messageHandler->second(message);
+            } else {
+                ACSDK_WARN(LX("onMessageFailed").d("reason", "unknownType").d("type", messageType));
+            }
+        }
+    });
 }
 
 void GUIClient::executeCommands(const std::string& command, const std::string& token) {
@@ -389,24 +437,24 @@ void GUIClient::executeCommands(const std::string& command, const std::string& t
 }
 
 void GUIClient::provideState(const unsigned int stateRequestToken) {
-    m_aplCoreConnectionManager->provideState(stateRequestToken);
+    m_executor.submit([this, stateRequestToken]() { m_aplCoreConnectionManager->provideState(stateRequestToken); });
 }
 
 void GUIClient::interruptCommandSequence() {
-    m_aplCoreGuiRenderer->interruptCommandSequence();
+    m_executor.submit([this]() { m_aplCoreGuiRenderer->interruptCommandSequence(); });
 }
 
-void GUIClient::handleTapToTalk(rapidjson::Document& message) {
+void GUIClient::executeHandleTapToTalk(rapidjson::Document& message) {
     m_guiManager->handleTapToTalk();
 }
 
-void GUIClient::handleHoldToTalk(rapidjson::Document& message) {
+void GUIClient::executeHandleHoldToTalk(rapidjson::Document& message) {
     m_guiManager->handleHoldToTalk();
 }
 
-void GUIClient::handleFocusAcquireRequest(rapidjson::Document& message) {
+void GUIClient::executeHandleFocusAcquireRequest(rapidjson::Document& message) {
     ACSDK_CRITICAL(LX("handleFocusAcquireRequest"));
-    FocusBridge::APLToken token;
+    APLToken token;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleFocusAcquireRequestFailed").d("reason", "tokenNotFound"));
         return;
@@ -418,15 +466,36 @@ void GUIClient::handleFocusAcquireRequest(rapidjson::Document& message) {
         return;
     }
 
-    processFocusAcquireRequest(token, channelName, APL_INTERFACE);
+    executeProcessFocusAcquireRequest(token, channelName, APL_INTERFACE);
 }
 
-void GUIClient::processFocusAcquireRequest(
+void GUIClient::executeHandleLogEvent(rapidjson::Document& message) {
+    std::string level;
+    if (!jsonUtils::retrieveValue(message, LEVEL_TAG, &level)) {
+        ACSDK_ERROR(LX("handleLogEventFailed").d("reason", "levelNotFound"));
+        return;
+    }
+
+    std::string component;
+    if (!jsonUtils::retrieveValue(message, COMPONENT_TAG, &component)) {
+        ACSDK_ERROR(LX("handleLogEventFailed").d("reason", "componentNotFound"));
+        return;
+    }
+
+    std::string logMessage;
+    if (!jsonUtils::retrieveValue(message, MESSAGE_TAG, &logMessage)) {
+        ACSDK_ERROR(LX("handleLogEventFailed").d("reason", "messageNotFound"));
+        return;
+    }
+
+    m_rendererLogBridge.log(level, component, logMessage);
+}
+
+void GUIClient::executeProcessFocusAcquireRequest(
     const APLToken token,
     const std::string& channelName,
     const std::string& avsInterface) {
-    m_executor.submit(
-        [this, token, channelName, avsInterface]() { executeFocusAcquireRequest(token, channelName, avsInterface); });
+    executeFocusAcquireRequest(token, channelName, avsInterface);
 }
 
 void GUIClient::executeFocusAcquireRequest(
@@ -447,23 +516,23 @@ void GUIClient::executeFocusAcquireRequest(
 
     if (!result) {
         ACSDK_ERROR(LX("executeFocusAcquireRequestFail").d("token", token).d("reason", "observer already exists"));
-        sendFocusResponse(token, false);
+        executeSendFocusResponse(token, false);
         return;
     }
 
-    result = acquireFocus(channelName, focusObserver);
+    result = executeAcquireFocus(channelName, focusObserver);
     if (!result) {
         ACSDK_ERROR(
             LX("executeFocusAcquireRequestFail").d("token", token).d("reason", "acquireChannel returned false"));
-        sendFocusResponse(token, false);
+        executeSendFocusResponse(token, false);
         return;
     }
 
-    sendFocusResponse(token, true);
+    executeSendFocusResponse(token, true);
 }
 
-void GUIClient::handleFocusReleaseRequest(rapidjson::Document& message) {
-    FocusBridge::APLToken token;
+void GUIClient::executeHandleFocusReleaseRequest(rapidjson::Document& message) {
+    APLToken token;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleFocusReleaseRequestFailed").d("reason", "tokenNotFound"));
         return;
@@ -475,11 +544,7 @@ void GUIClient::handleFocusReleaseRequest(rapidjson::Document& message) {
         return;
     }
 
-    processFocusReleaseRequest(token, channelName);
-}
-
-void GUIClient::processFocusReleaseRequest(const APLToken token, const std::string& channelName) {
-    m_executor.submit([this, token, channelName]() { executeFocusReleaseRequest(token, channelName); });
+    executeFocusReleaseRequest(token, channelName);
 }
 
 void GUIClient::executeFocusReleaseRequest(const APLToken token, const std::string& channelName) {
@@ -498,26 +563,26 @@ void GUIClient::executeFocusReleaseRequest(const APLToken token, const std::stri
 
     if (!result || !focusObserver) {
         ACSDK_ERROR(LX("executeFocusReleaseRequestFail").d("token", token).d("reason", "no observer found"));
-        sendFocusResponse(token, false);
+        executeSendFocusResponse(token, false);
         return;
     }
 
-    result = releaseFocus(channelName, focusObserver);
+    result = executeReleaseFocus(channelName, focusObserver);
     if (!result) {
         ACSDK_ERROR(
             LX("executeFocusReleaseRequestFail").d("token", token).d("reason", "releaseChannel returned false"));
-        sendFocusResponse(token, false);
+        executeSendFocusResponse(token, false);
         return;
     }
-    sendFocusResponse(token, true);
+    executeSendFocusResponse(token, true);
 }
 
-void GUIClient::sendFocusResponse(const APLToken token, const bool result) {
+void GUIClient::executeSendFocusResponse(const APLToken token, const bool result) {
     auto message = messages::FocusResponseMessage(token, result);
     sendMessage(message);
 }
 
-void GUIClient::handleOnFocusChangedReceivedConfirmation(rapidjson::Document& message) {
+void GUIClient::executeHandleOnFocusChangedReceivedConfirmation(rapidjson::Document& message) {
     APLToken token;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleOnFocusChangedReceivedConfirmationFailed").d("reason", "tokenNotFound"));
@@ -537,7 +602,7 @@ void GUIClient::handleOnFocusChangedReceivedConfirmation(rapidjson::Document& me
     }
 }
 
-void GUIClient::handleRenderStaticDocument(rapidjson::Document& message) {
+void GUIClient::executeHandleRenderStaticDocument(rapidjson::Document& message) {
     std::string token;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleRenderStaticDocumentFailed").d("reason", "tokenNotFound"));
@@ -556,11 +621,10 @@ void GUIClient::handleRenderStaticDocument(rapidjson::Document& message) {
         return;
     }
 
-    m_executor.submit(
-        [this, payload, token, windowId]() { m_aplCoreGuiRenderer->renderDocument(payload, token, windowId); });
+    m_aplCoreGuiRenderer->renderDocument(payload, AlexaPresentation::NON_APL_DOCUMENT_TOKEN, windowId);
 }
 
-void GUIClient::handleExecuteCommands(rapidjson::Document& message) {
+void GUIClient::executeHandleExecuteCommands(rapidjson::Document& message) {
     std::string token;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleExecuteCommandsFailed").d("reason", "tokenNotFound"));
@@ -573,10 +637,10 @@ void GUIClient::handleExecuteCommands(rapidjson::Document& message) {
         return;
     }
 
-    m_executor.submit([this, payload, token]() { m_aplCoreGuiRenderer->executeCommands(payload, token); });
+    m_aplCoreGuiRenderer->executeCommands(payload, token);
 }
 
-void GUIClient::handleActivityEvent(rapidjson::Document& message) {
+void GUIClient::executeHandleActivityEvent(rapidjson::Document& message) {
     std::string event;
     if (!jsonUtils::retrieveValue(message, EVENT_TAG, &event)) {
         ACSDK_ERROR(LX("handleActivityEventFailed").d("reason", "eventNotFound"));
@@ -591,7 +655,7 @@ void GUIClient::handleActivityEvent(rapidjson::Document& message) {
     m_guiManager->handleActivityEvent(activityEvent);
 }
 
-void GUIClient::handleNavigationEvent(rapidjson::Document& message) {
+void GUIClient::executeHandleNavigationEvent(rapidjson::Document& message) {
     std::string event;
     if (!jsonUtils::retrieveValue(message, EVENT_TAG, &event)) {
         ACSDK_ERROR(LX("handleNavigationEventFailed").d("reason", "eventNotFound"));
@@ -607,7 +671,7 @@ void GUIClient::handleNavigationEvent(rapidjson::Document& message) {
     m_guiManager->handleNavigationEvent(navigationEvent);
 }
 
-void GUIClient::handleAplEvent(rapidjson::Document& message) {
+void GUIClient::executeHandleAplEvent(rapidjson::Document& message) {
     if (!m_aplCoreConnectionManager) {
         ACSDK_ERROR(LX("handleAplEventFailed").d("reason", "APL Core Connection Manager has not been configured"));
         return;
@@ -622,7 +686,7 @@ void GUIClient::handleAplEvent(rapidjson::Document& message) {
     m_aplCoreConnectionManager->onMessage(payload);
 }
 
-void GUIClient::handleDeviceWindowState(rapidjson::Document& message) {
+void GUIClient::executeHandleDeviceWindowState(rapidjson::Document& message) {
     std::string payload;
     if (!jsonUtils::retrieveValue(message, PAYLOAD_TAG, &payload)) {
         ACSDK_ERROR(LX("handleDeviceWindowStateFailed").d("reason", "payloadNotFound"));
@@ -633,53 +697,57 @@ void GUIClient::handleDeviceWindowState(rapidjson::Document& message) {
 }
 
 void GUIClient::setObserver(const std::shared_ptr<MessagingServerObserverInterface>& observer) {
-    m_observer = observer;
+    m_executor.submit([this, observer]() { m_observer = observer; });
 }
 
 void GUIClient::onConnectionOpened() {
     ACSDK_DEBUG3(LX("onConnectionOpened"));
-    if (!m_initThread.joinable()) {
-        m_initThread = std::thread(&GUIClient::sendInitRequestAndWait, this);
-    } else {
-        ACSDK_INFO(LX("onConnectionOpened").m("init thread is not avilable"));
-    }
+    m_executor.submit([this]() {
+        if (!m_initThread.joinable()) {
+            m_initThread = std::thread(&GUIClient::sendInitRequestAndWait, this);
+        } else {
+            ACSDK_INFO(LX("onConnectionOpened").m("init thread is not avilable"));
+        }
 
-    if (m_observer) {
-        m_observer->onConnectionOpened();
-    }
+        if (m_observer) {
+            m_observer->onConnectionOpened();
+        }
+    });
 }
 
 void GUIClient::onConnectionClosed() {
     ACSDK_DEBUG3(LX("onConnectionClosed"));
-    if (!m_serverImplementation->isReady()) {
-        m_initMessageReceived = false;
-    }
+    m_executor.submit([this]() {
+        if (!m_serverImplementation->isReady()) {
+            m_initMessageReceived = false;
+        }
 
-    if (m_initThread.joinable()) {
-        m_initThread.join();
-    }
+        if (m_initThread.joinable()) {
+            m_initThread.join();
+        }
 
-    if (m_observer) {
-        m_observer->onConnectionClosed();
-    }
-    m_aplCoreConnectionManager->onConnectionClosed();
+        if (m_observer) {
+            m_observer->onConnectionClosed();
+        }
+        m_aplCoreConnectionManager->onConnectionClosed();
+    });
 }
 
 void GUIClient::renderTemplateCard(
     const std::string& jsonPayload,
     alexaClientSDK::avsCommon::avs::FocusState focusState) {
-    
     auto message = messages::RenderTemplateMessage(jsonPayload);
     sendMessage(message);
 }
 
 void GUIClient::clearTemplateCard() {
     ACSDK_DEBUG5(LX("clearTemplateCard"));
-    
-    m_aplCoreGuiRenderer->clearDocument();
-    
-    auto message = messages::ClearRenderTemplateCardMessage();
-    sendMessage(message);
+    m_executor.submit([this]() {
+        m_aplCoreGuiRenderer->clearDocument();
+
+        auto message = messages::ClearRenderTemplateCardMessage();
+        executeSendMessage(message);
+    });
 }
 
 void GUIClient::renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) {
@@ -689,25 +757,25 @@ void GUIClient::renderDocument(const std::string& jsonPayload, const std::string
 
 void GUIClient::clearDocument() {
     ACSDK_DEBUG5(LX("clearDocument"));
-    
-    m_aplCoreGuiRenderer->clearDocument();
-    
-    auto message = messages::ClearDocumentMessage();
-    sendMessage(message);
+    m_executor.submit([this]() {
+        m_aplCoreGuiRenderer->clearDocument();
+
+        auto message = messages::ClearDocumentMessage();
+        executeSendMessage(message);
+    });
 }
 
 void GUIClient::renderPlayerInfoCard(
     const std::string& jsonPayload,
     smartScreenSDKInterfaces::AudioPlayerInfo info,
     alexaClientSDK::avsCommon::avs::FocusState focusState) {
-    
     auto message = messages::RenderPlayerInfoMessage(jsonPayload, info);
     sendMessage(message);
 }
 
 void GUIClient::clearPlayerInfoCard() {
     ACSDK_DEBUG5(LX("clearPlayerInfoCard"));
-    
+
     auto message = messages::ClearPlayerInfoCardMessage();
     sendMessage(message);
 }
@@ -718,6 +786,7 @@ std::string GUIClient::getMaxAPLVersion() {
 
 void GUIClient::onLogout() {
     m_shouldRestart = true;
+    m_cond.notify_all();
 }
 
 SampleAppReturnCode GUIClient::run() {
@@ -725,7 +794,8 @@ SampleAppReturnCode GUIClient::run() {
     std::unique_lock<std::mutex> lock(m_mutex);
     m_cond.wait(lock, [this] { return m_shouldRestart || m_errorState; });
     ACSDK_DEBUG3(LX("runExits").d("reason", m_shouldRestart ? "loggedout" : "not initialized"));
-    return m_shouldRestart ? SampleAppReturnCode::RESTART : SampleAppReturnCode::OK;
+    return m_shouldRestart ? SampleAppReturnCode::RESTART
+                           : (m_errorState ? SampleAppReturnCode::ERROR : SampleAppReturnCode::OK);
 }
 
 void GUIClient::sendInitRequestAndWait() {
@@ -753,7 +823,7 @@ void GUIClient::sendInitRequestAndWait() {
     m_aplCoreConnectionManager->onConnectionOpened();
 }
 
-void GUIClient::sendGuiConfiguration() {
+void GUIClient::executeSendGuiConfiguration() {
     ACSDK_DEBUG9(LX(__func__));
 
     /// Get the root ConfigurationNode.
@@ -772,7 +842,7 @@ void GUIClient::sendGuiConfiguration() {
     sendMessage(message);
 }
 
-bool GUIClient::processInitResponse(const rapidjson::Document& message) {
+bool GUIClient::executeProcessInitResponse(const rapidjson::Document& message) {
     bool isSupported;
     if (!jsonUtils::retrieveValue(message, IS_SUPPORTED_TAG, &isSupported)) {
         ACSDK_ERROR(LX("processInitResponseFailed").d("reason", "isSupportedNotFound"));
@@ -801,19 +871,20 @@ bool GUIClient::processInitResponse(const rapidjson::Document& message) {
 
     m_initMessageReceived = true;
     if (newAPLMaxVersion != m_APLMaxVersion) {
-        ACSDK_DEBUG1(LX("processInitResponse").d("old maxAPL", m_APLMaxVersion).d("new max APL", newAPLMaxVersion));
+        ACSDK_DEBUG1(
+            LX("executeProcessInitResponse").d("old maxAPL", m_APLMaxVersion).d("new max APL", newAPLMaxVersion));
         saveAPLMaxVersionInStorage(m_miscStorage, newAPLMaxVersion);
 
         // Restart in order to call Capabilities API with the new APLMAxVersion
         m_shouldRestart = true;
     }
 
-    ACSDK_INFO(LX("processInitResponse").d("APL Max Version", m_APLMaxVersion));
+    ACSDK_INFO(LX("executeProcessInitResponse").d("APL Max Version", m_APLMaxVersion));
     m_cond.notify_all();
     if (m_initThread.joinable()) {
         m_initThread.join();
     }
-    sendGuiConfiguration();
+    executeSendGuiConfiguration();
     return true;
 }
 
@@ -831,12 +902,12 @@ GUIClient::ProxyFocusObserver::ProxyFocusObserver(
     const APLToken token,
     std::shared_ptr<GUIClient> guiClient,
     const std::string& channelName) :
-        m_token{token},
-        m_focusBridge{guiClient},
-        m_channelName{channelName} {
+        m_token{token}, m_focusBridge{guiClient}, m_channelName{channelName} {
 }
 
-void GUIClient::ProxyFocusObserver::onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState newFocus) {
+void GUIClient::ProxyFocusObserver::onFocusChanged(
+    alexaClientSDK::avsCommon::avs::FocusState newFocus,
+    alexaClientSDK::avsCommon::avs::MixingBehavior behavior) {
     if (newFocus != alexaClientSDK::avsCommon::avs::FocusState::NONE) {
         m_focusBridge->startAutoreleaseTimer(m_token, m_channelName);
     }
@@ -855,26 +926,23 @@ void GUIClient::startAutoreleaseTimer(const APLToken token, const std::string& c
 }
 
 void GUIClient::autoRelease(const APLToken token, const std::string& channelName) {
-    ACSDK_WARN(LX("autoRelease").d("token", token).d("channelName", channelName));
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> focusObserver;
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::Timer> autoReleaseTimer;
-    {
-        std::lock_guard<std::mutex> lock{m_mapMutex};
-        focusObserver = m_focusObservers[token];
-        if (!focusObserver) {
-            ACSDK_CRITICAL(LX("autoReleaseFailed").d("token", token).d("reason", "focusObserver is null"));
-            return;
+    ACSDK_DEBUG5(LX("autoRelease").d("token", token).d("channelName", channelName));
+    m_executor.submit([this, token, channelName]() {
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> focusObserver;
+        std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::Timer> autoReleaseTimer;
+        {
+            std::lock_guard<std::mutex> lock{m_mapMutex};
+            focusObserver = m_focusObservers[token];
+            if (!focusObserver) {
+                ACSDK_CRITICAL(LX("autoReleaseFailed").d("token", token).d("reason", "focusObserver is null"));
+                return;
+            }
         }
-    }
-    m_executor.submit(
-        [this, channelName, focusObserver] { m_guiManager->handleFocusReleaseRequest(channelName, focusObserver); });
+        m_guiManager->handleFocusReleaseRequest(channelName, focusObserver);
+    });
 }
 
-void GUIClient::sendOnFocusChanged(
-    const APLToken token,
-    const alexaClientSDK::avsCommon::avs::FocusState state) {
-
-    
+void GUIClient::sendOnFocusChanged(const APLToken token, const alexaClientSDK::avsCommon::avs::FocusState state) {
     auto message = messages::FocusChangedMessage(token, state);
     sendMessage(message);
 
@@ -891,33 +959,19 @@ void GUIClient::sendOnFocusChanged(
     }
 }
 
-void GUIClient::handleLogEvent(rapidjson::Document& message) {
-    std::string level;
-    if (!jsonUtils::retrieveValue(message, LEVEL_TAG, &level)) {
-        ACSDK_ERROR(LX("handleLogEventFailed").d("reason", "levelNotFound"));
-        return;
-    }
-
-    std::string component;
-    if (!jsonUtils::retrieveValue(message, COMPONENT_TAG, &component)) {
-        ACSDK_ERROR(LX("handleLogEventFailed").d("reason", "componentNotFound"));
-        return;
-    }
-
-    std::string logMessage;
-    if (!jsonUtils::retrieveValue(message, MESSAGE_TAG, &logMessage)) {
-        ACSDK_ERROR(LX("handleLogEventFailed").d("reason", "messageNotFound"));
-        return;
-    }
-
-    m_rendererLogBridge.log(level, component, logMessage);
-}
-
 void GUIClient::sendMessage(smartScreenSDKInterfaces::MessageInterface& message) {
     writeMessage(message.get());
 }
 
+void GUIClient::executeSendMessage(smartScreenSDKInterfaces::MessageInterface& message) {
+    executeWriteMessage(message.get());
+}
+
 void GUIClient::writeMessage(const std::string& payload) {
+    m_executor.submit([this, payload]() { executeWriteMessage(payload); });
+}
+
+void GUIClient::executeWriteMessage(const std::string& payload) {
     m_serverImplementation->writeMessage(payload);
 }
 

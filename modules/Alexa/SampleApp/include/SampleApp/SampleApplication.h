@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "ConsolePrinter.h"
@@ -35,13 +36,17 @@
 #include <AndroidSLESMediaPlayer/AndroidSLESMediaPlayer.h>
 #endif
 
-#include "FocusBridge.h"
 #include "AplCoreGuiRenderer.h"
 #include "GUI/GUIClient.h"
 #include "GUI/GUIManager.h"
 
+#ifdef BLUETOOTH_BLUEZ_PULSEAUDIO_OVERRIDE_ENDPOINTS
+#include <BlueZ/PulseAudioBluetoothInitializer.h>
+#endif
+
 #include <CapabilitiesDelegate/CapabilitiesDelegate.h>
 #include <ExternalMediaPlayer/ExternalMediaPlayer.h>
+#include <AVSCommon/Utils/MediaPlayer/PooledMediaPlayerFactory.h>
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -62,12 +67,15 @@ public:
      * @param pathToInputFolder The path to the inputs folder containing data files needed by this application.
      * @param logLevel The level of logging to enable.  If this parameter is an empty string, the SDK's default
      *     logging level will be used.
+     * @param An optional @c DiagnosticsInterface object to provide diagnostics on the SDK.
      * @return A new @c SampleApplication, or @c nullptr if the operation failed.
      */
     static std::unique_ptr<SampleApplication> create(
         const std::vector<std::string>& configFiles,
         const std::string& pathToInputFolder,
-        const std::string& logLevel = "");
+        const std::string& logLevel = "",
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics =
+            nullptr);
 
     /**
      * Runs the application, blocking until the user asks the application to quit or a device reset is triggered.
@@ -84,14 +92,16 @@ public:
      *
      * @param httpContentFetcherFactory The HTTPContentFetcherFactory to be used while creating the mediaPlayers.
      * @param equalizerRuntimeSetup Equalizer runtime setup to register equalizers
-     * @param additionalSpeakers The speakerInterface to add the created mediaPlayer.
+     * @param additionalSpeakers The @c SpeakerInterface to add the created mediaPlayer.
      * @return @c true if the mediaPlayer of all the registered adapters could be created @c false otherwise.
      */
     bool createMediaPlayersForAdapters(
         std::shared_ptr<alexaClientSDK::avsCommon::utils::libcurlUtils::HTTPContentFetcherFactory>
             httpContentFetcherFactory,
         std::shared_ptr<smartScreenClient::EqualizerRuntimeSetup> equalizerRuntimeSetup,
-        std::vector<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface>>& additionalSpeakers);
+        std::multimap<
+            alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type,
+            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface>>& additionalSpeakers);
 
     /**
      * Instances of this class register ExternalMediaAdapters. Each adapter registers itself by instantiating
@@ -101,7 +111,8 @@ public:
     public:
         /**
          * Register an @c ExternalMediaAdapter for use by @c ExternalMediaPlayer.
-         * @param playerId The @c playerId identifying the @c ExtnalMediaAdapter to register.
+         *
+         * @param playerId The @c playerId identifying the @c ExternalMediaAdapter to register.
          * @param createFunction The function to use to create instances of the specified @c ExternalMediaAdapter.
          */
         AdapterRegistration(
@@ -109,21 +120,6 @@ public:
             alexaClientSDK::capabilityAgents::externalMediaPlayer::ExternalMediaPlayer::AdapterCreateFunction
                 createFunction);
     };
-
-    /**
-     * Signature of functions to create a MediaPlayer.
-     *
-     * @param httpContentFetcherFactory The HTTPContentFetcherFactory to be used while creating the mediaPlayers.
-     * @param type The type of the SpeakerInterface.
-     * @param name The name of the MediaPlayer instance.
-     * @return Return shared pointer to the created MediaPlayer instance.
-     */
-    using MediaPlayerCreateFunction = std::shared_ptr<ApplicationMediaPlayer> (*)(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::HTTPContentFetcherInterfaceFactoryInterface>
-            contentFetcherFactory,
-        bool enableEqualizer,
-        alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface::Type type,
-        std::string name);
 
     /**
      * Instances of this class register MediaPlayers to be created. Each third-party adapter registers a mediaPlayer
@@ -136,13 +132,11 @@ public:
          * Register a @c MediaPlayer for use by a music provider adapter.
          *
          * @param playerId The @c playerId identifying the @c ExternalMediaAdapter to register.
-         * @speakerType The SpeakerType of the mediaPlayer to be created.
-         * @param createFunction The function to use to create instances of the mediaPlayer to use for the player.
+         * @param speakerType The SpeakerType of the mediaPlayer to be created.
          */
         MediaPlayerRegistration(
             const std::string& playerId,
-            alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface::Type speakerType,
-            MediaPlayerCreateFunction createFunction);
+            alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type speakerType);
     };
 
 private:
@@ -153,20 +147,22 @@ private:
      * @param pathToInputFolder The path to the inputs folder containing data files needed by this application.
      * @param logLevel The level of logging to enable.  If this parameter is an empty string, the SDK's default
      *     logging level will be used.
+     * @param An optional @c DiagnosticsInterface object to provide diagnostics on the SDK.
      * @return @c true if initialization succeeded, else @c false.
      */
     bool initialize(
         const std::vector<std::string>& configFiles,
         const std::string& pathToInputFolder,
-        const std::string& logLevel);
+        const std::string& logLevel,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics);
 
     /**
      * Create an application media player.
      *
      * @param contentFetcherFactory Used to create objects that can fetch remote HTTP content.
      * @param enableEqualizer Flag indicating if equalizer should be enabled for this media player.
-     * @param type The type used to categorize the speaker for volume control.
      * @param name The media player instance name used for logging purpose.
+     * @param enableLiveMode Flag, indicating if the player is in live mode.
      * @return A pointer to the @c ApplicationMediaPlayer and to its speaker if it succeeds; otherwise, return @c
      * nullptr.
      */
@@ -177,8 +173,8 @@ private:
         std::shared_ptr<alexaClientSDK::avsCommon::utils::libcurlUtils::HTTPContentFetcherFactory>
             httpContentFetcherFactory,
         bool enableEqualizer,
-        alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface::Type type,
-        const std::string& name);
+        const std::string& name,
+        bool enableLiveMode = false);
 
     /// The @c GUIClient
     std::shared_ptr<gui::GUIClient> m_guiClient;
@@ -200,8 +196,11 @@ private:
     /// The @c MediaPlayer used by @c SpeechSynthesizer.
     std::shared_ptr<ApplicationMediaPlayer> m_speakMediaPlayer;
 
-    /// The @c MediaPlayer used by @c AudioPlayer.
-    std::shared_ptr<ApplicationMediaPlayer> m_audioMediaPlayer;
+    /// The @c MediaPlayerFactory used by @c AudioPlayer.
+    std::unique_ptr<alexaClientSDK::mediaPlayer::PooledMediaPlayerFactory> m_audioMediaPlayerFactory;
+
+    /// The Pool of @c MediaPlayers used by @c AudioPlayer (via @c PooledMediaPlayerFactory)
+    std::vector<std::shared_ptr<ApplicationMediaPlayer>> m_audioMediaPlayerPool;
 
     /// The @c MediaPlayer used by @c Alerts.
     std::shared_ptr<ApplicationMediaPlayer> m_alertsMediaPlayer;
@@ -215,17 +214,25 @@ private:
     /// The @c MediaPlayer used by @c SystemSoundPlayer.
     std::shared_ptr<ApplicationMediaPlayer> m_systemSoundMediaPlayer;
 
+#ifdef ENABLE_COMMS_AUDIO_PROXY
+    /// The @c MediaPlayer used by @c Comms.
+    std::shared_ptr<ApplicationMediaPlayer> m_commsMediaPlayer;
+#endif
+
+#ifdef ENABLE_PCC
+    /// The @c MediaPlayer used by PhoneCallController.
+    std::shared_ptr<ApplicationMediaPlayer> m_phoneMediaPlayer;
+#endif
+
     /// The @c CapabilitiesDelegate used by the client.
     std::shared_ptr<alexaClientSDK::capabilitiesDelegate::CapabilitiesDelegate> m_capabilitiesDelegate;
 
     /// The @c MediaPlayer used by @c NotificationsCapabilityAgent.
     std::shared_ptr<ApplicationMediaPlayer> m_ringtoneMediaPlayer;
 
-    using SpeakerTypeAndCreateFunc =
-        std::pair<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface::Type, MediaPlayerCreateFunction>;
-
-    /// The singleton map from @c playerId to @c MediaPlayerCreateFunction.
-    static std::unordered_map<std::string, SpeakerTypeAndCreateFunc> m_playerToMediaPlayerMap;
+    /// The singleton map from @c playerId to @c SpeakerInterface::Type.
+    static std::unordered_map<std::string, alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type>
+        m_playerToSpeakerTypeMap;
 
     /// The singleton map from @c playerId to @c ExternalMediaAdapter creation functions.
     static alexaClientSDK::capabilityAgents::externalMediaPlayer::ExternalMediaPlayer::AdapterCreationMap
@@ -239,6 +246,11 @@ private:
 #if defined(ANDROID_MEDIA_PLAYER) || defined(ANDROID_MICROPHONE)
     /// The android OpenSL ES engine used to create media players and microphone.
     std::shared_ptr<applicationUtilities::androidUtilities::AndroidSLESEngine> m_openSlEngine;
+#endif
+
+#ifdef BLUETOOTH_BLUEZ_PULSEAUDIO_OVERRIDE_ENDPOINTS
+    /// Iniitalizer object to reload PulseAudio Bluetooth modules.
+    std::shared_ptr<bluetoothImplementations::blueZ::PulseAudioBluetoothInitializer> m_pulseAudioInitializer;
 #endif
 };
 

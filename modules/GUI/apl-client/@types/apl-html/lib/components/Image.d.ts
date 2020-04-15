@@ -85,6 +85,7 @@ export declare class Image extends Component<IImageProperties> {
     private allFiltersInCanvas;
     private hasFiltersInCanvas;
     private applyFiltersTimeout;
+    private isShadowHolderAdded;
     constructor(renderer: APLRenderer, component: APL.Component, factory: FactoryFunction, parent?: Component);
     protected boundsUpdated(): void;
     private setBorderRadius;
@@ -95,6 +96,8 @@ export declare class Image extends Component<IImageProperties> {
     private setOverlayColor;
     private setOverlayGradient;
     private setSource;
+    private applyShadowEffectWhenScaled;
+    private hasShadowPropertyDefined;
     /**
      * If there is any blur filter applied after noise, then need to apply
      * both noise and blur filters in canvas, return true

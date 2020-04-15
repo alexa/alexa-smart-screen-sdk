@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -62,7 +62,6 @@
 #include "SampleApp/AplCoreConnectionManager.h"
 #include "SampleApp/AplCoreGuiRenderer.h"
 #include "SampleApp/SampleApplicationReturnCodes.h"
-#include "SampleApp/FocusBridge.h"
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -99,7 +98,8 @@ public:
 
     // @name TemplateRuntimeObserverInterface Functions
     /// @{
-    void renderTemplateCard(const std::string& jsonPayload, alexaClientSDK::avsCommon::avs::FocusState focusState) override;
+    void renderTemplateCard(const std::string& jsonPayload, alexaClientSDK::avsCommon::avs::FocusState focusState)
+        override;
     void clearTemplateCard() override;
     void renderPlayerInfoCard(
         const std::string& jsonPayload,
@@ -214,7 +214,9 @@ private:
 
         /// @name ChannelObserverInterface Functions
         /// @{
-        void onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState newFocus) override;
+        void onFocusChanged(
+            alexaClientSDK::avsCommon::avs::FocusState newFocus,
+            alexaClientSDK::avsCommon::avs::MixingBehavior behavior) override;
         ///@}
 
     private:
@@ -243,93 +245,93 @@ private:
     void sendInitRequestAndWait();
 
     /// Process initResponse message received from the client.
-    bool processInitResponse(const rapidjson::Document& message);
+    bool executeProcessInitResponse(const rapidjson::Document& message);
 
     /// Send viewport characteristic and GUI app config data in structured JSON format.
-    void sendGuiConfiguration();
+    void executeSendGuiConfiguration();
 
     /**
      * Handle TapToTalk event.
      *
      * @param message A complete message object with header and payload.
      */
-    void handleTapToTalk(rapidjson::Document& message);
+    void executeHandleTapToTalk(rapidjson::Document& message);
 
     /**
      * Handle HoldToTalk event.
      *
      * @param message A complete message object with header and payload.
      */
-    void handleHoldToTalk(rapidjson::Document& message);
+    void executeHandleHoldToTalk(rapidjson::Document& message);
 
     /**
      * Handle focus acquire requests.
      *
      * @param message A complete message holding the request.
      */
-    void handleFocusAcquireRequest(rapidjson::Document& message);
+    void executeHandleFocusAcquireRequest(rapidjson::Document& message);
 
     /**
      * Handle focus release requests.
      *
      * @param message A complete message holding the request.
      */
-    void handleFocusReleaseRequest(rapidjson::Document& message);
+    void executeHandleFocusReleaseRequest(rapidjson::Document& message);
 
     /**
      * Handle focus message received confirmation messages.
      *
      * @param message A complete message holding the confirmation.
      */
-    void handleOnFocusChangedReceivedConfirmation(rapidjson::Document& message);
+    void executeHandleOnFocusChangedReceivedConfirmation(rapidjson::Document& message);
 
     /**
      * Handle RenderStaticDocument message.
      *
      * @param message A complete message holding the render document directive.
      */
-    void handleRenderStaticDocument(rapidjson::Document& message);
+    void executeHandleRenderStaticDocument(rapidjson::Document& message);
 
     /**
      * Handle ExecuteCommands message.
      *
      * @param message A complete message holding the confirmation.
      */
-    void handleExecuteCommands(rapidjson::Document& message);
+    void executeHandleExecuteCommands(rapidjson::Document& message);
 
     /**
      * Handle activityEvent message.
      *
      * @param message A complete message holding the event.
      */
-    void handleActivityEvent(rapidjson::Document& message);
+    void executeHandleActivityEvent(rapidjson::Document& message);
 
     /**
      * Handle navigationEvent message.
      *
      * @param message A complete message holding the event.
      */
-    void handleNavigationEvent(rapidjson::Document& message);
+    void executeHandleNavigationEvent(rapidjson::Document& message);
 
     /**
      * Handle logEvent message.
      *
      * @param message A complete message holding the event.
      */
-    void handleLogEvent(rapidjson::Document& message);
+    void executeHandleLogEvent(rapidjson::Document& message);
 
     /**
      * Handle aplEvent message.
      *
      * @param message A complete message holding the event.
      */
-    void handleAplEvent(rapidjson::Document& message);
+    void executeHandleAplEvent(rapidjson::Document& message);
 
     /**
      * Handle deviceWindowState message.
      * @param message A complete message holding the event.
      */
-    void handleDeviceWindowState(rapidjson::Document& message);
+    void executeHandleDeviceWindowState(rapidjson::Document& message);
 
     /// Internal function to execute @see processFocusAcquireRequest
     void executeFocusAcquireRequest(
@@ -346,7 +348,7 @@ private:
      * @param token Requester token.
      * @param result Result of focus operation.
      */
-    void sendFocusResponse(const APLToken token, const bool result);
+    void executeSendFocusResponse(const APLToken token, const bool result);
 
     /**
      * Starting timer to release channel in situations when focus operation result or
@@ -379,18 +381,41 @@ private:
      * @param channelName Name of channel to acquire.
      * @param avsInterface AVS interface to report as owner of channel.
      */
-    void processFocusAcquireRequest(
+    void executeProcessFocusAcquireRequest(
         const APLToken token,
         const std::string& channelName,
         const std::string& avsInterface);
 
     /**
-     * Process FocusManager focus release request from APL.
-     *
-     * @param token Operation token - unique per acquire/release request pair.
-     * @param channelName Name of channel to release.
+     * Sends a GUI Message to the server.
+     * @param message The message to be written.
      */
-    void processFocusReleaseRequest(const APLToken token, const std::string& channelName);
+    void executeSendMessage(smartScreenSDKInterfaces::MessageInterface& message);
+
+    /**
+     * Write a message to the server.
+     *
+     * @param payload an arbitrary string
+     */
+    void executeWriteMessage(const std::string& payload);
+
+    /**
+     * An internal function handling audio focus requests in the executor thread.
+     * @param channelName The channel to be requested.
+     * @param channelObserver the channelObserver to be notified.
+     */
+    bool executeAcquireFocus(
+        std::string channelName,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver);
+
+    /**
+     * An internal function handling release audio focus requests in the executor thread.
+     * @param channelName The channel to be released.
+     * @param channelObserver the channelObserver to be notified.
+     */
+    bool executeReleaseFocus(
+        std::string channelName,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver);
 
     // The GUI manager implementation.
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIServerInterface> m_guiManager;

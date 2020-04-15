@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Amazon Software License (the "License").
  * You may not use this file except in compliance with the License.
@@ -95,7 +95,9 @@ public:
 
     /// @name ChannelObserverInterface Functions
     /// @{
-    void onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState newFocus) override;
+    void onFocusChanged(
+        alexaClientSDK::avsCommon::avs::FocusState newFocus,
+        alexaClientSDK::avsCommon::avs::MixingBehavior behavior) override;
     /// @}
 
     /// @name DialogUXStateObserverInterface Functions
@@ -218,6 +220,11 @@ public:
      * be done prior to this call.
      */
     void setExecutor(const std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor>& executor);
+
+    /**
+     * The placeholder token to use for rendering Non-APL documents
+     */
+    static const std::string NON_APL_DOCUMENT_TOKEN;
 
 private:
     /// Enum for the different events sent by the TemplateRuntime capability agent.

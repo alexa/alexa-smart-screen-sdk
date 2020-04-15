@@ -1,3 +1,21 @@
+### v2.0.2 released 04/14/2019:
+
+#### Bug fixes
+* Added support for Raspbian Buster.
+* Upgrade dependency on Device SDK 1.19
+* Player info no longer waits for the TTS timeout to elapse before being displayed.
+* Fixed a bug with some objects not being properly cleaned-up during shutdown.
+* Timer sounds now stop correctly when dialog is interrupted.
+* Minor fixes in rendering (text truncations for non-English languages, emoji handling, hyphenation).
+* Fixed image scaling and shadows related bug. 
+* Fixed AVG rendering bug.
+* Fixed a HLS Playing bug.
+* Improved APL imports processing latency.
+
+#### Known issues:
+* For some videos with sound, there might be an issue associated with auto-playing such videos in both Chrome and Firefox. Permission changes in browsers are needed for auto-playing those videos.  
+* The build option ENABLE_CAPTIONS does not enable captions. Enabling it will cause undefined behaviour during a build.
+
 ### v2.0.1 released 11/26/2019:
 
 #### Bug Fixes

@@ -30,18 +30,52 @@ public:
     MOCK_METHOD2(
         setStateProvider,
         void(
-            const alexaClientSDK::avsCommon::avs::NamespaceAndName& namespaceAndName,
+            const alexaClientSDK::avsCommon::avs::CapabilityTag& namespaceAndName,
             std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::StateProviderInterface> stateProvider));
     MOCK_METHOD4(
         setState,
         alexaClientSDK::avsCommon::sdkInterfaces::SetStateResult(
-            const alexaClientSDK::avsCommon::avs::NamespaceAndName& namespaceAndName,
+            const alexaClientSDK::avsCommon::avs::CapabilityTag& namespaceAndName,
             const std::string& jsonState,
             const alexaClientSDK::avsCommon::avs::StateRefreshPolicy& refreshPolicy,
             const unsigned int stateRequestToken));
-    MOCK_METHOD1(
+    MOCK_METHOD3(
         getContext,
-        void(std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextRequesterInterface> contextRequester));
+        alexaClientSDK::avsCommon::sdkInterfaces::ContextRequestToken(
+            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextRequesterInterface>,
+            const std::string&,
+            const std::chrono::milliseconds&));
+    MOCK_METHOD3(
+        reportStateChange,
+        void(
+            const alexaClientSDK::avsCommon::avs::CapabilityTag& capabilityIdentifier,
+            const alexaClientSDK::avsCommon::avs::CapabilityState& capabilityState,
+            alexaClientSDK::avsCommon::sdkInterfaces::AlexaStateChangeCauseType cause));
+    MOCK_METHOD3(
+        provideStateResponse,
+        void(
+            const alexaClientSDK::avsCommon::avs::CapabilityTag& capabilityIdentifier,
+            const alexaClientSDK::avsCommon::avs::CapabilityState& capabilityState,
+            const unsigned int stateRequestToken));
+    MOCK_METHOD3(
+        provideStateUnavailableResponse,
+        void(
+            const alexaClientSDK::avsCommon::avs::CapabilityTag& capabilityIdentifier,
+            const unsigned int stateRequestToken,
+            bool isEndpointUnreachable));
+    MOCK_METHOD1(
+        addContextManagerObserver,
+        void(std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerObserverInterface> observer));
+    MOCK_METHOD1(
+        removeContextManagerObserver,
+        void(const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerObserverInterface>&
+                 observer));
+    MOCK_METHOD2(
+        addStateProvider,
+        void(
+            const alexaClientSDK::avsCommon::avs::CapabilityTag& capabilityIdentifier,
+            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::StateProviderInterface> stateProvider));
+    MOCK_METHOD1(removeStateProvider, void(const alexaClientSDK::avsCommon::avs::CapabilityTag& capabilityIdentifier));
 };
 
 }  // namespace test

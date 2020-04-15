@@ -505,7 +505,6 @@ export class App extends React.Component<any, IAppState> {
         if (event.code === this.lastKeyDownCode) {
             return;
         }
-        this.handleUserInteraction();
         switch (event.code) {
             // Press talk key to start audio recognition
             case this.deviceAppConfig.deviceKeys.talkKey.code : {
@@ -521,6 +520,7 @@ export class App extends React.Component<any, IAppState> {
                 this.sendNavigationEvent(NavigationEvent.BACK);
                 break;
             default : {
+                this.handleUserInteraction();
                 break;
             }
         }

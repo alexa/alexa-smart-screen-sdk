@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2018-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -75,7 +75,7 @@ void JsonUIManager::onSettingChanged(const std::string& key, const std::string& 
 
 void JsonUIManager::onSpeakerSettingsChanged(
     const SpeakerManagerObserverInterface::Source& source,
-    const SpeakerInterface::Type& type,
+    const avsCommon::sdkInterfaces::ChannelVolumeInterface::Type& type,
     const SpeakerInterface::SpeakerSettings& settings) {
     m_executor.submit([source, type, settings]() {
         std::ostringstream oss;
@@ -246,8 +246,7 @@ void JsonUIManager::microphoneOn() {
 void JsonUIManager::reportAlexaState() {
     std::string alexaState;
 
-    switch (m_connectionStatus)
-    {
+    switch (m_connectionStatus) {
         case alexaClientSDK::avsCommon::sdkInterfaces::ConnectionStatusObserverInterface::Status::DISCONNECTED:
             alexaState = "DISCONNECTED";
             break;
@@ -257,14 +256,16 @@ void JsonUIManager::reportAlexaState() {
         case alexaClientSDK::avsCommon::sdkInterfaces::ConnectionStatusObserverInterface::Status::CONNECTED:
             switch (m_dialogState) {
                 /*
-                * This is an intermediate state after a SPEAK directive is completed. In the case of a speech burst the
-                * next SPEAK could kick in or if its the last SPEAK directive ALEXA moves to the IDLE state. So we do
-                * nothing for this state.
-                */
+                 * This is an intermediate state after a SPEAK directive is completed. In the case of a speech burst the
+                 * next SPEAK could kick in or if its the last SPEAK directive ALEXA moves to the IDLE state. So we do
+                 * nothing for this state.
+                 */
                 case alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface::DialogUXState::FINISHED:
                     break;
                 default:
-                    alexaState = alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface::stateToString(m_dialogState);
+                    alexaState =
+                        alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface::stateToString(
+                            m_dialogState);
                     break;
             }
             break;

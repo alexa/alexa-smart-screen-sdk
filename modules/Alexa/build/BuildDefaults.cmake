@@ -45,6 +45,9 @@ include(Comms)
 # Setup PCC variables.
 include(PCC)
 
+# Setup MCC variables.
+include(MCC)
+
 # Setup android variables.
 include(Android)
 
@@ -56,6 +59,15 @@ include (MRM)
 
 # Setup A4B variables.
 include (A4B)
+
+# Setup speech encoder variables.
+include (SpeechEncoder)
+
+# Setup Metrics variables.
+include (Metrics)
+
+# Setup Captions variables.
+include (Captions)
 
 if (HAS_EXTERNAL_MEDIA_PLAYER_ADAPTERS)
     include (ExternalMediaPlayerAdapters)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2018-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ public:
     /// @{
     void onSpeakerSettingsChanged(
         const alexaClientSDK::avsCommon::sdkInterfaces::SpeakerManagerObserverInterface::Source& source,
-        const alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface::Type& type,
+        const alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type& type,
         const alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface::SpeakerSettings& settings) override;
     /// }
 
@@ -214,7 +214,7 @@ private:
 
     /**
      * Sends authorization request message to GUI Client Interface.
-     */ 
+     */
     void sendAuthorizationRequestMessage();
 
     /// The current dialog UX state of the SDK
@@ -246,7 +246,7 @@ private:
 
     // URL returned by CBLAuthRequesterInterface for authorization
     std::string m_authUrl;
-    
+
     // CBL Code returned by CBLAuthRequesterInterface for authorization
     std::string m_authCode;
 

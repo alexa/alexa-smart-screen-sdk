@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -32,13 +32,12 @@
 #pragma GCC diagnostic pop
 #include <thread>
 
-#include <AVSCommon/Utils/LibcurlUtils/HTTPContentFetcherFactory.h>
-
 #include <SmartScreenSDKInterfaces/AudioPlayerInfo.h>
 #include <SmartScreenSDKInterfaces/GUIServerInterface.h>
 #include <SmartScreenSDKInterfaces/TemplateRuntimeObserverInterface.h>
 
 #include "SampleApp/AplCoreConnectionManager.h"
+#include "SampleApp/AplCoreGuiContentDownloadManager.h"
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -53,12 +52,11 @@ public:
      *
      * @param messagingInterface Pointer to the messaging interface
      * @param aplCoreConnectionManager Pointer to the APL Core connection manager
-     * @param httpContentFetcherFactory Pointer to a http content fetcher factory for making requests for APL imports
+     * @param aplCoreGuiContentDownloadManager Pointer to an APL Content Download Manager
      */
     AplCoreGuiRenderer(
         std::shared_ptr<AplCoreConnectionManager> aplCoreConnectionManager,
-        std::shared_ptr<alexaClientSDK::avsCommon::utils::libcurlUtils::HTTPContentFetcherFactory>
-            httpContentFetcherFactory);
+        std::shared_ptr<AplCoreGuiContentDownloadManager> aplCoreGuiContentDownloadManager);
 
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId = "");
 
@@ -114,22 +112,14 @@ private:
     std::string extractSupportedViewports(const std::string& jsonPayload);
 
     /**
-     * Downloads package requested by import from provided URL.
-     * @param source URL
-     * @return package content
-     */
-    std::string downloadPackage(const std::string& source);
-
-    /**
      * A reference to the APL Core connection manager to forward APL messages to
      */
     std::shared_ptr<AplCoreConnectionManager> m_aplCoreConnectionManager;
 
     /**
-     * Used to create objects that can fetch remote HTTP content.
+     * A reference to the Apl Core Gui Content Download manager to get packages
      */
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::HTTPContentFetcherInterfaceFactoryInterface>
-        m_contentFetcherFactory;
+    std::shared_ptr<AplCoreGuiContentDownloadManager> m_aplCoreGuiContentDownloadManager;
 
     /**
      * A reference to GUIManager

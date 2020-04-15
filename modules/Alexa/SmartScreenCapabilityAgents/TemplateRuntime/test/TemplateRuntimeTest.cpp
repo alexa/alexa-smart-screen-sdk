@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -69,6 +69,9 @@ static const NamespaceAndName PLAYER_INFO{NAMESPACE, "RenderPlayerInfo"};
 
 /// The @c MessageId identifer.
 static const std::string MESSAGE_ID("messageId");
+
+/// The second @c MessageId identifer.
+static const std::string MESSAGE_ID2("messageId2");
 
 /// An audioItemId for the RenderPlayerInfo directive.
 static const std::string AUDIO_ITEM_ID("AudioItemId abcdefgh");
@@ -227,14 +230,18 @@ void TemplateRuntimeTest::SetUp() {
     m_templateRuntime->addObserver(m_mockGui);
 
     ON_CALL(*m_mockFocusManager, acquireChannel(_, _, _)).WillByDefault(InvokeWithoutArgs([this] {
-        m_templateRuntime->onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState::FOREGROUND);
+        m_templateRuntime->onFocusChanged(
+            alexaClientSDK::avsCommon::avs::FocusState::FOREGROUND,
+            alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         return true;
     }));
 
     ON_CALL(*m_mockFocusManager, releaseChannel(_, _)).WillByDefault(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
-        m_templateRuntime->onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState::NONE);
+        m_templateRuntime->onFocusChanged(
+            alexaClientSDK::avsCommon::avs::FocusState::NONE,
+            alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         releaseChannelSuccess->set_value(true);
         return returnValue;
     }));
@@ -678,7 +685,7 @@ TEST_F(TemplateRuntimeTest, test_focusNone) {
     m_templateRuntime->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
     m_templateRuntime->CapabilityAgent::handleDirective(MESSAGE_ID);
     waitForAsyncTask();
-    m_templateRuntime->onFocusChanged(FocusState::NONE);
+    m_templateRuntime->onFocusChanged(FocusState::NONE, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
     waitForAsyncTask();
 }
 /**
@@ -697,7 +704,9 @@ TEST_F(TemplateRuntimeTest, test_displayCardCleared) {
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
-        m_templateRuntime->onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState::NONE);
+        m_templateRuntime->onFocusChanged(
+            alexaClientSDK::avsCommon::avs::FocusState::NONE,
+            alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         releaseChannelSuccess->set_value(true);
         return returnValue;
     }));
@@ -748,7 +757,8 @@ TEST_F(TemplateRuntimeTest, test_reacquireChannel) {
     EXPECT_CALL(*m_mockGui, renderTemplateCard(TEMPLATE_PAYLOAD, _)).Times(Exactly(1));
 
     m_templateRuntime->handleDirectiveImmediately(directive1);
-    m_templateRuntime->onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState::NONE);
+    m_templateRuntime->onFocusChanged(
+        alexaClientSDK::avsCommon::avs::FocusState::NONE, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
     waitForAsyncTask();
 }
 
@@ -782,7 +792,9 @@ TEST_F(TemplateRuntimeTest, testTimer_RenderPlayerInfoAfterPlayerActivityChanged
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
-        m_templateRuntime->onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState::NONE);
+        m_templateRuntime->onFocusChanged(
+            alexaClientSDK::avsCommon::avs::FocusState::NONE,
+            alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         releaseChannelSuccess->set_value(true);
         return returnValue;
     }));
@@ -801,8 +813,102 @@ TEST_F(TemplateRuntimeTest, testTimer_RenderPlayerInfoAfterPlayerActivityChanged
     waitForAsyncTask();
     context.audioItemId = AUDIO_ITEM_ID_1;
     m_templateRuntime->onRenderPlayerCardsInfoChanged(alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING, context);
-    m_templateRuntime->onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState::FOREGROUND);
+    m_templateRuntime->onFocusChanged(
+        alexaClientSDK::avsCommon::avs::FocusState::FOREGROUND,
+        alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
     m_templateRuntime->displayCardCleared();
+    waitForAsyncTask();
+}
+
+/**
+ * Tests that if a player directive is received after a template directive the card is cleared and player is rendered.
+ */
+TEST_F(TemplateRuntimeTest, test_templateDirectiveFollowedbyPlayerDirective) {
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(TEMPLATE.nameSpace, TEMPLATE.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, TEMPLATE_PAYLOAD, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockGui, renderTemplateCard(TEMPLATE_PAYLOAD, _)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+
+    m_templateRuntime->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_templateRuntime->CapabilityAgent::handleDirective(MESSAGE_ID);
+    waitForAsyncTask();
+
+    const std::string messageId2{"messageId2"};
+
+    auto avsMessageHeader2 = std::make_shared<AVSMessageHeader>(PLAYER_INFO.nameSpace, PLAYER_INFO.name, messageId2);
+    auto mockDirectiveHandlerResult1 =
+        make_unique<StrictMock<smartScreenSDKInterfaces::test::MockDirectiveHandlerResult>>();
+    std::shared_ptr<AVSDirective> directive2 =
+        AVSDirective::create("", avsMessageHeader2, PLAYERINFO_PAYLOAD, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockGui, clearTemplateCard()).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderPlayerInfoCard(PLAYERINFO_PAYLOAD, _, _))
+        .Times(Exactly(1))
+        .WillOnce(InvokeWithoutArgs([] {}));
+    EXPECT_CALL(*mockDirectiveHandlerResult1, setCompleted()).Times(Exactly(1));
+
+    m_templateRuntime->CapabilityAgent::preHandleDirective(directive2, std::move(mockDirectiveHandlerResult1));
+    m_templateRuntime->CapabilityAgent::handleDirective(messageId2);
+
+    RenderPlayerInfoCardsObserverInterface::Context context;
+    context.mediaProperties = m_mediaPropertiesFetcher;
+    context.audioItemId = AUDIO_ITEM_ID;
+    context.offset = TIMEOUT;
+    m_templateRuntime->onRenderPlayerCardsInfoChanged(alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING, context);
+
+    waitForAsyncTask();
+}
+
+/**
+ * Tests RenderPlayerInfo Directive. Expect that the RenderPlayerInfo callback will not be called if non-player card is
+ * currently in foreground. To test, we first start player, render non-player card forcing music-player to background.
+ * Then we send RenderPlayerInfo directive for the player in background.
+ * Expected: The player should not be rendered.
+ */
+TEST_F(TemplateRuntimeTest, test_PlayerCardInfoDirectiveAfterNonPlayerInForeground) {
+    // Render Audio Player.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(PLAYER_INFO.nameSpace, PLAYER_INFO.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, PLAYERINFO_PAYLOAD, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockGui, renderPlayerInfoCard(PLAYERINFO_PAYLOAD, _, _))
+        .Times(Exactly(2));  // Once for Foreground and once for background
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));  // after non-player card is rendered
+
+    RenderPlayerInfoCardsObserverInterface::Context context;
+    context.mediaProperties = m_mediaPropertiesFetcher;
+    context.audioItemId = AUDIO_ITEM_ID;
+    m_templateRuntime->onRenderPlayerCardsInfoChanged(alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING, context);
+    m_templateRuntime->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_templateRuntime->CapabilityAgent::handleDirective(MESSAGE_ID);
+    waitForAsyncTask();
+
+    // Dummy variable not used in the API call.
+    const std::string apl_payload{"{ }"};
+    const std::string apl_token{"token"};
+    const std::string apl_window_id{"default"};
+
+    // Simulate APL rendered.
+    m_templateRuntime->renderDocument(apl_payload, apl_token, apl_window_id);
+    m_templateRuntime->onFocusChanged(
+        FocusState::BACKGROUND, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
+    waitForAsyncTask();
+
+    // Attempt to render player card info again.
+
+    auto avsMessageHeader2 = std::make_shared<AVSMessageHeader>(PLAYER_INFO.nameSpace, PLAYER_INFO.name, MESSAGE_ID2);
+    std::shared_ptr<AVSDirective> directive2 =
+        AVSDirective::create("", avsMessageHeader2, PLAYERINFO_PAYLOAD, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockGui, renderPlayerInfoCard(PLAYERINFO_PAYLOAD, _, _))
+        .Times(Exactly(0));  // Should not be rendered
+    m_templateRuntime->CapabilityAgent::preHandleDirective(directive2, std::move(m_mockDirectiveHandlerResult));
+    m_templateRuntime->CapabilityAgent::handleDirective(MESSAGE_ID2);
     waitForAsyncTask();
 }
 

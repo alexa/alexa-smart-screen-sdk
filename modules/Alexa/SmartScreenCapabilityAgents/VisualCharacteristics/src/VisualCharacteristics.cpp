@@ -104,8 +104,15 @@ std::shared_ptr<VisualCharacteristics> VisualCharacteristics::create(
     return visualCharacteristics;
 }
 
+void VisualCharacteristics::doShutdown() {
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.shutdown();
+    m_contextManager.reset();
+}
+
 VisualCharacteristics::VisualCharacteristics(
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerInterface> contextManager) {
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerInterface> contextManager) :
+        RequiresShutdown{"VisualCharacteristics"} {
     m_contextManager = contextManager;
 
     getVisualCharacteristicsCapabilityConfiguration();
@@ -173,11 +180,14 @@ std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityCon
 void VisualCharacteristics::provideState(
     const alexaClientSDK::avsCommon::avs::NamespaceAndName& stateProviderName,
     unsigned int stateRequestToken) {
-    m_contextManager->setState(DEVICE_WINDOW_STATE, m_deviceWindowState, StateRefreshPolicy::ALWAYS, stateRequestToken);
+    m_executor.submit([this, stateRequestToken] {
+        m_contextManager->setState(
+            DEVICE_WINDOW_STATE, m_deviceWindowState, StateRefreshPolicy::ALWAYS, stateRequestToken);
+    });
 }
 
 void VisualCharacteristics::setDeviceWindowState(const std::string& deviceWindowState) {
-    m_deviceWindowState = deviceWindowState;
+    m_executor.submit([this, deviceWindowState] { m_deviceWindowState = deviceWindowState; });
 }
 
 }  // namespace visualCharacteristics

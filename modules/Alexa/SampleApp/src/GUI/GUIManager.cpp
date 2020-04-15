@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -240,6 +240,7 @@ void GUIManager::handleHoldToTalk() {
 }
 
 void GUIManager::handleMicrophoneToggle() {
+    ACSDK_DEBUG5(LX(__func__));
     m_executor.submit([this]() {
         if (!m_wakeWordAudioProvider) {
             return;
@@ -259,7 +260,7 @@ void GUIManager::handleUserEvent(std::string userEventPayload) {
         rapidjson::Document document;
         rapidjson::ParseResult result = document.Parse(userEventPayload);
 
-        ACSDK_DEBUG(LX(__func__).d("payload", userEventPayload));
+        ACSDK_DEBUG5(LX(__func__).d("payload", userEventPayload));
 
         if (!result) {
             ACSDK_ERROR(LX(__func__).d("reason", "Payload parse error."));
@@ -391,7 +392,7 @@ void GUIManager::setFirmwareVersion(avsCommon::sdkInterfaces::softwareInfo::Firm
     m_executor.submit([this, firmwareVersion]() { m_ssClient->setFirmwareVersion(firmwareVersion); });
 }
 
-void GUIManager::adjustVolume(avsCommon::sdkInterfaces::SpeakerInterface::Type type, int8_t delta) {
+void GUIManager::adjustVolume(avsCommon::sdkInterfaces::ChannelVolumeInterface::Type type, int8_t delta) {
     m_executor.submit([this, type, delta]() {
         /*
          * Group the unmute action as part of the same affordance that caused the volume change, so we don't
@@ -411,7 +412,7 @@ void GUIManager::adjustVolume(avsCommon::sdkInterfaces::SpeakerInterface::Type t
     });
 }
 
-void GUIManager::setMute(avsCommon::sdkInterfaces::SpeakerInterface::Type type, bool mute) {
+void GUIManager::setMute(avsCommon::sdkInterfaces::ChannelVolumeInterface::Type type, bool mute) {
     m_executor.submit([this, type, mute]() {
         std::future<bool> future = m_ssClient->getSpeakerManager()->setMute(type, mute);
         if (!future.valid()) {
@@ -675,6 +676,7 @@ void GUIManager::setClient(std::shared_ptr<smartScreenClient::SmartScreenClient>
 }
 
 void GUIManager::doShutdown() {
+    ACSDK_DEBUG3(LX(__func__));
     m_executor.shutdown();
     m_audioFocusManager.reset();
     m_ssClient.reset();

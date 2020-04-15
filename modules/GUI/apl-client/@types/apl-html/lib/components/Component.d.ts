@@ -118,6 +118,7 @@ export declare abstract class Component<PropsType = IGenericPropType> extends Ev
     protected setOpacity: () => void;
     protected setBoundsAndDisplay: () => void;
     protected setUserProperties: () => void;
+    protected getCssShadow: () => string;
     private setShadow;
     protected applyCssShadow: (shadowParams: string) => void;
 }

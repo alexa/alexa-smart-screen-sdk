@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Amazon Software License (the "License").
  * You may not use this file except in compliance with the License.
@@ -123,6 +123,8 @@ static const std::chrono::milliseconds DEFAULT_DOCUMENT_INTERACTION_TIMEOUT_MS{3
 /// The AlexaPresentation context state signature.
 static const avsCommon::avs::NamespaceAndName RENDERED_DOCUMENT_STATE{ALEXA_PRESENTATION_APL_NAMESPACE,
                                                                       VISUAL_CONTEXT_NAME};
+
+const std::string AlexaPresentation::NON_APL_DOCUMENT_TOKEN = "NonAPLDocumentToken";
 
 std::shared_ptr<AlexaPresentation> AlexaPresentation::create(
     std::shared_ptr<avsCommon::sdkInterfaces::FocusManagerInterface> focusManager,
@@ -252,7 +254,9 @@ void AlexaPresentation::doClearExecuteCommand(const std::string& reason) {
     m_lastExecuteCommandTokenAndDirective.first.clear();
 }
 
-void AlexaPresentation::onFocusChanged(avsCommon::avs::FocusState newFocus) {
+void AlexaPresentation::onFocusChanged(
+    avsCommon::avs::FocusState newFocus,
+    alexaClientSDK::avsCommon::avs::MixingBehavior behavior) {
     m_executor->submit([this, newFocus]() { executeOnFocusChangedEvent(newFocus); });
 }
 
@@ -381,7 +385,7 @@ void AlexaPresentation::sendUserEvent(const std::string& payload) {
 void AlexaPresentation::doShutdown() {
     m_executor->shutdown();
 
-    doClearExecuteCommand("RenderingHandlerShuttingDown");
+    doClearExecuteCommand("AlexaPresentationShuttingDown");
 
     m_visualStateProvider.reset();
     m_messageSender.reset();
@@ -989,6 +993,11 @@ void AlexaPresentation::processRenderDocumentResult(
         }
 
         ACSDK_DEBUG3(LX("processRenderDocumentResultExecutor").d("token", token).d("result", result));
+
+        if (token == NON_APL_DOCUMENT_TOKEN) {
+            // There is no need to perform further checks if this document is not APL
+            return;
+        }
 
         if (m_lastRenderedAPLToken != token) {
             ACSDK_ERROR(LX("processRenderDocumentResultFailedInExecutor")

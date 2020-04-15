@@ -144,7 +144,7 @@ private:
     bool onValidate(connection_hdl connectionHdl);
 
     /// Indicates whether the server was successfully initialised
-    bool m_initialised{false};
+    std::atomic_bool m_initialised{false};
 
     /// The websocket server instance
     server m_webSocketServer;

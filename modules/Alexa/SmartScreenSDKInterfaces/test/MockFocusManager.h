@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -31,7 +31,13 @@ public:
         bool(
             const std::string& channelName,
             std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
-            const std::string& interface));
+            const std::string& interfaceName));
+    MOCK_METHOD2(
+        acquireChannel,
+        bool(
+            const std::string& channelName,
+            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface::Activity>
+                channelActivity));
     MOCK_METHOD2(
         releaseChannel,
         std::future<bool>(
@@ -45,6 +51,9 @@ public:
     MOCK_METHOD1(
         removeObserver,
         void(const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface>& observer));
+    MOCK_METHOD3(
+        modifyContentType,
+        void(const std::string&, const std::string&, alexaClientSDK::avsCommon::avs::ContentType));
 };
 
 }  // namespace test

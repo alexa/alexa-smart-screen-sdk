@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -205,7 +205,9 @@ DirectiveHandlerConfiguration TemplateRuntime::getConfiguration() const {
     return configuration;
 }
 
-void TemplateRuntime::onFocusChanged(alexaClientSDK::avsCommon::avs::FocusState newFocus) {
+void TemplateRuntime::onFocusChanged(
+    alexaClientSDK::avsCommon::avs::FocusState newFocus,
+    alexaClientSDK::avsCommon::avs::MixingBehavior behavior) {
     m_executor->submit([this, newFocus]() { executeOnFocusChangedEvent(newFocus); });
 }
 
@@ -473,6 +475,15 @@ void TemplateRuntime::handleRenderPlayerInfoDirective(std::shared_ptr<DirectiveI
                                 .d("discardedAudioItemId", discardedAudioItem.audioItemId));
             }
             m_audioItems.push_front(itemPair);
+
+            if (NonPlayerInfoDisplayType::RENDER_TEMPLATE == m_activeNonPlayerInfoType) {
+                /**
+                 * This is a new audio playback item but we cannot render it until we receive the audio item.
+                 * We need to clear the card here so that we can switch to the media player
+                 * once we receive the audio player info update
+                 */
+                executeClearCard();
+            }
         }
 
         setHandlingCompleted(info);
@@ -579,7 +590,8 @@ void TemplateRuntime::executeAudioPlayerInfoUpdates(
 }
 
 void TemplateRuntime::executeAudioPlayerStartTimer(alexaClientSDK::avsCommon::avs::PlayerActivity state) {
-    if (alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING == state && NonPlayerInfoDisplayType::NONE == m_activeNonPlayerInfoType) {
+    if (alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING == state &&
+        NonPlayerInfoDisplayType::NONE == m_activeNonPlayerInfoType) {
         executeStopTimer();
     } else if (
         alexaClientSDK::avsCommon::avs::PlayerActivity::PAUSED == state ||

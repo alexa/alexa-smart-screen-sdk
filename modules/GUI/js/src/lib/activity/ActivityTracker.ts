@@ -41,12 +41,22 @@ export class ActivityTracker {
      */
     public recordActive(name : string) : number {
         const stateChanged = this.componentsEmpty();
-        this.currentActivityToken++;
-        this.activeComponents.set(this.currentActivityToken, name);
-        if (stateChanged) {
-            this.reportActive();
+        let prevToken : number = 0;
+        this.activeComponents.forEach((value : string, key : number) => {
+            if (value === name) {
+                prevToken = key;
+            }
+        });
+        if (prevToken === 0) {
+            this.currentActivityToken++;
+            this.activeComponents.set(this.currentActivityToken, name);
+            if (stateChanged) {
+                this.reportActive();
+            }
+            return this.currentActivityToken;
+        } else {
+            return prevToken;
         }
-        return this.currentActivityToken;
     }
 
     /**

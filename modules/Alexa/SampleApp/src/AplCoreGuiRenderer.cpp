@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -37,12 +37,6 @@ static const std::string TAG{"AplCoreGuiRenderer"};
 static const char* ALEXA_IMPORT_PATH = "https://d2na8397m465mh.cloudfront.net/packages/%s/%s/document.json";
 /// The number of bytes read from the attachment with each read in the read loop.
 static const size_t CHUNK_SIZE(1024);
-/// Process attachment ID
-static const std::string PROCESS_ATTACHMENT_ID = "import_download:";
-/// A wait period for a polling loop that constantly check if a content fetcher finished fetching the payload or failed.
-static const std::chrono::milliseconds WAIT_FOR_ACTIVITY_TIMEOUT{100};
-/// Timeout to wait for a package to arrive from the content fetcher
-static const std::chrono::minutes FETCH_TIMEOUT{5};
 /// Name of the mainTemplate parameter to which avs datasources binds to.
 static const std::string DEFAULT_PARAM_BINDING = "payload";
 /// Default string to attach to mainTemplate parameters.
@@ -50,10 +44,10 @@ static const std::string DEFAULT_PARAM_VALUE = "{}";
 
 AplCoreGuiRenderer::AplCoreGuiRenderer(
     std::shared_ptr<AplCoreConnectionManager> aplCoreConnectionManager,
-    std::shared_ptr<HTTPContentFetcherFactory> httpContentFetcherFactory) :
+    std::shared_ptr<AplCoreGuiContentDownloadManager> aplCoreGuiContentDownloadManager) :
         m_isDocumentCleared{false},
         m_aplCoreConnectionManager{aplCoreConnectionManager},
-        m_contentFetcherFactory{httpContentFetcherFactory} {
+        m_aplCoreGuiContentDownloadManager{aplCoreGuiContentDownloadManager} {
 }
 
 void AplCoreGuiRenderer::executeCommands(const std::string& jsonPayload, const std::string& token) {
@@ -130,111 +124,14 @@ std::string AplCoreGuiRenderer::extractSupportedViewports(const std::string& jso
     return jsonData;
 }
 
-std::string AplCoreGuiRenderer::downloadPackage(const std::string& source) {
-    auto contentFetcher = m_contentFetcherFactory->create(source);
-    contentFetcher->getContent(HTTPContentFetcherInterface::FetchOptions::ENTIRE_BODY);
-
-    HTTPContentFetcherInterface::Header header = contentFetcher->getHeader(nullptr);
-    if (!header.successful) {
-        ACSDK_ERROR(LX(__func__).sensitive("source", source).m("getHeaderFailed"));
-        return "";
-    }
-
-    if (!isStatusCodeSuccess(header.responseCode)) {
-        ACSDK_ERROR(LX("downloadPackageFailed")
-                        .d("statusCode", header.responseCode)
-                        .d("reason", "nonSuccessStatusCodeFromGetHeader"));
-        return "";
-    }
-
-    ACSDK_DEBUG9(LX("downloadPackage")
-                     .d("contentType", header.contentType)
-                     .d("statusCode", header.responseCode)
-                     .sensitive("url", source)
-                     .m("headersReceived"));
-
-    auto stream = std::make_shared<InProcessAttachment>(PROCESS_ATTACHMENT_ID);
-    std::shared_ptr<AttachmentWriter> streamWriter = stream->createWriter(WriterPolicy::BLOCKING);
-
-    if (!contentFetcher->getBody(streamWriter)) {
-        ACSDK_ERROR(LX("downloadPackageFailed").d("reason", "getBodyFailed"));
-        return "";
-    }
-
-    auto startTime = std::chrono::steady_clock::now();
-    auto elapsedTime = std::chrono::steady_clock::now() - startTime;
-    HTTPContentFetcherInterface::State contentFetcherState = contentFetcher->getState();
-    while ((FETCH_TIMEOUT > elapsedTime) && (HTTPContentFetcherInterface::State::BODY_DONE != contentFetcherState) &&
-           (HTTPContentFetcherInterface::State::ERROR != contentFetcherState)) {
-        std::this_thread::sleep_for(WAIT_FOR_ACTIVITY_TIMEOUT);
-        elapsedTime = std::chrono::steady_clock::now() - startTime;
-        contentFetcherState = contentFetcher->getState();
-    }
-
-    if (FETCH_TIMEOUT <= elapsedTime) {
-        ACSDK_ERROR(LX("downloadPackageFailed").d("reason", "waitTimeout"));
-        return "";
-    }
-
-    if (HTTPContentFetcherInterface::State::ERROR == contentFetcherState) {
-        ACSDK_ERROR(LX("downloadPackageFailed").d("reason", "receivingBodyFailed"));
-        return "";
-    }
-
-    std::unique_ptr<AttachmentReader> reader = stream->createReader(ReaderPolicy::NONBLOCKING);
-
-    std::string packageContent;
-    auto readStatus = AttachmentReader::ReadStatus::OK;
-    std::vector<char> buffer(CHUNK_SIZE, 0);
-    bool streamClosed = false;
-    AttachmentReader::ReadStatus previousStatus = AttachmentReader::ReadStatus::OK_TIMEDOUT;
-    ssize_t bytesReadSoFar = 0;
-    ssize_t bytesRead = -1;
-    while (!streamClosed && bytesRead != 0) {
-        bytesRead = reader->read(buffer.data(), buffer.size(), &readStatus);
-        bytesReadSoFar += bytesRead;
-        if (previousStatus != readStatus) {
-            ACSDK_DEBUG9(LX(__func__).d("readStatus", readStatus));
-            previousStatus = readStatus;
-        }
-        switch (readStatus) {
-            case AttachmentReader::ReadStatus::CLOSED:
-                streamClosed = true;
-                if (bytesRead == 0) {
-                    break;
-                }
-                /* FALL THROUGH - to add any data received even if closed */
-            case AttachmentReader::ReadStatus::OK:
-            case AttachmentReader::ReadStatus::OK_WOULDBLOCK:
-            case AttachmentReader::ReadStatus::OK_TIMEDOUT:
-                packageContent.append(buffer.data(), bytesRead);
-                break;
-            case AttachmentReader::ReadStatus::OK_OVERRUN_RESET:
-                // Current AttachmentReader policy renders this outcome impossible.
-                ACSDK_ERROR(LX("downloadPackageFailed").d("reason", "overrunReset"));
-                break;
-            case AttachmentReader::ReadStatus::ERROR_OVERRUN:
-            case AttachmentReader::ReadStatus::ERROR_BYTES_LESS_THAN_WORD_SIZE:
-            case AttachmentReader::ReadStatus::ERROR_INTERNAL:
-                ACSDK_ERROR(LX("downloadPackageFailed").d("reason", "readError"));
-                return "";
-        }
-        if (0 == bytesRead) {
-            ACSDK_DEBUG9(LX(__func__).m("alreadyReadAllBytes"));
-        }
-    }
-
-    ACSDK_DEBUG9(LX("downloadPackage").d("URL", contentFetcher->getUrl()));
-
-    return packageContent;
-}
-
 void AplCoreGuiRenderer::renderByAplCore(
     const std::string& document,
     const std::string& data,
     const std::string& supportedViewports,
     const std::string& token,
     const std::string& windowId) {
+    auto startTime = std::chrono::system_clock::now();
+
     auto content = apl::Content::create(document);
     if (!content) {
         ACSDK_ERROR(LX("renderDocumentFailed").d("document", document).m("Unable to create content"));
@@ -265,7 +162,7 @@ void AplCoreGuiRenderer::renderByAplCore(
                 source = sourceBuffer;
             }
 
-            auto packageContent = downloadPackage(source);
+            auto packageContent = m_aplCoreGuiContentDownloadManager->retrievePackage(source);
             if (packageContent.empty()) {
                 ACSDK_ERROR(LX("renderDocumentFailed")
                                 .d("package", name)
@@ -280,6 +177,12 @@ void AplCoreGuiRenderer::renderByAplCore(
             content->addPackage(package, packageContent);
         }
     }
+
+    ACSDK_DEBUG9(
+        LX("renderDocument")
+            .d("downloadContentTimeInMs",
+               std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now() - startTime)
+                   .count()));
 
     if (!content->isReady()) {
         ACSDK_ERROR(LX("renderDocumentFailed").m("Content is not ready"));

@@ -15,6 +15,10 @@
     // "websocketCertificate":"server.chain"
     // The private key file the websocket server should use when SSL is enabled
     // "websocketPrivateKey":"server.key"
+    // The cache reuse period when downloading content packages
+    // "contentCacheReusePeriodInSeconds": "600",
+    // The maximum cache size when caching content packages
+    // "contentCacheMaxSize": "50"
   },
   "gui": {
     "appConfig": {

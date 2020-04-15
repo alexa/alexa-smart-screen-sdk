@@ -4,7 +4,7 @@ The SmartScreenSDKConfig is used to configure addtional functionality of the Sma
 
 The [default config](SmartScreenSDKConfig.json) file is a reference implementation of the SmartScreenSDK and GUI App for a TV type device that displays both fullscreen and lower third visual responses.
 
-There are addtional sample device configurations for the GUI in the /guiConfigSamples:
+There are additional sample device configurations for the GUI in the /guiConfigSamples:
 * [TV Fullscreen + Side Panel](guiConfigSamples/GuiConfigSample_TvOverlayPortrait.json)
 * [TV Fullscreen Only](guiConfigSamples/GuiConfigSample_TvFullscreen.json)
 * [Smart Screen Landscape](guiConfigSamples/GuiConfigSample_SmartScreenLargeLandscape.json)
@@ -19,7 +19,9 @@ There are addtional sample device configurations for the GUI in the /guiConfigSa
     "websocketPort":{{NUMBER}},
     "websocketCertificateAuthority":"{{STRING}}",
     "websocketCertificate":"{{STRING}}",
-    "websocketPrivateKey":"{{STRING}}"
+    "websocketPrivateKey":"{{STRING}}",
+    "contentCacheReusePeriodInSeconds": "{{STRING}}",
+    "contentCacheMaxSize": "{{STRING}}"
   },
   "gui": {
     "appConfig": {
@@ -53,7 +55,7 @@ There are addtional sample device configurations for the GUI in the /guiConfigSa
 
 # SampleApp Parameters
 
-Config parameters for the SmartScreenSDK SampleApp.  Handles configruation of  [websocket server](../../../README.md#websocket-encryption) used for [message communication between SDK SampleApp and GUI App](../SDK-GUI-API.md).
+Config parameters for the SmartScreenSDK SampleApp.  Handles configuration of  [websocket server](../../../README.md#websocket-encryption) used for [message communication between SDK SampleApp and GUI App](../SDK-GUI-API.md) and caching of imported packages.
 
 ```
 "sampleApp": {
@@ -61,17 +63,20 @@ Config parameters for the SmartScreenSDK SampleApp.  Handles configruation of  [
     "websocketPort":{{NUMBER}},
     "websocketCertificateAuthority":"{{STRING}}",
     "websocketCertificate":"{{STRING}}",
-    "websocketPrivateKey":"{{STRING}}"
+    "websocketPrivateKey":"{{STRING}}",
+    "contentCacheReusePeriodInSeconds": "{{STRING}}",
+    "contentCacheMaxSize": "{{STRING}}"
 }
 ```
 
-| Parameter                     | Type      | Required  | Default           | Description
-| -------------                 |-------    |:--------: |-----              | ----- |
-| websocketInterface            | string    | No        | `"127.0.0.1"`     | The interface which the websocket server will bind to.<br/><br/>**Note**: For security reasons, it is strongly recommended that the loopback interface is used.  When using interfaces, other than loopback, additional security measures should be taken to ensure the security and integrity of data between the client and server.
-| websocketPort                 | number    | No        | `8933`            | The port which the websocket server will listen to.<br/><br/>**Note**: The port should be a positive integer in the range `[1-65535]`, It is strongly recommended that a port number `> 1023` is used
-| websocketCertificateAuthority | string    | No        | `"ca.cert"`       | The Certificate Authority file to verify client certificate.
-| websocketCertificate          | string    | No        | `"server.chain"`  | The certificate file the websocket server should use when SSL is enabled.
-| websocketPrivateKey           | string    | No        | `"server.key"`    | The private key file the websocket server should use when SSL is enabled.
+| Parameter                         | Type      | Required  | Default           | Description
+| -------------                     |-------    |:--------: |-----              | ----- |
+| websocketInterface                | string    | No        | `"127.0.0.1"`     | The interface which the websocket server will bind to.<br/><br/>**Note**: For security reasons, it is strongly recommended that the loopback interface is used.  When using interfaces, other than loopback, additional security measures should be taken to ensure the security and integrity of data between the client and server.
+| websocketPort                     | number    | No        | `8933`            | The port which the websocket server will listen to.<br/><br/>**Note**: The port should be a positive integer in the range `[1-65535]`, It is strongly recommended that a port number `> 1023` is used
+| websocketCertificateAuthority     | string    | No        | `"ca.cert"`       | The Certificate Authority file to verify client certificate.
+| websocketCertificate              | string    | No        | `"server.chain"`  | The certificate file the websocket server should use when SSL is enabled.
+| contentCacheReusePeriodInSeconds  | string    | No        | `"600"`           | The number of seconds to reuse a cached package.
+| contentCacheMaxSize               | string    | No        | `"50"`            | The max size for the cache of imported packages.
 
 
 # GUI Parameters

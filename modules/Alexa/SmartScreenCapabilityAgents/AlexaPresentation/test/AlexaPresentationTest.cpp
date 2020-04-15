@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Amazon Software License (the "License").
  * You may not use this file except in compliance with the License.
@@ -161,9 +161,11 @@ static const std::string MESSAGE_PAYLOAD_KEY = "payload";
                                                                "}";
 
 // Properly formed execute command
- static const std::string EXECUTE_COMMAND_PAYLOAD = "{"
+static const std::string EXECUTE_COMMAND_PAYLOAD = "{"
                                                    "\"presentationToken\":\"APL_TOKEN\","
-                                                   "\"commands\":\"{idleCommand}\""
+                                                   "\"commands\": ["
+                                                   " {\"type\": \"idleCommand\"} "
+                                                   "]"
                                                    "}";
 
  static const std::string TIMEOUT_SETTINGS_CONFIG =
@@ -297,14 +299,16 @@ void AlexaPresentationTest::SetUp() {
     m_AlexaPresentation->addObserver(m_mockGui);
 
     ON_CALL(*m_mockFocusManager, acquireChannel(_, _, _)).WillByDefault(InvokeWithoutArgs([this] {
-        m_AlexaPresentation->onFocusChanged(avsCommon::avs::FocusState::FOREGROUND);
+        m_AlexaPresentation->onFocusChanged(
+            avsCommon::avs::FocusState::FOREGROUND, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         return true;
     }));
 
     ON_CALL(*m_mockFocusManager, releaseChannel(_, _)).WillByDefault(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
-        m_AlexaPresentation->onFocusChanged(avsCommon::avs::FocusState::NONE);
+        m_AlexaPresentation->onFocusChanged(
+            avsCommon::avs::FocusState::NONE, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         releaseChannelSuccess->set_value(true);
         return returnValue;
     }));
@@ -524,7 +528,7 @@ TEST_F(AlexaPresentationTest, testExecuteCommandAfterMismatchedAPLCard) {
  *
  * @note DISABLED for now. Following up JIRA https://issues.labcollab.net/browse/ARC-871
  */
-TEST_F(AlexaPresentationTest, DISABLED_testExecuteCommandAfterRightAPL) {
+TEST_F(AlexaPresentationTest, testExecuteCommandAfterRightAPL) {
     avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
 
     // Create Directive.
@@ -556,6 +560,7 @@ TEST_F(AlexaPresentationTest, DISABLED_testExecuteCommandAfterRightAPL) {
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive1, std::move(m_mockDirectiveHandlerResult));
     m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID_2);
+    m_AlexaPresentation->processExecuteCommandsResult(MESSAGE_ID_2, true, "");
     m_executor->waitForSubmittedTasks();
 }
 
@@ -581,14 +586,20 @@ TEST_F(AlexaPresentationTest, testAPLClearCard) {
     EXPECT_CALL(*m_mockGui, clearDocument()).Times(1);
 
     // Expect a call to getContext as part of sending APL_DISMISSED event.
-    EXPECT_CALL(*m_mockContextManager, getContext(_))
-        .WillOnce(Invoke(
-            [this](std::shared_ptr<ContextRequesterInterface> contextRequester) { m_contextTrigger.notify_one(); }));
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
-        m_AlexaPresentation->onFocusChanged(avsCommon::avs::FocusState::NONE);
+        m_AlexaPresentation->onFocusChanged(
+            avsCommon::avs::FocusState::NONE, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         releaseChannelSuccess->set_value(true);
         return returnValue;
     }));
@@ -643,15 +654,21 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
-        m_AlexaPresentation->onFocusChanged(avsCommon::avs::FocusState::NONE);
+        m_AlexaPresentation->onFocusChanged(
+            avsCommon::avs::FocusState::NONE, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         releaseChannelSuccess->set_value(true);
         return returnValue;
     }));
 
     // Expect a call to getContext.
-    EXPECT_CALL(*m_mockContextManager, getContext(_))
-        .WillOnce(Invoke(
-            [this](std::shared_ptr<ContextRequesterInterface> contextRequester) { m_contextTrigger.notify_one(); }));
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
 
     auto verifyEvent = [](std::shared_ptr<avsCommon::avs::MessageRequest> request) {
         verifySendMessage(request, DOCUMENT_DISMISSED_EVENT, EXPECTED_DOCUMENT_DISMISSED_PAYLOAD, NAMESPACE1);
@@ -690,13 +707,19 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
-        m_AlexaPresentation->onFocusChanged(avsCommon::avs::FocusState::NONE);
+        m_AlexaPresentation->onFocusChanged(
+            avsCommon::avs::FocusState::NONE, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         releaseChannelSuccess->set_value(true);
         return returnValue;
     }));
-    EXPECT_CALL(*m_mockContextManager, getContext(_))
-        .WillOnce(Invoke(
-            [this](std::shared_ptr<ContextRequesterInterface> contextRequester) { m_contextTrigger.notify_one(); }));
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
     EXPECT_CALL(*m_mockContextManager, setState(_, _, _, _)).Times(Exactly((1)));
 
     // Make sure that this is not called, because the last APL has been cleared
@@ -763,15 +786,21 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsGUIInactive) {
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
-        m_AlexaPresentation->onFocusChanged(avsCommon::avs::FocusState::NONE);
+        m_AlexaPresentation->onFocusChanged(
+            avsCommon::avs::FocusState::NONE, alexaClientSDK::avsCommon::avs::MixingBehavior::UNDEFINED);
         releaseChannelSuccess->set_value(true);
         return returnValue;
     }));
 
     // Expect a call to getContext.
-    EXPECT_CALL(*m_mockContextManager, getContext(_))
-        .WillOnce(Invoke(
-            [this](std::shared_ptr<ContextRequesterInterface> contextRequester) { m_contextTrigger.notify_one(); }));
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
 
     auto verifyEvent = [](std::shared_ptr<avsCommon::avs::MessageRequest> request) {
         verifySendMessage(request, DOCUMENT_DISMISSED_EVENT, EXPECTED_DOCUMENT_DISMISSED_PAYLOAD, NAMESPACE1);
@@ -864,9 +893,14 @@ TEST_F(AlexaPresentationTest, testAPLFollowedByAPL) {
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD_2, "APL_TOKEN_2", WINDOW_ID)).Times(1);
 
     // Expect a call to getContext.
-    EXPECT_CALL(*m_mockContextManager, getContext(_))
-        .WillOnce(Invoke(
-            [this](std::shared_ptr<ContextRequesterInterface> contextRequester) { m_contextTrigger.notify_one(); }));
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
 
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(AtLeast(1));
 
@@ -893,9 +927,14 @@ TEST_F(AlexaPresentationTest, testAPLFollowedByAPL) {
     // clearDocument() is going to be called for the 2nd APL card because it's cleared by timeout.
     EXPECT_CALL(*m_mockGui, clearDocument()).Times(Exactly(1));
     // Expect a call to getContext.
-    EXPECT_CALL(*m_mockContextManager, getContext(_))
-        .WillOnce(Invoke(
-            [this](std::shared_ptr<ContextRequesterInterface> contextRequester) { m_contextTrigger.notify_one(); }));
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
     auto verifyEvent2 = [](std::shared_ptr<avsCommon::avs::MessageRequest> request) {
         verifySendMessage(request, DOCUMENT_DISMISSED_EVENT, EXPECTED_DOCUMENT_DISMISSED_PAYLOAD_2, NAMESPACE1);
     };
@@ -918,9 +957,14 @@ TEST_F(AlexaPresentationTest, testSendUserEvent) {
     };
     EXPECT_CALL(*m_mockMessageSender, sendMessage(_)).Times(Exactly(1)).WillOnce(Invoke(verifyEvent));
     // Expect a call to getContext.
-    EXPECT_CALL(*m_mockContextManager, getContext(_))
-        .WillOnce(Invoke(
-            [this](std::shared_ptr<ContextRequesterInterface> contextRequester) { m_contextTrigger.notify_one(); }));
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
 
     m_AlexaPresentation->sendUserEvent(SAMPLE_USER_EVENT_PAYLOAD);
     // wait for getContext
