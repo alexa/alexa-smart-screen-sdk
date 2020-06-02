@@ -4,4 +4,7 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 project(modules LANGUAGES CXX)
 
 add_subdirectory("Alexa")
-add_subdirectory("GUI")
+if (NOT MSVC)
+	# For UWP, build the GUIClient on UWP branch on a different platform
+	add_subdirectory("GUI")
+endif()

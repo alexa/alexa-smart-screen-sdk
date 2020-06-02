@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -19,6 +19,11 @@
 #include <AVSCommon/AVS/PlaybackButtons.h>
 
 #include "SampleApp/GUI/GUIManager.h"
+
+#ifdef UWP_BUILD
+#include <UWPSampleApp/Utils.h>
+#include <SSSDKCommon/AudioFileUtil.h>
+#endif
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -160,7 +165,13 @@ GUIManager::GUIManager(
     m_isHoldOccurring = false;
     m_isTapOccurring = false;
     m_isSpeakingOrListening = false;
+
+#ifdef UWP_BUILD
+    m_micWrapper = std::dynamic_pointer_cast<alexaSmartScreenSDK::sssdkCommon::NullMicrophone>(micWrapper);
+#else
     m_micWrapper = micWrapper;
+#endif
+
     m_micWrapper->startStreamingMicrophoneData();
 }
 
@@ -205,21 +216,33 @@ void GUIManager::executeCommands(const std::string& jsonPayload, const std::stri
     m_guiClient->executeCommands(jsonPayload, token);
 }
 
+void GUIManager::dataSourceUpdate(
+    const std::string& sourceType,
+    const std::string& jsonPayload,
+    const std::string& token) {
+    m_guiClient->dataSourceUpdate(sourceType, jsonPayload, token);
+}
+
 void GUIManager::handleTapToTalk() {
     ACSDK_DEBUG9(LX("handleTapToTalk"));
-    m_executor.submit([this]() {
-        if (!m_isMicOn) {
-            return;
-        }
-        if (!m_isTapOccurring) {
-            if (m_ssClient->notifyOfTapToTalk(m_tapToTalkAudioProvider).get()) {
-                m_isTapOccurring = true;
+    m_executor
+        .submit([this]() {
+            if (!m_isMicOn) {
+                return;
             }
-        } else {
-            m_isTapOccurring = false;
-            m_ssClient->notifyOfTapToTalkEnd();
-        }
-    });
+            if (!m_isTapOccurring) {
+                if (m_ssClient->notifyOfTapToTalk(m_tapToTalkAudioProvider).get()) {
+                    m_isTapOccurring = true;
+                }
+            } else {
+                m_isTapOccurring = false;
+                m_ssClient->notifyOfTapToTalkEnd();
+            }
+        })
+#ifdef UWP_BUILD
+        .wait()
+#endif
+        ;
 }
 
 void GUIManager::handleHoldToTalk() {
@@ -327,6 +350,14 @@ void GUIManager::handleUserEvent(std::string userEventPayload) {
             }
         } while (0);
     });
+}
+
+void GUIManager::handleDataSourceFetchRequestEvent(std::string type, std::string payload) {
+    m_executor.submit([this, type, payload] { m_ssClient->sendDataSourceFetchRequestEvent(type, payload); });
+}
+
+void GUIManager::handleRuntimeErrorEvent(std::string payload) {
+    m_executor.submit([this, payload] { m_ssClient->sendRuntimeErrorEvent(payload); });
 }
 
 void GUIManager::sendUserEvent(const std::string& payload) {
@@ -614,12 +645,34 @@ void GUIManager::handleNavigationEvent(smartScreenSDKInterfaces::NavigationEvent
     });
 }
 
+void GUIManager::forceExit() {
+    m_executor.submit([this]() { m_ssClient->forceExit(); });
+}
+
 void GUIManager::setDocumentIdleTimeout(std::chrono::milliseconds timeout) {
     m_executor.submit([this, timeout]() { m_ssClient->setDocumentIdleTimeout(timeout); });
 }
 
 void GUIManager::handleDeviceWindowState(std::string payload) {
     m_executor.submit([this, payload]() { m_ssClient->setDeviceWindowState(payload); });
+}
+
+void GUIManager::handleRenderComplete() {
+    m_executor.submit([this]() {
+        m_ssClient->handleRenderComplete(
+            NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
+    });
+}
+
+void GUIManager::handleDisplayMetrics(uint64_t dropFrameCount) {
+    m_executor.submit([this, dropFrameCount]() {
+        m_ssClient->handleDropFrameCount(
+            dropFrameCount, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
+    });
+}
+
+void GUIManager::handleAPLEvent(APLClient::AplRenderingEvent event) {
+    m_ssClient->handleAPLEvent(event, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
 }
 
 void GUIManager::executeStopForegroundActivity() {
@@ -675,6 +728,10 @@ void GUIManager::setClient(std::shared_ptr<smartScreenClient::SmartScreenClient>
     });
 }
 
+std::chrono::milliseconds GUIManager::getDeviceTimezoneOffset() {
+    return m_ssClient->getDeviceTimezoneOffset();
+}
+
 void GUIManager::doShutdown() {
     ACSDK_DEBUG3(LX(__func__));
     m_executor.shutdown();
@@ -687,6 +744,18 @@ void GUIManager::doShutdown() {
     }
     m_micWrapper.reset();
 }
+
+#ifdef UWP_BUILD
+void GUIManager::inputAudioFile(const std::string& audioFile) {
+    bool errorOccured = false;
+    auto audioData = alexaSmartScreenSDK::sssdkCommon::AudioFileUtil::readAudioFromFile(audioFile, errorOccured);
+    if (errorOccured) {
+        return;
+    }
+    handleTapToTalk();
+    m_micWrapper->writeAudioData(audioData);
+}
+#endif
 
 }  // namespace gui
 }  // namespace sampleApp

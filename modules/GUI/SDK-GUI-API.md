@@ -15,7 +15,7 @@ All messages (in any direction) have a basic structure, the *type* attribute ind
 
 ## initRequest
 
-This message is sending initialization data to the GUI client and expecting an `initResponse` message back.
+This message is sending initialization data to the GUI client and expecting an [initResponse](#initresponse) message back.
 
 ```javascript
 {
@@ -26,7 +26,7 @@ This message is sending initialization data to the GUI client and expecting an `
 
 ## guiConfiguration
 
-This message is sending configuration data to the GUI client to initialize window presentation and functionality, and expecting a `deviceWindowState` message back.
+This message is sending configuration data to the GUI client to initialize window presentation and functionality, and expecting a [deviceWindowState](#devicewindowstate) message back.
 
 ```javascript
 {
@@ -75,7 +75,7 @@ This message provides the GUI Client with Focus state changes on corresponding c
 
 ## focusResponse
 
-This message provides the GUI Client with the result of `focusAcquireRequest` and `focusReleaseRequest` requests processing.
+This message provides the GUI Client with the result of [focusAcquireRequest](#focusacquirerequest) and [focusReleaseRequest](#focusacquirerequest) requests processing.
 
 ```javascript
 {
@@ -166,7 +166,7 @@ This message instructs the client to clear visual content from the screen.
 ## aplRender
 
 This message instructs the GUI Client to start an APL render in the targeted window.
-The APL renderer will use the `aplEvent` message to poll the SDK for drawing data delivered via `aplCore` messages.
+The APL renderer will use the [aplEvent](#aplevent) message to poll the SDK for drawing data delivered via [aplCore](#aplcore) messages.
 
 ```javascript
 {
@@ -201,7 +201,7 @@ This message instructs the client to clear visual content from the screen.
 
 ## initResponse
 
-This message is sent as a response to an `initRequest` message and contains whether the given SDK version is supported and the maximum APL version supported by the client.
+This message is sent as a response to an [initRequest](#initrequest) message and contains whether the given SDK version is supported and the maximum APL version supported by the client.
 
 ```javascript
 {
@@ -213,7 +213,7 @@ This message is sent as a response to an `initRequest` message and contains whet
 
 ## deviceWindowState
 
-This message is sent as a response to a `guiConfiguration` message, or reported to the SDK on any client side change to available window states.  It contains data defining the state of the targetable windows in the client at time of report.
+This message is sent as a response to a [guiConfiguration](#guiconfiguration) message, or reported to the SDK on any client side change to available window states.  It contains data defining the state of the targetable windows in the client at time of report.
 
 ```javascript
 {
@@ -248,7 +248,7 @@ This message is sent from FocusManager in order to request release of the previo
 
 ## onFocusChangedReceivedConfirmation
 
-This message is sent from GUI Client to confirm that `onFocusChanged` message was received.
+This message is sent from GUI Client to confirm that [onFocusChanged](#onfocuschanged) message was received.
 
 ```javascript
 {
@@ -283,7 +283,7 @@ See : https://developer.amazon.com/docs/alexa-voice-service/speechrecognizer.htm
 
 ## executeCommands
 
-This message instructs the SDK to execute APL commands, sent from the GUI Client, in the active APL Renderer. *Payload* is an arbitrary object that contains one or more commands.  The SDK will respond with `aplCore` messages.
+This message instructs the SDK to execute APL commands, sent from the GUI Client, in the active APL Renderer. *Payload* is an arbitrary object that contains one or more commands.  The SDK will respond with [aplCore](#aplcore) messages.
 
 See : https://developer.amazon.com/docs/alexa-presentation-language/apl-execute-command-directive.html
 
@@ -297,7 +297,7 @@ See : https://developer.amazon.com/docs/alexa-presentation-language/apl-execute-
 
 ## renderStaticDocument
 
-This message instructs the SDK to render the contained APL document and datasource, sent from the GUI Client, in the specified APL Renderer window. *Payload* is an arbitrary object that contains the document, datasources, and supportedViewports.  The SDK will respond with `aplCore` messages.
+This message instructs the SDK to render the contained APL document and datasource, sent from the GUI Client, in the specified APL Renderer window. *Payload* is an arbitrary object that contains the document, datasources, and supportedViewports.  The SDK will respond with an [aplRender](#aplrender) message.
 
 See : https://developer.amazon.com/docs/alexa-presentation-language/apl-render-document-skill-directive.html
 
@@ -312,7 +312,7 @@ See : https://developer.amazon.com/docs/alexa-presentation-language/apl-render-d
 
 ## aplEvent
 
-This message handles all communication with the APL Core Engine, sending interaction and UI update events from the active APL Renderer to the SDK.  *Payload* is an arbitrary object containing the event data.  The SDK will respond with `aplCore` messages.
+This message handles all communication with the APL Core Engine, sending interaction and UI update events from the active APL Renderer to the SDK.  *Payload* is an arbitrary object containing the event data.  The SDK will respond with [aplCore](#aplcore) messages.
 
 ```javascript
 {
@@ -352,6 +352,15 @@ type NavigationEvent =
 {
     type: 'navigationEvent',
     event: NavigationEvent
+}
+```
+
+## toggleCaptionsEvent
+
+This message is sent to the SDK to toggle the on/off for displaying captions
+```javascript
+{
+    type: 'toggleCaptions'
 }
 ```
 

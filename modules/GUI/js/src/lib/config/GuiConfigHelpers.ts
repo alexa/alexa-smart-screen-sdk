@@ -20,7 +20,8 @@ import { IVisualCharacteristics } from './visualCharacteristics/IVisualCharacter
 import { IVideo } from './visualCharacteristics/IVideo';
 import {
     IViewportCharacteristics,
-    DeviceMode
+    DeviceMode,
+    ILogger
 } from 'apl-client';
 import {
     IWindowState,
@@ -61,12 +62,14 @@ const VideoKey : string = 'video';
 export const resolveDeviceAppConfig = (
     screenWidth : number,
     screenHeight : number,
-    guiConfigPayload : any) : IDeviceAppConfig => {
+    guiConfigPayload : any,
+    logger : ILogger) : IDeviceAppConfig => {
     const guiConfig : IGuiConfig = resolveGuiConfig(guiConfigPayload);
     const deviceAppConfig = createDeviceAppConfig(
         guiConfig,
         screenWidth,
-        screenHeight);
+        screenHeight,
+        logger);
     return deviceAppConfig;
 };
 
@@ -167,7 +170,8 @@ const extractVideo = (visualCharacteristicsNode : any) : IVideo => {
 const createDeviceAppConfig = (
     guiConfig : IGuiConfig,
     screenWidth : number,
-    screenHeight : number) : IDeviceAppConfig => {
+    screenHeight : number,
+    logger : ILogger) : IDeviceAppConfig => {
 
     const visualCharacteristics : IVisualCharacteristics = guiConfig.visualCharacteristics;
     const appConfig : IAppConfig = guiConfig.appConfig;
@@ -212,7 +216,8 @@ const createDeviceAppConfig = (
             windowConfig.sizeConfigurationId,
             visualCharacteristics.display,
             screenWidth,
-            screenHeight
+            screenHeight,
+            logger
         );
 
         deviceAppConfig.rendererWindowConfigs.push(rendererWindowConfig);
@@ -237,10 +242,10 @@ const createViewportCharacteristicsFromWindowTemplate = (
     windowSizeId : string,
     deviceDisplay : IDeviceDisplay,
     screenPixelWidth : number,
-    screenPixelHeight : number ) : IViewportCharacteristics => {
+    screenPixelHeight : number,
+    logger : ILogger ) : IViewportCharacteristics => {
 
     const deviceDisplayPixelDimensions = deviceDisplay.dimensions as IDisplayPixelDimensions;
-
     let pixelWidth : number = screenPixelWidth;
     let pixelHeight : number = screenPixelHeight;
 
@@ -255,10 +260,14 @@ const createViewportCharacteristicsFromWindowTemplate = (
         }
 
         if (windowSizeConfiguration) {
-            const windowSize : IDisplayWindowDiscreteSize =
-                windowSizeConfiguration as IDisplayWindowDiscreteSize;
-            pixelWidth = windowSize.value.value.width;
-            pixelHeight = windowSize.value.value.height;
+           if (windowSizeConfiguration.type === 'DISCRETE') {
+                const windowSize : IDisplayWindowDiscreteSize =
+                    windowSizeConfiguration as IDisplayWindowDiscreteSize;
+                pixelWidth = windowSize.value.value.width;
+                pixelHeight = windowSize.value.value.height;
+            } else {
+                 logger.error('CONTINUOUS type is not supported');
+            }
         }
     }
 

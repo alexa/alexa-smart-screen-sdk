@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 
 import { ActivityEvent } from '../activity/ActivityEvent';
@@ -13,7 +13,7 @@ import { NavigationEvent } from './NavigationEvent';
  * @exports
  */
 export enum AlexaState {
-    /// Guard for unkonwn state.
+    /// Guard for unknown state.
     UNKNOWN = 'UNKNOWN',
     /// Alexa is disconnected.
     DISCONNECTED = 'DISCONNECTED',
@@ -64,7 +64,8 @@ export type InboundMessageType =
     | 'clearPlayerInfoCard'
     | 'clearDocument'
     | 'aplRender'
-    | 'aplCore';
+    | 'aplCore'
+    | 'renderCaptions';
 
 export interface IBaseInboundMessage {
     type : InboundMessageType;
@@ -121,6 +122,10 @@ export interface IAPLCoreMessage extends IBaseInboundMessage {
     payload : any;
 }
 
+export interface IRenderCaptionsMessage extends IBaseInboundMessage {
+    payload : any;
+}
+
 export type OutboundMessageType =
     'initResponse'
     | 'deviceWindowState'
@@ -134,7 +139,8 @@ export type OutboundMessageType =
     | 'aplEvent'
     | 'activityEvent'
     | 'navigationEvent'
-    | 'logEvent';
+    | 'logEvent'
+    | 'toggleCaptions';
 
 export interface IBaseOutboundMessage {
     type : OutboundMessageType;

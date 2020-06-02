@@ -1,5 +1,5 @@
 Alexa Smart Screen SDK
-Copyright 2018-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 
 *********************************
 Alexa Smart Screen SDK COMPONENTS

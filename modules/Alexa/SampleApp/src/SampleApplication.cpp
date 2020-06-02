@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -46,10 +46,14 @@
 
 #ifdef PORTAUDIO
 #include <SampleApp/PortAudioMicrophoneWrapper.h>
+#elif defined(UWP_BUILD)
+#include "SSSDKCommon/NullMicrophone.h"
 #endif
 
 #ifdef GSTREAMER_MEDIA_PLAYER
 #include <MediaPlayer/MediaPlayer.h>
+#elif defined(UWP_BUILD)
+#include <SSSDKCommon/NullMediaSpeaker.h>
 #endif
 
 #ifdef ANDROID
@@ -108,7 +112,7 @@
 #include <CapabilitiesDelegate/Storage/SQLiteCapabilitiesDelegateStorage.h>
 #include <Notifications/SQLiteNotificationsStorage.h>
 #ifdef ENABLE_CAPTIONS
-#include <SampleApp/CaptionPresenter.h>
+#include <SampleApp/SmartScreenCaptionPresenter.h>
 #endif
 #include <SampleApp/SampleEqualizerModeController.h>
 #include <SQLiteStorage/SQLiteMiscStorage.h>
@@ -124,10 +128,12 @@
 #include <csignal>
 #include <fstream>
 
+#ifndef UWP_BUILD
 #include <Communication/WebSocketServer.h>
+#else
+#include "UWPSampleApp/UWPSampleApp/include/UWPSampleApp/NullSocketServer.h"
+#endif
 
-#include "SampleApp/AplCoreEngineSDKLogBridge.h"
-#include "SampleApp/AplCoreGuiRenderer.h"
 #include "SampleApp/JsonUIManager.h"
 #include "SampleApp/LocaleAssetsManager.h"
 
@@ -213,6 +219,12 @@ static const std::string CONTENT_CACHE_MAX_SIZE_KEY("contentCacheMaxSize");
 
 /// Default value for max number of cache entries for imported packages.
 static const std::string DEFAULT_CONTENT_CACHE_MAX_SIZE("50");
+
+/// The key in our config file to find the maxNumberOfConcurrentDownloads configuration.
+static const std::string MAX_NUMBER_OF_CONCURRENT_DOWNLOAD_CONFIGURATION_KEY = "maxNumberOfConcurrentDownloads";
+
+// The default value for the maximum number of concurrent downloads.
+static const int DEFAULT_MAX_NUMBER_OF_CONCURRENT_DOWNLOAD = 5;
 
 using namespace alexaClientSDK;
 using namespace alexaClientSDK::capabilityAgents::externalMediaPlayer;
@@ -684,6 +696,9 @@ bool SampleApplication::initialize(
 
     // Create the websocket server that handles communications with websocket clients
 
+#ifdef UWP_BUILD
+    auto webSocketServer = std::make_shared<NullSocketServer>();
+#else
     auto webSocketServer = std::make_shared<communication::WebSocketServer>(websocketInterface, websocketPortNumber);
 
 #ifdef ENABLE_WEBSOCKET_SSL
@@ -696,9 +711,10 @@ bool SampleApplication::initialize(
     std::string sslPrivateKeyFile;
     sampleAppConfig.getString(WEBSOCKET_PRIVATE_KEY, &sslPrivateKeyFile);
 
-    m_webSocketServer->setCertificateFile(sslCaFile, sslCertificateFile, sslPrivateKeyFile);
-#endif
+    webSocketServer->setCertificateFile(sslCaFile, sslCertificateFile, sslPrivateKeyFile);
+#endif  // ENABLE_WEBSOCKET_SSL
 
+#endif  // UWP_BUILD
     m_guiClient = gui::GUIClient::create(webSocketServer, miscStorage);
 
     if (!m_guiClient) {
@@ -715,14 +731,24 @@ bool SampleApplication::initialize(
         DEFAULT_CONTENT_CACHE_REUSE_PERIOD_IN_SECONDS);
     sampleAppConfig.getString(CONTENT_CACHE_MAX_SIZE_KEY, &maxCacheSize, DEFAULT_CONTENT_CACHE_MAX_SIZE);
 
-    auto aplCoreGuiContentDownloadManager = std::make_shared<AplCoreGuiContentDownloadManager>(
+    auto contentDownloadManager = std::make_shared<CachingDownloadManager>(
         httpContentFetcherFactory, std::stol(cachePeriodInSeconds), std::stol(maxCacheSize));
-    auto aplCoreConnectionManager = std::make_shared<AplCoreConnectionManager>(m_guiClient);
-    auto aplCoreGuiRenderer =
-        std::make_shared<AplCoreGuiRenderer>(aplCoreConnectionManager, aplCoreGuiContentDownloadManager);
 
-    m_guiClient->setAplCoreConnectionManager(aplCoreConnectionManager);
-    m_guiClient->setAplCoreGuiRenderer(aplCoreGuiRenderer);
+    int maxNumberOfConcurrentDownloads;
+    sampleAppConfig.getInt(
+        MAX_NUMBER_OF_CONCURRENT_DOWNLOAD_CONFIGURATION_KEY,
+        &maxNumberOfConcurrentDownloads,
+        DEFAULT_MAX_NUMBER_OF_CONCURRENT_DOWNLOAD);
+
+    if (1 > maxNumberOfConcurrentDownloads) {
+        maxNumberOfConcurrentDownloads = DEFAULT_MAX_NUMBER_OF_CONCURRENT_DOWNLOAD;
+        ACSDK_ERROR(LX("Invalid values for maxNumberOfConcurrentDownloads"));
+    }
+
+    auto parameters = AplClientBridgeParameter{.maxNumberOfConcurrentDownloads = maxNumberOfConcurrentDownloads};
+    auto aplRenderer = AplClientBridge::create(contentDownloadManager, m_guiClient, parameters);
+
+    m_guiClient->setAplClientBridge(aplRenderer);
 
     if (!m_guiClient->start()) {
         return false;
@@ -732,7 +758,7 @@ bool SampleApplication::initialize(
     /*
      * Create the presentation layer for the captions.
      */
-    auto captionPresenter = std::make_shared<alexaSmartScreenSDK::sampleApp::CaptionPresenter>();
+    auto captionPresenter = std::make_shared<alexaSmartScreenSDK::sampleApp::SmartScreenCaptionPresenter>(m_guiClient);
 #endif
 
     /*
@@ -848,7 +874,6 @@ bool SampleApplication::initialize(
     providers.push_back(avsGatewayManager);
     providers.push_back(m_capabilitiesDelegate);
 
-    apl::LoggerFactory::instance().initialize(std::make_shared<AplCoreEngineSDKLogBridge>(AplCoreEngineSDKLogBridge()));
     /*
      * Create a factory for creating objects that handle tasks that need to be performed right after establishing
      * a connection to AVS.
@@ -957,6 +982,9 @@ bool SampleApplication::initialize(
 #elif defined(ANDROID_MICROPHONE)
     std::shared_ptr<applicationUtilities::androidUtilities::AndroidSLESMicrophone> micWrapper =
         m_openSlEngine->createAndroidMicrophone(sharedDataStream);
+#elif defined(UWP_BUILD)
+    std::shared_ptr<alexaSmartScreenSDK::sssdkCommon::NullMicrophone> micWrapper =
+        std::make_shared<alexaSmartScreenSDK::sssdkCommon::NullMicrophone>(sharedDataStream);
 #else
 #error "No audio input provided"
 #endif
@@ -1094,8 +1122,8 @@ bool SampleApplication::initialize(
 #ifdef ENABLE_CAPTIONS
     std::vector<std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface>> captionableMediaSources = pool;
     captionableMediaSources.emplace_back(m_speakMediaPlayer);
-    client->addCaptionPresenter(captionPresenter);
-    client->setCaptionMediaPlayers(captionableMediaSources);
+    smartScreenClient->addCaptionPresenter(captionPresenter);
+    smartScreenClient->setCaptionMediaPlayers(captionableMediaSources);
 #endif
 
 #ifdef ENABLE_REVOKE_AUTH
@@ -1145,6 +1173,11 @@ SampleApplication::createApplicationMediaPlayer(
     }
     auto speaker = mediaPlayer->getSpeaker();
     return {std::move(mediaPlayer), speaker};
+#elif defined(UWP_BUILD)
+    auto mediaPlayer = std::make_shared<alexaSmartScreenSDK::sssdkCommon::TestMediaPlayer>();
+    auto speaker = std::make_shared<alexaSmartScreenSDK::sssdkCommon::NullMediaSpeaker>();
+
+    return {mediaPlayer, speaker};
 #endif
 }
 

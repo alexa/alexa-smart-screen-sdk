@@ -8,3 +8,6 @@ add_library(Utils INTERFACE)
 
 target_include_directories(Utils INTERFACE
     "${Utils_SOURCE_DIR}/include")
+
+# install target
+asdk_install()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -46,7 +46,8 @@ public:
      * Constructor
      * @param type The type from this message
      */
-    Message(const std::string& type) : smartScreenSDKInterfaces::MessageInterface(type) {}
+    Message(const std::string& type) : smartScreenSDKInterfaces::MessageInterface(type) {
+    }
 
     /**
      * Add a new member to the json
@@ -57,7 +58,7 @@ public:
     Message& addMember(const std::string& name, const std::string& value) {
         mDocument.AddMember(
             rapidjson::Value(name.c_str(), mDocument.GetAllocator()).Move(),
-            rapidjson::Value(value.c_str(), mDocument.GetAllocator()).Move(), 
+            rapidjson::Value(value.c_str(), mDocument.GetAllocator()).Move(),
             mDocument.GetAllocator());
         return *this;
     }
@@ -70,9 +71,7 @@ public:
      */
     Message& addMember(const std::string& name, unsigned value) {
         mDocument.AddMember(
-            rapidjson::Value(name.c_str(), mDocument.GetAllocator()).Move(),
-            value, 
-            mDocument.GetAllocator());
+            rapidjson::Value(name.c_str(), mDocument.GetAllocator()).Move(), value, mDocument.GetAllocator());
         return *this;
     }
 
@@ -114,7 +113,9 @@ public:
      */
     Message& setPayload(const std::string& payload) {
         mDocument.AddMember(
-            MSG_PAYLOAD_TAG, rapidjson::Value(payload.c_str(), mDocument.GetAllocator()).Move(), mDocument.GetAllocator());
+            MSG_PAYLOAD_TAG,
+            rapidjson::Value(payload.c_str(), mDocument.GetAllocator()).Move(),
+            mDocument.GetAllocator());
         return *this;
     }
 

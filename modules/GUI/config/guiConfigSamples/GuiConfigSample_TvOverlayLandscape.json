@@ -37,6 +37,11 @@
                     "code": "Escape",
                     "keyCode": 27,
                     "key": "Escape"
+                },
+                "toggleCaptionsKey": {
+                    "code": "KeyC",
+                    "keyCode": 67,
+                    "key": "c"
                 }
             }
         },

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@
 #include <AVSCommon/Utils/Bluetooth/BluetoothEventBus.h>
 #include <AVSCommon/Utils/Network/InternetConnectionMonitor.h>
 #include <AVSCommon/Utils/Metrics/MetricRecorderInterface.h>
+#include <AVSCommon/Utils/Metrics/MetricEventBuilder.h>
 
 #ifdef ACSDK_ENABLE_METRICS_RECORDING
 #include <Metrics/MetricRecorder.h>
@@ -555,6 +556,8 @@ bool SmartScreenClient::initialize(
         return false;
     }
 
+    m_deviceTimeZoneOffset = settingsManagerBuilder.getDeviceTimezoneOffset();
+
     /*
      * Creating the Audio Activity Tracker - This component is responsibly for
      * reporting the audio channel focus
@@ -1057,7 +1060,12 @@ bool SmartScreenClient::initialize(
      */
     m_alexaPresentation =
         alexaSmartScreenSDK::smartScreenCapabilityAgents::alexaPresentation::AlexaPresentation::create(
-            m_visualFocusManager, m_exceptionSender, m_connectionManager, contextManager, visualStateProvider);
+            m_visualFocusManager,
+            m_exceptionSender,
+            metricRecorder,
+            m_connectionManager,
+            contextManager,
+            visualStateProvider);
     if (!m_alexaPresentation) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateAlexaPresentationCapabilityAgent"));
         return false;
@@ -1424,6 +1432,7 @@ void SmartScreenClient::onFocusChanged(
     alexaClientSDK::avsCommon::avs::MixingBehavior behavior) {
     if (newFocus == alexaClientSDK::avsCommon::avs::FocusState::FOREGROUND) {
         stopForegroundActivity();
+        m_audioInputProcessor->resetState();
         clearCard();
     }
 }
@@ -1776,6 +1785,14 @@ void SmartScreenClient::sendUserEvent(const std::string& payload) {
     m_alexaPresentation->sendUserEvent(payload);
 }
 
+void SmartScreenClient::sendDataSourceFetchRequestEvent(const std::string& type, const std::string& payload) {
+    m_alexaPresentation->sendDataSourceFetchRequestEvent(type, payload);
+}
+
+void SmartScreenClient::sendRuntimeErrorEvent(const std::string& payload) {
+    m_alexaPresentation->sendRuntimeErrorEvent(payload);
+}
+
 void SmartScreenClient::handleVisualContext(uint64_t token, std::string payload) {
     m_alexaPresentation->onVisualContextAvailable(token, payload);
 }
@@ -1809,6 +1826,46 @@ void SmartScreenClient::clearAllExecuteCommands() {
 
 void SmartScreenClient::setDeviceWindowState(const std::string& payload) {
     m_visualCharacteristics->setDeviceWindowState(payload);
+}
+
+void SmartScreenClient::addSpeechSynthesizerObserver(
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeechSynthesizerObserverInterface> observer) {
+    if (!m_speechSynthesizer) {
+        ACSDK_ERROR(LX("addSpeechSynthesizerObserverFailed").d("reason", "speechSynthesizerNotSupported"));
+        return;
+    }
+    m_speechSynthesizer->addObserver(observer);
+};
+
+void SmartScreenClient::removeSpeechSynthesizerObserver(
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeechSynthesizerObserverInterface> observer) {
+    if (!m_speechSynthesizer) {
+        ACSDK_ERROR(LX("addSpeechSynthesizerObserverFailed").d("reason", "speechSynthesizerNotSupported"));
+        return;
+    }
+    m_speechSynthesizer->removeObserver(observer);
+}
+
+std::chrono::milliseconds SmartScreenClient::getDeviceTimezoneOffset() {
+    return m_deviceTimeZoneOffset;
+}
+
+void SmartScreenClient::handleRenderComplete(bool isAlexaPresentationPresenting) {
+    if (isAlexaPresentationPresenting) {
+        m_alexaPresentation->recordRenderComplete();
+    }
+}
+
+void SmartScreenClient::handleDropFrameCount(uint64_t dropFrameCount, bool isAlexaPresentationPresenting) {
+    if (isAlexaPresentationPresenting) {
+        m_alexaPresentation->recordDropFrameCount(dropFrameCount);
+    }
+}
+
+void SmartScreenClient::handleAPLEvent(APLClient::AplRenderingEvent event, bool isAlexaPresentationPresenting) {
+    if (isAlexaPresentationPresenting) {
+        m_alexaPresentation->recordAPLEvent(event);
+    }
 }
 
 SmartScreenClient::~SmartScreenClient() {

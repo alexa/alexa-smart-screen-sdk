@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -18,6 +18,10 @@
 #include <iostream>
 #include <algorithm>
 
+#ifdef UWP_BUILD
+#include <windows.h>
+#endif
+
 /**
  *  When using pretty print, we pad our strings in the beginning and in the end with the margin representation '#'
  *  and 7 spaces. E.g., if I pass "Hello world!" string, pretty print will look like:
@@ -34,9 +38,22 @@ using namespace alexaClientSDK;
 
 std::shared_ptr<std::mutex> ConsolePrinter::m_globalMutex = std::make_shared<std::mutex>();
 
+#ifdef UWP_BUILD
+std::wstring s2ws(const std::string& sa) {
+    std::string& s = sa + "\n";
+    int len;
+    int slength = (int)s.length() + 1;
+    len = MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, 0, 0);
+    wchar_t* buf = new wchar_t[len];
+    MultiByteToWideChar(CP_ACP, 0, s.c_str(), slength, buf, len);
+    std::wstring r(buf);
+    delete[] buf;
+    return r;
+}
+#endif
+
 ConsolePrinter::ConsolePrinter() :
-        avsCommon::utils::logger::Logger(avsCommon::utils::logger::Level::UNKNOWN),
-        m_mutex(m_globalMutex) {
+        avsCommon::utils::logger::Logger(avsCommon::utils::logger::Level::UNKNOWN), m_mutex(m_globalMutex) {
 }
 
 void ConsolePrinter::simplePrint(const std::string& stringToPrint) {
@@ -46,7 +63,12 @@ void ConsolePrinter::simplePrint(const std::string& stringToPrint) {
     }
 
     std::lock_guard<std::mutex> lock{*mutex};
+#ifdef UWP_BUILD
+    auto ws = s2ws(stringToPrint);
+    OutputDebugString((LPCWSTR)ws.c_str());
+#else
     std::cout << stringToPrint << std::endl;
+#endif
 }
 
 void ConsolePrinter::prettyPrint(std::initializer_list<std::string> lines) {
@@ -82,7 +104,14 @@ void ConsolePrinter::emit(
     const char* threadMoniker,
     const char* text) {
     std::lock_guard<std::mutex> lock{*m_mutex};
+
+#ifdef UWP_BUILD
+    auto formatted = m_logFormatter.format(level, time, threadMoniker, text);
+    auto ws = s2ws(formatted);
+    OutputDebugString((LPCWSTR)ws.c_str());
+#else
     std::cout << m_logFormatter.format(level, time, threadMoniker, text) << std::endl;
+#endif
 }
 
 }  // namespace sampleApp

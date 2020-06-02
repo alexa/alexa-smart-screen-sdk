@@ -14,6 +14,7 @@ if ((PORTAUDIO AND GSTREAMER_MEDIA_PLAYER) OR (ANDROID_MEDIA_PLAYER AND ANDROID_
     endif()
 
     add_subdirectory("src")
+    add_subdirectory("test")
 else()
     message("To build the sample app, please enable microphone and media player modules.")
 endif()

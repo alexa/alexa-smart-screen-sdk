@@ -6,10 +6,11 @@ add_library(AlexaPresentation SHARED
 target_include_directories(AlexaPresentation
     PUBLIC "${AlexaPresentation_SOURCE_DIR}/include"
         "${SmartScreenSDKInterfaces_SOURCE_DIR}/include"
+        "${APLClient_SOURCE_DIR}/include"
         "${ASDK_INCLUDE_DIRS}"
         "${RAPIDJSON_INCLUDE_DIR}")
 
-target_link_libraries(AlexaPresentation "${ASDK_LDFLAGS}" SmartScreenSDKInterfaces)
+target_link_libraries(AlexaPresentation "${ASDK_LDFLAGS}" SmartScreenSDKInterfaces APLClient)
 
 # install target
 asdk_install()

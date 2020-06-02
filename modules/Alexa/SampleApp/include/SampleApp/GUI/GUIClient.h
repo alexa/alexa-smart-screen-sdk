@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -57,10 +57,11 @@
 #include <SmartScreenSDKInterfaces/MessageInterface.h>
 #include <SmartScreenSDKInterfaces/MessagingServerInterface.h>
 #include <SmartScreenSDKInterfaces/NavigationEvent.h>
+#include <SmartScreenSDKInterfaces/RenderCaptionsInterface.h>
 #include <SampleApp/GUILogBridge.h>
+#include <SampleApp/SmartScreenCaptionStateManager.h>
 
-#include "SampleApp/AplCoreConnectionManager.h"
-#include "SampleApp/AplCoreGuiRenderer.h"
+#include "SampleApp/AplClientBridge.h"
 #include "SampleApp/SampleApplicationReturnCodes.h"
 
 namespace alexaSmartScreenSDK {
@@ -79,7 +80,8 @@ class GUIClient
         , public alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIClientInterface
         , public alexaClientSDK::avsCommon::utils::RequiresShutdown
-        , public std::enable_shared_from_this<GUIClient> {
+        , public std::enable_shared_from_this<GUIClient>
+        , public alexaSmartScreenSDK::smartScreenSDKInterfaces::RenderCaptionsInterface {
 public:
     /// Alias for GUI provided token.
     using APLToken = uint64_t;
@@ -114,6 +116,8 @@ public:
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
     void clearDocument() override;
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
+    void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
+        override;
     /// @}
 
     // @name VisualStateProviderInterface Functions
@@ -180,14 +184,21 @@ public:
     void onLogout() override;
     /// @}
 
-    /*
+    /**
      * @return Returns the max APL version supported.
      */
     std::string getMaxAPLVersion();
 
-    void setAplCoreConnectionManager(std::shared_ptr<AplCoreConnectionManager> aplCoreConnectionManager);
+    /**
+     * Sets the APL Client Bridge
+     * @param aplClientBridge The APL Client bridge
+     */
+    void setAplClientBridge(std::shared_ptr<AplClientBridge> aplClientBridge);
 
-    void setAplCoreGuiRenderer(std::shared_ptr<AplCoreGuiRenderer> aplCoreGuiRenderer);
+    /// @name RenderCaptionsInterface Function
+    /// @{
+    void renderCaptions(const std::string& payload) override;
+    /// @}
 
 private:
     // @name RequiresShutdown Functions
@@ -333,6 +344,18 @@ private:
      */
     void executeHandleDeviceWindowState(rapidjson::Document& message);
 
+    /**
+     * Handle renderComplete message.
+     * @param message A complete message holding the event.
+     */
+    void executeHandleRenderComplete(rapidjson::Document& message);
+
+    /**
+     * Handle displayMetrics message.
+     * @param message A complete message holding the event.
+     */
+    void executeHandleDisplayMetrics(rapidjson::Document& message);
+
     /// Internal function to execute @see processFocusAcquireRequest
     void executeFocusAcquireRequest(
         const APLToken token,
@@ -462,11 +485,8 @@ private:
     /// Server observer
     std::shared_ptr<smartScreenSDKInterfaces::MessagingServerObserverInterface> m_observer;
 
-    /// The APL Core bridge
-    std::shared_ptr<AplCoreConnectionManager> m_aplCoreConnectionManager;
-
-    // The APL Core renderer
-    std::shared_ptr<AplCoreGuiRenderer> m_aplCoreGuiRenderer;
+    // The APL renderer
+    std::shared_ptr<AplClientBridge> m_aplClientBridge;
 
     /// Flag to indicate that a fatal failure occurred. In this case, customer can either reset the device or kill
     /// the app.
@@ -487,6 +507,9 @@ private:
 
     /// GUI log bridge to be used to handle log events.
     GUILogBridge m_rendererLogBridge;
+
+    /// CaptionManager to manage settings for captions
+    SmartScreenCaptionStateManager m_captionManager;
 };
 
 }  // namespace gui

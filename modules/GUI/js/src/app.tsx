@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 
 import * as React from 'react';
@@ -35,7 +35,8 @@ import {
     IAPLRenderMessage,
     IGuiConfigurationMessage,
     IDeviceWindowStateMessage,
-    IBaseInboundMessage
+    IBaseInboundMessage,
+    IRenderCaptionsMessage
 } from './lib/messages/messages';
 import { PlayerInfoWindow, RENDER_PLAYER_INFO_WINDOW_ID } from './components/PlayerInfoWindow';
 import { resolveRenderTemplate } from './lib/displayCards/AVSDisplayCardHelpers';
@@ -49,24 +50,30 @@ import { IDeviceAppConfig, AudioInputInitiator } from './lib/config/IDeviceAppCo
 import { IDisplayPixelDimensions } from './lib/config/visualCharacteristics/IDeviceDisplay';
 import { resolveDeviceAppConfig, resolveDeviceWindowState } from './lib/config/GuiConfigHelpers';
 import { IWindowState } from './lib/config/visualCharacteristics/IWindowState';
+import { UWPWebViewClient } from './lib/messages/UWPClient';
+import { CaptionsView } from './components/CaptionsView';
 
 const HOST = 'localhost';
 const PORT = 8933;
 
 /// Maximum APL version supported by the runtime.
-const APL_MAX_VERSION = '1.2';
+const APL_MAX_VERSION = '1.3';
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '0.10';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.1';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
+
+/// Indicates whether to use the UWP client
+declare const USE_UWP_CLIENT : boolean;
 
 export interface IAppState {
     alexaState : AlexaState;
     targetWindowId : string;
     playerInfoMessage : IRenderPlayerInfoMessage;
     updateActiveAPLRendererWindow : boolean;
+    captionsMessage : IRenderCaptionsMessage;
 }
 
 export class App extends React.Component<any, IAppState> {
@@ -81,6 +88,9 @@ export class App extends React.Component<any, IAppState> {
     protected talkButtonDownMessage : OutboundMessageType;
     protected talkButtonUpMessage : OutboundMessageType;
     protected eventListenersAdded : boolean;
+    private captionFrame : any;
+    private lastCaptionTimeOutId : number;
+    private toggleCaptionsMessage : OutboundMessageType = 'toggleCaptions';
 
     /**
      * Compare two versions as strings.
@@ -121,6 +131,23 @@ export class App extends React.Component<any, IAppState> {
 
         const isSupported : boolean = (this.compareVersions(SMART_SCREEN_SDK_MIN_VERSION, smartScreenSDKVer) <= 0);
         this.sendInitResponse(isSupported, APL_MAX_VERSION);
+    }
+
+    protected handleRenderCaptions(message : IBaseInboundMessage) {
+        this.captionFrame = JSON.parse(JSON.stringify((message as IRenderCaptionsMessage).payload));
+        clearTimeout(this.lastCaptionTimeOutId);
+
+        this.setState({
+            captionsMessage : this.captionFrame
+        });
+
+        this.lastCaptionTimeOutId = setTimeout(this.clearCaptions, this.captionFrame.duration);
+    }
+
+    protected clearCaptions = () => {
+        this.setState({
+            captionsMessage : undefined
+        });
     }
 
     protected handleRenderTemplateMessage(message : IBaseInboundMessage) {
@@ -206,7 +233,7 @@ export class App extends React.Component<any, IAppState> {
             = message as IGuiConfigurationMessage;
 
         this.deviceAppConfig = resolveDeviceAppConfig(
-            window.innerWidth, window.innerHeight, guiConfigurationMessage.payload);
+            window.innerWidth, window.innerHeight, guiConfigurationMessage.payload, this.logger);
 
         this.windowState = resolveDeviceWindowState(this.deviceAppConfig);
 
@@ -294,6 +321,10 @@ export class App extends React.Component<any, IAppState> {
               this.aplConnection.handleMessage(message as IAPLCoreMessage);
               break;
             }
+            case 'renderCaptions': {
+                this.handleRenderCaptions(message);
+                break;
+            }
             default: {
                 this.logger.warn('received message with unsupported type. Type: ', message.type);
                 break;
@@ -319,8 +350,11 @@ export class App extends React.Component<any, IAppState> {
             onMessage : this.onClientMessage.bind(this),
             insecure : DISABLE_WEBSOCKET_SSL
         };
-
-        this.client = new Client(clientConfig);
+        if (USE_UWP_CLIENT) {
+            this.client = new UWPWebViewClient(clientConfig);
+        } else {
+            this.client = new Client(clientConfig);
+        }
         this.aplConnection = new WebsocketConnectionWrapper(this.client);
         SDKLogTransport.initialize(this.client);
 
@@ -328,7 +362,8 @@ export class App extends React.Component<any, IAppState> {
             alexaState : AlexaState.IDLE,
             playerInfoMessage : undefined,
             updateActiveAPLRendererWindow : false,
-            targetWindowId : undefined
+            targetWindowId : undefined,
+            captionsMessage : undefined
         };
 
         this.eventListenersAdded = false;
@@ -371,6 +406,16 @@ export class App extends React.Component<any, IAppState> {
     }
 
     protected sendTalkButtonEvent(type : OutboundMessageType) {
+        if (type === undefined) {
+            return;
+        }
+        const message : IBaseOutboundMessage = {
+            type
+        };
+        this.client.sendMessage(message);
+    }
+
+    protected sendToggleCaptionsEvent(type : OutboundMessageType) {
         if (type === undefined) {
             return;
         }
@@ -455,6 +500,9 @@ export class App extends React.Component<any, IAppState> {
                 />
                 {playerInfo}
                 {aplRendererWindows}
+                <CaptionsView
+                    captionsMessage={this.state.captionsMessage}
+                />
                 <VoiceChrome
                     deviceAppConfig={this.deviceAppConfig}
                     targetWindowId={this.state.targetWindowId}
@@ -518,6 +566,10 @@ export class App extends React.Component<any, IAppState> {
             // Similar to BACK button pressed on remote
             case this.deviceAppConfig.deviceKeys.backKey.code:
                 this.sendNavigationEvent(NavigationEvent.BACK);
+                break;
+            // Similar to toggle options setting on remote
+            case this.deviceAppConfig.deviceKeys.toggleCaptionsKey.code:
+                this.sendToggleCaptionsEvent(this.toggleCaptionsMessage);
                 break;
             default : {
                 this.handleUserInteraction();

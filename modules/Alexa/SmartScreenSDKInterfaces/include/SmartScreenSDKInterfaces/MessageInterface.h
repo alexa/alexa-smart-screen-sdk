@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,15 +22,15 @@
 #include <rapidjson/writer.h>
 #include <rapidjson/stringbuffer.h>
 
-/// The root GUI message type
-const char MSG_TYPE_TAG[] = "type";
-
 namespace alexaSmartScreenSDK {
 namespace smartScreenSDKInterfaces {
 
+/// The root GUI message type
+const char MSG_TYPE_TAG[] = "type";
+
 /**
- * An interface for rapidjson::Document based messages.  
- * 
+ * An interface for rapidjson::Document based messages.
+ *
  * All messages have the format:
  * { "type": STRING }
  */

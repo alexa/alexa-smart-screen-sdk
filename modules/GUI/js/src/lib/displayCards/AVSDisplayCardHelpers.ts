@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 
 import {
@@ -80,7 +80,8 @@ export const resolveRenderPlayerInfoCommand = (
         type : 'updateRenderPlayerInfo',
         mediaOffsetInMilliseconds: message.audioOffset,
         mediaLengthInMilliseconds : message.payload.content.mediaLengthInMilliseconds,
-        audioPlayerState: message.audioPlayerState
+        audioPlayerState: message.audioPlayerState,
+        controls: message.payload.controls
     };
     return createExecuteCommandsMessage(RENDER_PLAYER_INFO_KEY, command);
 };

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@
 #include <Settings/Types/LocaleWakeWordsSetting.h>
 #include <System/TimeZoneHandler.h>
 #include <System/LocaleHandler.h>
-
 #include "SmartScreenClient/DeviceSettingsManagerBuilder.h"
 
 /// String to identify log entries originating from this file.
@@ -133,10 +132,37 @@ DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withTimeZoneSetting(
         settingsConfig.getString(DEFAULT_TIMEZONE_CONFIGURATION_KEY, &defaultTimezone, DEFAULT_TIMEZONE);
     }
 
+    m_deviceTimeZoneOffset = calculateDeviceTimezoneOffset(defaultTimezone);
+
     return withSynchronizedSetting<DeviceSettingsIndex::TIMEZONE, SharedAVSSettingProtocol>(
         alexaClientSDK::capabilityAgents::system::TimeZoneHandler::getTimeZoneMetadata(),
         defaultTimezone,
         applyFunction);
+}
+
+std::chrono::milliseconds DeviceSettingsManagerBuilder::getDeviceTimezoneOffset() {
+    return m_deviceTimeZoneOffset;
+}
+
+std::chrono::milliseconds DeviceSettingsManagerBuilder::calculateDeviceTimezoneOffset(const std::string& timeZone) {
+#ifdef _MSC_VER
+    TIME_ZONE_INFORMATION TimeZoneInfo;
+    GetTimeZoneInformation(&TimeZoneInfo);
+    auto offsetInMinutes = - TimeZoneInfo.Bias - TimeZoneInfo.DaylightBias;
+    ACSDK_DEBUG9(LX(__func__).m(std::to_string(offsetInMinutes)));
+    return std::chrono::minutes(offsetInMinutes);
+#else
+    char *prevTZ = getenv("TZ");
+    setenv("TZ", timeZone.c_str(), 1);
+    time_t t = time(NULL);
+    struct tm *structtm = localtime(&t);
+    if (prevTZ) {
+        setenv("TZ", prevTZ, 1);
+    } else {
+        unsetenv("TZ");
+    }
+    return std::chrono::milliseconds(structtm->tm_gmtoff * 1000);
+#endif
 }
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withLocaleSetting(

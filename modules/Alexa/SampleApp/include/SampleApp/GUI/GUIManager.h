@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
 #include <AVSCommon/Utils/RequiresShutdown.h>
 
+#include <APLClient/AplRenderingEvent.h>
 #include <AlexaPresentation/AlexaPresentation.h>
 #include <TemplateRuntimeCapabilityAgent/TemplateRuntime.h>
 
@@ -40,6 +41,10 @@
 
 #ifdef ENABLE_PCC
 #include "PhoneCaller.h"
+#endif
+
+#ifdef UWP_BUILD
+#include <SSSDKCommon/NullMicrophone.h>
 #endif
 
 namespace alexaSmartScreenSDK {
@@ -107,6 +112,9 @@ public:
 
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
 
+    void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
+        override;
+
     void interruptCommandSequence() override;
     /// @}
 
@@ -152,6 +160,10 @@ public:
 
     void handleUserEvent(std::string userEventPayload) override;
 
+    void handleDataSourceFetchRequestEvent(std::string type, std::string payload) override;
+
+    void handleRuntimeErrorEvent(std::string payload) override;
+
     void handleVisualContext(uint64_t token, std::string payload) override;
 
     bool handleFocusAcquireRequest(
@@ -177,6 +189,14 @@ public:
     void setDocumentIdleTimeout(std::chrono::milliseconds timeout) override;
 
     void handleDeviceWindowState(std::string payload) override;
+
+    void forceExit() override;
+
+    void handleRenderComplete() override;
+
+    void handleAPLEvent(APLClient::AplRenderingEvent event) override;
+
+    void handleDisplayMetrics(uint64_t dropFrameCount) override;
     /// }
 
     /**
@@ -189,6 +209,10 @@ public:
      * @param client The input smart screen client
      */
     void setClient(std::shared_ptr<smartScreenClient::SmartScreenClient> client);
+
+#ifdef UWP_BUILD
+    void inputAudioFile(const std::string& audioFile);
+#endif
 
 private:
     /**
@@ -332,6 +356,11 @@ private:
      */
     void stopCall();
 
+    /**
+     * Gets Device Time Zone Offset.
+     */
+    std::chrono::milliseconds getDeviceTimezoneOffset() override;
+
 #ifdef ENABLE_PCC
     /**
      * PhoneCallController commands
@@ -398,8 +427,11 @@ private:
     bool m_isMicOn;
 
     /// The microphone managing object.
+#ifdef UWP_BUILD
+    std::shared_ptr<alexaSmartScreenSDK::sssdkCommon::NullMicrophone> m_micWrapper;
+#else
     std::shared_ptr<alexaClientSDK::applicationUtilities::resources::audio::MicrophoneInterface> m_micWrapper;
-
+#endif
     /// The currently active smartScreenSDKInterfaces::NonPlayerInfoDisplayType
     smartScreenSDKInterfaces::NonPlayerInfoDisplayType m_activeNonPlayerInfoDisplayType;
 

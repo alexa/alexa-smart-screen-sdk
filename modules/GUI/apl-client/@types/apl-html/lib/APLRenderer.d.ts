@@ -65,6 +65,13 @@ export interface ISendEvent {
     components: any[];
 }
 /**
+ * Event coming from APL to request data fetch for any of registered DataSources.
+ */
+export interface IDataSourceFetchRequest {
+    type: string;
+    payload: any;
+}
+/**
  * keyboard handler type
  */
 export declare enum KeyHandlerType {
@@ -91,6 +98,12 @@ export interface IAPLOptions {
     audioPlayerFactory?: AudioPlayerFactory;
     /** Callback for executed SendEvent commands */
     onSendEvent?: (event: ISendEvent) => void;
+    /** Callback for Finish command */
+    onFinish?: () => void;
+    /** Callback for Data Source fetch requests */
+    onDataSourceFetchRequest?: (event: IDataSourceFetchRequest) => void;
+    /** Callback for pending errors from APLCore Library */
+    onRunTimeError?: (pendingErrors: object[]) => void;
     /**
      * Callback when a AVG source needs to be retreived by the consumer
      * If this is not provided, this viewhost will use the fetch API to
@@ -105,6 +118,10 @@ export interface IAPLOptions {
      * Contains developer tool options
      */
     developerToolOptions?: IDeveloperToolOptions;
+    /** Starting UTC time in milliseconds since 1/1/1970 */
+    utcTime: number;
+    /** Offset of the local time zone from UTC in milliseconds */
+    localTimeAdjustment: number;
 }
 /**
  * The main renderer. Create a new one with `const renderer = APLRenderer.create(content);`
@@ -128,10 +145,12 @@ export default abstract class APLRenderer<Options = {
      */
     protected constructor(mOptions: IAPLOptions);
     init(): void;
+    private setBackground(docTheme);
     /**
      * Get developer tool options (if defined)
      */
     getDeveloperToolOptions(): IDeveloperToolOptions | undefined;
+    onRunTimeError(pendingErrors: object[]): void;
     /**
      * Called by core when a text measure is required
      * @param component The component to measure
@@ -166,6 +185,14 @@ export default abstract class APLRenderer<Options = {
      * @param id The developer assigned component ID
      */
     getComponentById(id: string): Component;
+    /**
+     * @returns true if is in screenLock state, false otherwise.
+     */
+    screenLock(): boolean;
+    /**
+     * Cancel Animation Frame
+     */
+    stopUpdate(): Promise<void>;
     /**
      * Return a map of components where the key matches the non-unique part of mappingKey
      * (when mappings are created a unique identifier is appended to ensure maps are unique)

@@ -1,5 +1,5 @@
 /*!
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 import { IAudioEventListener } from './IAudioEventListener';
 export declare type AudioPlayerFactory = (eventListener: IAudioEventListener) => AudioPlayer;

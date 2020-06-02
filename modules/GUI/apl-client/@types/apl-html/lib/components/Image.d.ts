@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 import { ImageAlign } from '../enums/ImageAlign';
 import { ImageScale } from '../enums/ImageScale';
@@ -10,6 +10,7 @@ import { Component, FactoryFunction, IComponentProperties } from './Component';
 import 'image-scale';
 import APLRenderer from '../APLRenderer';
 import { NoiseFilterKind } from '../enums/NoiseFilterKind';
+import { ILogger } from '../logging/ILogger';
 /**
  * @ignore
  */
@@ -99,9 +100,13 @@ export declare class Image extends Component<IImageProperties> {
     private applyShadowEffectWhenScaled;
     private hasShadowPropertyDefined;
     /**
+     * Check filters, update hasFiltersInCanvas and allFiltersInCanvas.
+     *
      * If there is any blur filter applied after noise, then need to apply
-     * both noise and blur filters in canvas, return true
-     * otherwise implement only noise in canvas, return false
+     * both noise and blur filters in canvas, set allFiltersInCanvas to true
+     * otherwise implement only noise in canvas, set allFiltersInCanvas to false.
+     *
+     * If there is any filter to be implemented in canvas, set hasFiltersInCanvas to true.
      */
     private checkFilters;
     /**
@@ -111,8 +116,10 @@ export declare class Image extends Component<IImageProperties> {
     private applyFiltersOnCanvas;
     private convertFilterComponentToCss(filter);
     private getCssFilterFromApl(filters);
-    private getCssGradient(gradient);
+    static getCssGradient(gradient: IGradient, logger: ILogger): string;
+    static getCssPureColorGradient(color: string): string;
     private setImageScale();
     private getImageScale();
-    private setImageAlignment();
+    private setImageHolderAlignment();
+    private setImageAndCanvasAlignment();
 }

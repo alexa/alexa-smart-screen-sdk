@@ -318,6 +318,8 @@
 # define GTEST_DISABLE_MSC_WARNINGS_POP_()
 #endif
 
+//TODO: better solution
+#define GTEST_LANG_CXX11 1
 #ifndef GTEST_LANG_CXX11
 // gcc and clang define __GXX_EXPERIMENTAL_CXX0X__ when
 // -std={c,gnu}++{0x,11} is passed.  The C++11 standard specifies a

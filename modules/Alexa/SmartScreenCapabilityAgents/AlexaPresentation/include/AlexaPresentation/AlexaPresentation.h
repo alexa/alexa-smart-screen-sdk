@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Amazon Software License (the "License").
  * You may not use this file except in compliance with the License.
@@ -34,7 +34,11 @@
 #include <AVSCommon/Utils/RequiresShutdown.h>
 #include <AVSCommon/Utils/Threading/Executor.h>
 #include <AVSCommon/Utils/Timing/Timer.h>
+#include <AVSCommon/Utils/Metrics/MetricRecorderInterface.h>
+#include <AVSCommon/Utils/Metrics/DataPointDurationBuilder.h>
+#include <AVSCommon/Utils/Metrics/DataPointCounterBuilder.h>
 
+#include <APLClient/AplRenderingEvent.h>
 #include <SmartScreenSDKInterfaces/ActivityEvent.h>
 #include <SmartScreenSDKInterfaces/AlexaPresentationObserverInterface.h>
 #include <SmartScreenSDKInterfaces/DisplayCardState.h>
@@ -74,6 +78,7 @@ public:
     static std::shared_ptr<AlexaPresentation> create(
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface> focusManager,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ExceptionEncounteredSenderInterface> exceptionSender,
+        std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerInterface> contextManager,
         std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface>
@@ -152,6 +157,23 @@ public:
      */
     void sendUserEvent(const std::string& payload);
 
+    /**
+     * Send @c DataSourceFetchRequest to AVS
+     *
+     * @param type type of DataSource requesting a fetch.
+     * @param payload The @c DataSourceFetchRequest event payload. The caller of this
+     * function is responsible to pass the payload as it defined by AVS.
+     */
+    void sendDataSourceFetchRequestEvent(const std::string& type, const std::string& payload);
+
+    /**
+     * Send @c RuntimeError to AVS
+     *
+     * @param payload The @c RuntimeError event payload. The caller of this
+     * function is responsible to pass the payload as it defined by AVS.
+     */
+    void sendRuntimeErrorEvent(const std::string& payload);
+
     /// @name StateProviderInterface Functions
     /// @{
     void provideState(
@@ -222,9 +244,25 @@ public:
     void setExecutor(const std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor>& executor);
 
     /**
+     * Record the finish event for currently rendering document
+     */
+    void recordRenderComplete();
+
+    /**
+     * Record display Metrics event
+     * @param dropFrameCount Count of the frames dropped
+     */
+    void recordDropFrameCount(uint64_t dropFrameCount);
+
+    /**
+     * Record the APL event for currently rendering document
+     */
+    void recordAPLEvent(APLClient::AplRenderingEvent event);
+
+    /**
      * The placeholder token to use for rendering Non-APL documents
      */
-    static const std::string NON_APL_DOCUMENT_TOKEN;
+    static const std::string getNonAPLDocumentToken();
 
 private:
     /// Enum for the different events sent by the TemplateRuntime capability agent.
@@ -236,7 +274,25 @@ private:
          *  Event sent when user interacts with a rendered GUI component. The event carries the complete component
          * context of the render component in its payload.
          */
-        APL_USER_EVENT
+        APL_USER_EVENT,
+
+        /**
+         * Fired by devices and sent to the Alexa Platform when the device wishes to load more items for a
+         * dynamicIndexList.
+         */
+        APL_LOAD_INDEX_LIST_DATA,
+
+        /**
+         * Fired by devices and sent to the Alexa Platform when the device wishes to load more items for a
+         * dynamicTokenList.
+         */
+        APL_LOAD_TOKEN_LIST_DATA,
+
+        /**
+         * Fired by devices and sent to the Alexa Platform when the device need to notify AVS about any error
+         * returned by APL runtime.
+         */
+        APL_RUNTIME_ERROR,
     };
 
     /// Document interaction state.
@@ -260,6 +316,7 @@ private:
     AlexaPresentation(
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface> focusManager,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ExceptionEncounteredSenderInterface> exceptionSender,
+        std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerInterface> contextManager,
         std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface>
@@ -318,6 +375,14 @@ private:
     void handleExecuteCommandDirective(std::shared_ptr<DirectiveInfo> info);
 
     /**
+     * This function handles a @c Dynamic source data related directives.
+     *
+     * @param info The @c DirectiveInfo containing the @c AVSDirective and the @c DirectiveHandlerResultInterface.
+     * @param sourceType Dynamic source type.
+     */
+    void handleDynamicListDataDirective(std::shared_ptr<DirectiveInfo> info, const std::string& sourceType);
+
+    /**
      * This function handles any unknown directives received by @c AlexaPresentation CA.
      *
      * @param info The @c DirectiveInfo containing the @c AVSDirective and the @c DirectiveHandlerResultInterface.
@@ -352,6 +417,15 @@ private:
      * @param info The directive to be handled.
      */
     void executeCommandEvent(std::shared_ptr<DirectiveInfo> info);
+
+    /**
+     * This function handles the notification of the processDataSourceUpdate callbacks to all the observers.  This
+     * function is intended to be used in the context of @c m_executor worker thread.
+     *
+     * @param info The directive to be handled.
+     * @param sourceType Data source type.
+     */
+    void dataSourceUpdateEvent(std::shared_ptr<DirectiveInfo> info, const std::string& sourceType);
 
     /**
      * This is an internal function that is called when the state machine is ready to notify the
@@ -401,6 +475,16 @@ private:
      */
     void executeExecuteCommandEvent(
         const std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityAgent::DirectiveInfo> info);
+
+    /**
+     * This is a state machine function to handle the LoadIndexListData event.
+     *
+     * @param info The directive to be handled.
+     * @param sourceType Data source type.
+     */
+    void executeDynamicListDataEvent(
+        const std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityAgent::DirectiveInfo> info,
+        const std::string& sourceType);
 
     /**
      *
@@ -511,6 +595,89 @@ private:
 
     /// This is the worker thread for the @c AlexaPresentation CA.
     std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor> m_executor;
+
+    /// @{
+    /// Helper members required for metrics collection
+
+    /// Enumeration of timer metrics events that could be emitted from @c SmartScreenClient.
+    enum class MetricEvent {
+        /// Metric to record time-taken to render document
+        RENDER_DOCUMENT,
+
+        /// Metric to record time-taken to render document by view-host
+        LAYOUT,
+
+        /// Metric to record time-taken to document inflate event
+        INFLATE,
+
+        /// Metric to count the number of times text measurement was initiated
+        TEXT_MEASURE_COUNT,
+
+        /// Metric to count number of dropped frames
+        DROP_FRAME,
+
+        /// Out of Bound
+        MAX
+    };
+
+    /// Metrics DataPoint Names
+    static std::map<MetricEvent, std::string> MetricsDataPointNames;
+
+    /**
+     * Start recording or update @c metricsEvent
+     *
+     * @param Metrics event in context
+     */
+    void startMetricsEvent(MetricEvent metricEvent);
+
+    /**
+     * Stops recording and submit @c metricsEvent
+     *
+     * @param metricsEvent Metrics event in context
+     * @param activityName Name of the activity to be concluded
+     */
+    void endMetricsEvent(MetricEvent metricEvent, const std::string& activityName);
+
+    /**
+     * Reset @c metricsEvent
+     *
+     * @param metricsEvent Metrics event in context
+     */
+    void resetMetricsEvent(MetricEvent metricEvent);
+
+    /**
+     * Records a single metrics data-point with value and submit @c metricsEvent
+     *
+     * @param metricsEvent Metrics event in context
+     * @param count Total Count of the event
+     * @param activityName Name of the activity to be concluded
+     */
+    void triggerMetricsEventWithData(MetricEvent metricEvent, uint64_t count, const std::string& activityName);
+
+    /**
+     * Records a single metrics data-point with value and submit @c metricsEvent
+     *
+     * @param metricsEvent Metrics event in context
+     * @param tp Start-time of the event
+     * @param activityName Name of the activity to be concluded
+     */
+    void triggerMetricsEventWithData(
+        MetricEvent metricEvent,
+        std::chrono::steady_clock::time_point& tp,
+        const std::string& activityName);
+
+    /// The @c MetricRecorder used to record useful metrics from the presentation layer.
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> m_metricRecorder;
+
+    /// The mutex to ensure exclusivity over @c MetricRecorder
+    std::mutex m_MetricsRecorderMutex;
+
+    /// Stores the currently active time data points
+    std::map<MetricEvent, std::chrono::steady_clock::time_point> m_currentActiveTimePoints;
+
+    /// Stores the currently active count data points
+    std::map<MetricEvent, uint64_t> m_currentActiveCountPoints;
+    /// @}
 };
 
 }  // namespace alexaPresentation

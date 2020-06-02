@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 import APLRenderer from '../APLRenderer';
 import { PropertyKey } from '../enums/PropertyKey';
@@ -11,6 +11,8 @@ import { Scrollable } from './Scrollable';
  */
 export interface ISequenceProperties extends IComponentProperties {
     [PropertyKey.kPropertyScrollDirection]: ScrollDirection;
+    [PropertyKey.kPropertyScrollPosition]: number;
+    [PropertyKey.kPropertyNotifyChildrenChanged]: any;
 }
 /**
  * @ignore
@@ -19,10 +21,12 @@ export declare class Sequence extends Scrollable<ISequenceProperties> {
     private childCount;
     private first;
     private last;
-    private firstChildContainerIndex;
+    private childCache;
     protected fullyLoaded: boolean;
     constructor(renderer: APLRenderer, component: APL.Component, factory: FactoryFunction, parent?: Component);
     init(): void;
+    private adjustIndices(target, insert);
+    setProperties(props: ISequenceProperties): Promise<void>;
     private setScrollDirection;
     private onScroll(relativePosition);
     private createItem(index, insertAt?);

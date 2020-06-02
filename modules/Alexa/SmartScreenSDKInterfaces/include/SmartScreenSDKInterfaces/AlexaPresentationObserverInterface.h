@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -60,6 +60,18 @@ public:
      * @param token Directive token used to bind result processing.
      */
     virtual void executeCommands(const std::string& jsonPayload, const std::string& token) = 0;
+
+    /**
+     * Used to notify observer when @c Alexa.Presentation.APL directives related to DataSource updates received.
+     *
+     * @param sourceType DataSource type.
+     * @param jsonPayload The payload of the directive in structured JSON format.
+     * @param token Directive token used to bind result processing.
+     */
+    virtual void dataSourceUpdate(
+        const std::string& sourceType,
+        const std::string& jsonPayload,
+        const std::string& token) = 0;
 
     /**
      * Used to notify the observer when a command execution sequence should be interrupted

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -54,6 +54,7 @@
 #include <AVSCommon/SDKInterfaces/PowerResourceManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/SingleSettingObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/SpeechInteractionHandlerInterface.h>
+#include <AVSCommon/SDKInterfaces/SpeechSynthesizerObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/Storage/MiscStorageInterface.h>
 #include <AVSCommon/SDKInterfaces/SystemSoundPlayerInterface.h>
 #include <AVSCommon/SDKInterfaces/SystemTimeZoneInterface.h>
@@ -78,6 +79,7 @@
 #include <Notifications/NotificationsCapabilityAgent.h>
 #include <Notifications/NotificationRenderer.h>
 
+#include <APLClient/AplRenderingEvent.h>
 #include <AlexaPresentation/AlexaPresentation.h>
 #include <TemplateRuntimeCapabilityAgent/TemplateRuntime.h>
 #include <VisualCharacteristics/VisualCharacteristics.h>
@@ -115,6 +117,7 @@
 #include <SpeechSynthesizer/SpeechSynthesizer.h>
 #include <System/SoftwareInfoSender.h>
 #include <System/UserInactivityMonitor.h>
+#include <APLClient/AplRenderingEvent.h>
 
 #ifdef ENABLE_REVOKE_AUTH
 #include <System/RevokeAuthorizationHandler.h>
@@ -765,6 +768,19 @@ public:
     void sendUserEvent(const std::string& payload);
 
     /**
+     * Sends a DataSourceFetchRequest event.
+     * @param type DataSource type.
+     * @param payload event.
+     */
+    void sendDataSourceFetchRequestEvent(const std::string& type, const std::string& payload);
+
+    /**
+     * Sends a RuntimeError event.
+     * @param payload event.
+     */
+    void sendRuntimeErrorEvent(const std::string& payload);
+
+    /**
      * Handle visual context.
      * @param token The visual context token.
      * @param payload The input payload.
@@ -805,6 +821,20 @@ public:
     void setDocumentIdleTimeout(std::chrono::milliseconds timeout);
 
     /**
+     * Add an observer to SpeechSynthesizer.
+     * @param observer The SpeechSynthesizer observer.
+     */
+    void addSpeechSynthesizerObserver(
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeechSynthesizerObserverInterface> observer);
+
+    /**
+     * Remove an observer from SpeechSynthesizer.
+     * @param observer The SpeechSynthesizer observer.
+     */
+    void removeSpeechSynthesizerObserver(
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeechSynthesizerObserverInterface> observer);
+
+    /**
      * Clear all execute commands.
      */
     void clearAllExecuteCommands();
@@ -814,6 +844,31 @@ public:
      * @param payload The payload for device window state.
      */
     void setDeviceWindowState(const std::string& payload);
+
+    /**
+     * Gets Device Time Zone Offset.
+     */
+    std::chrono::milliseconds getDeviceTimezoneOffset();
+
+    /**
+     * handle the renderComplete notification for APL Document
+     * @param isAlexaPresentationPresenting Whether the AlexaPresentation agent is presenting or not.
+     */
+    void handleRenderComplete(bool isAlexaPresentationPresenting);
+
+    /**
+     * handle the displayMetrics notification for APL Document
+     * @param dropFrameCount Count of the number of frames dropped.
+     * @param isAlexaPresentationPresenting Whether the AlexaPresentation agent is presenting or not.
+     */
+    void handleDropFrameCount(uint64_t dropFrameCount, bool isAlexaPresentationPresenting);
+
+    /**
+     * handle the event raised by APL core engine
+     * @param event APL Event in context
+     * @param isAlexaPresentationPresenting Whether the AlexaPresentation agent is presenting or not.
+     */
+    void handleAPLEvent(APLClient::AplRenderingEvent event, bool isAlexaPresentationPresenting);
 
     /**
      * Destructor.
@@ -1142,6 +1197,8 @@ private:
     /// The @c AVSGatewayManager instance used in the AVS Gateway connection sequence.
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AVSGatewayManagerInterface> m_avsGatewayManager;
 
+    /// Device Timezone Offset in milliseconds.
+    std::chrono::milliseconds m_deviceTimeZoneOffset;
 #ifdef ENABLE_COMMS_AUDIO_PROXY
     /// The CallAudioDeviceProxy used to work with audio proxy audio driver of CommsLib.
     std::shared_ptr<alexaClientSDK::capabilityAgents::callManager::CallAudioDeviceProxy> m_callAudioDeviceProxy;

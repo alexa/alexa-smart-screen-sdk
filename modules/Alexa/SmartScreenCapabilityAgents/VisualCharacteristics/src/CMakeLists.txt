@@ -11,9 +11,5 @@ target_include_directories(VisualCharacteristics
 
 target_link_libraries(VisualCharacteristics "${ASDK_LDFLAGS}" SmartScreenSDKInterfaces)
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    target_link_libraries(VisualCharacteristics "-Wl,-rpath,${ASDK_LIBRARY_DIRS},--disable-new-dtags")
-endif()
-
 # install target
 asdk_install()

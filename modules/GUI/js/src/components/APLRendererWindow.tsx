@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 
 import * as React from 'react';
@@ -54,6 +54,8 @@ export class WebsocketConnectionWrapper extends APLClient {
   public sendMessage(message : object) {
     switch (Object(message).type) {
       case 'executeCommands' :
+      case 'renderComplete':
+      case 'displayMetrics':
       case 'renderStaticDocument' : {
         this.client.sendMessage(Object(message));
         break;
@@ -177,8 +179,7 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
             <div id={this.props.id}
                 className={'aplRendererViewport'}
                 style={{
-                  transitionDelay: windowTransitionDelay,
-                  transition: 'transform ' + this.windowActiveTransitionInMS + 'ms ease-out',
+                  transition: 'transform ' + this.windowActiveTransitionInMS + 'ms ease-out ' + windowTransitionDelay,
                   transform: windowTranslateTransition
                 }}>
                 <div
@@ -233,6 +234,7 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
       rendererElement.style.overflow = 'hidden';
       rendererElement.style.width = `${this.renderer.context.getViewportWidth()}px`;
       rendererElement.style.height = `${this.renderer.context.getViewportHeight()}px`;
+
       // onRendererInit callback
       if (this.props.windowState === APLRendererWindowState.ACTIVE && this.props.onRendererInit) {
         this.props.onRendererInit();
@@ -240,6 +242,12 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
       this.setState({
         // Update state once we've rendered
         windowState : this.props.windowState
+      });
+
+      // this.renderer.onRenderComplete();
+      this.client.sendMessage({
+        type: 'renderComplete',
+        payload : { }
       });
     });
   }

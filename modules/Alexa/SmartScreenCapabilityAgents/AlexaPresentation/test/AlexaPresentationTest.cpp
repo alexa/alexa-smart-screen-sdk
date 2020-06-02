@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Amazon Software License (the "License").
  * You may not use this file except in compliance with the License.
@@ -75,6 +75,12 @@ static const NamespaceAndName COMMAND{NAMESPACE2, "ExecuteCommands"};
 /// The name for UserEvent event.
 static const std::string USER_EVENT_EVENT{"UserEvent"};
 
+/// The name for LoadIndexListData event.
+static const std::string LOAD_INDEX_LIST_DATA{"LoadIndexListData"};
+
+/// The name for LoadTokenListData event.
+static const std::string LOAD_TOKEN_LIST_DATA{"LoadTokenListData"};
+
 /// The name for UserEvent event.
 static const std::string DOCUMENT_DISMISSED_EVENT{"Dismissed"};
 
@@ -86,6 +92,20 @@ static const std::string MESSAGE_ID_2("messageId2");
 
 /// Payload to be sent for UserEvent
 static const std::string SAMPLE_USER_EVENT_PAYLOAD = R"({"key":"value"})";
+
+/// DynamicIndexList DataSource type
+static const std::string DYNAMIC_INDEX_LIST("dynamicIndexList");
+
+/// Payload to be sent for ListDataSourceFetchRequest
+static const std::string SAMPLE_INDEX_DATA_SOURCE_FETCH_REQUEST =
+    R"({"correlationToken":"101","count":10.0,"listId":"vQdpOESlok","startIndex":1.0})";
+
+/// DynamicTokenList DataSource type
+static const std::string DYNAMIC_TOKEN_LIST("dynamicTokenList");
+
+/// Payload to be sent for TokenDataSourceFetchRequest
+static const std::string SAMPLE_TOKEN_DATA_SOURCE_FETCH_REQUEST =
+    R"({"correlationToken":"101","listId":"vQdpOESlok","pageToken":"nextPage"})";
 
 /// String to identify log entries originating from this file.
 static const std::string TAG("AlexaPresentationTest");
@@ -176,6 +196,7 @@ static const std::string EXECUTE_COMMAND_PAYLOAD = "{"
 
 /// A visual state request token.
  static const unsigned int STATE_REQUEST_TOKEN = 1;
+ static std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder;
 
 // clang-format on
 
@@ -186,6 +207,9 @@ public:
     MOCK_METHOD3(
         renderDocument,
         void(const std::string& jsonPayload, const std::string& token, const std::string& windowId));
+    MOCK_METHOD3(
+        dataSourceUpdate,
+        void(const std::string& sourceType, const std::string& jsonPayload, const std::string& token));
     MOCK_METHOD0(clearDocument, void());
     MOCK_METHOD0(interruptCommandSequence, void());
 };
@@ -290,6 +314,7 @@ void AlexaPresentationTest::SetUp() {
     m_AlexaPresentation = AlexaPresentation::create(
         m_mockFocusManager,
         m_mockExceptionSender,
+        metricRecorder,
         m_mockMessageSender,
         m_mockContextManager,
         m_mockVisualStateProvider);
@@ -325,8 +350,8 @@ void AlexaPresentationTest::TearDown() {
  * Tests creating the AlexaPresentation with a null contextManager.
  */
 TEST_F(AlexaPresentationTest, testNullContextManagerInterface) {
-    auto alexaPresentation =
-        AlexaPresentation::create(m_mockFocusManager, m_mockExceptionSender, m_mockMessageSender, nullptr);
+    auto alexaPresentation = AlexaPresentation::create(
+        m_mockFocusManager, m_mockExceptionSender, metricRecorder, m_mockMessageSender, nullptr);
     ASSERT_EQ(alexaPresentation, nullptr);
 }
 
@@ -334,8 +359,8 @@ TEST_F(AlexaPresentationTest, testNullContextManagerInterface) {
  * Tests creating the AlexaPresentation with a null focusManagerInterface.
  */
 TEST_F(AlexaPresentationTest, testNullFocusManagerInterface) {
-    auto alexaPresentation =
-        AlexaPresentation::create(nullptr, m_mockExceptionSender, m_mockMessageSender, m_mockContextManager);
+    auto alexaPresentation = AlexaPresentation::create(
+        nullptr, m_mockExceptionSender, metricRecorder, m_mockMessageSender, m_mockContextManager);
     ASSERT_EQ(alexaPresentation, nullptr);
 }
 
@@ -343,14 +368,14 @@ TEST_F(AlexaPresentationTest, testNullFocusManagerInterface) {
  * Tests creating the AlexaPresentation with a null exceptionSender.
  */
 TEST_F(AlexaPresentationTest, testNullExceptionSender) {
-    auto alexaPresentation =
-        AlexaPresentation::create(m_mockFocusManager, nullptr, m_mockMessageSender, m_mockContextManager);
+    auto alexaPresentation = AlexaPresentation::create(
+        m_mockFocusManager, nullptr, metricRecorder, m_mockMessageSender, m_mockContextManager);
     ASSERT_EQ(alexaPresentation, nullptr);
 }
 
 TEST_F(AlexaPresentationTest, testNullMessageSender) {
-    auto alexaPresentation =
-        AlexaPresentation::create(m_mockFocusManager, m_mockExceptionSender, nullptr, m_mockContextManager);
+    auto alexaPresentation = AlexaPresentation::create(
+        m_mockFocusManager, m_mockExceptionSender, metricRecorder, nullptr, m_mockContextManager);
     ASSERT_EQ(alexaPresentation, nullptr);
 }
 
@@ -967,6 +992,56 @@ TEST_F(AlexaPresentationTest, testSendUserEvent) {
         }));
 
     m_AlexaPresentation->sendUserEvent(SAMPLE_USER_EVENT_PAYLOAD);
+    // wait for getContext
+    m_contextTrigger.wait_for(exitLock, TIMEOUT);
+    m_AlexaPresentation->onContextAvailable("");
+
+    std::unique_lock<std::mutex> lk(m);
+    conditionVariable.wait(lk);
+}
+
+TEST_F(AlexaPresentationTest, testIndexListDataSourceFetchRequestEvent) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    auto verifyEvent = [](std::shared_ptr<avsCommon::avs::MessageRequest> request) {
+        verifySendMessage(request, LOAD_INDEX_LIST_DATA, SAMPLE_INDEX_DATA_SOURCE_FETCH_REQUEST, NAMESPACE2);
+    };
+    EXPECT_CALL(*m_mockMessageSender, sendMessage(_)).Times(Exactly(1)).WillOnce(Invoke(verifyEvent));
+    // Expect a call to getContext.
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
+
+    m_AlexaPresentation->sendDataSourceFetchRequestEvent(DYNAMIC_INDEX_LIST, SAMPLE_INDEX_DATA_SOURCE_FETCH_REQUEST);
+    // wait for getContext
+    m_contextTrigger.wait_for(exitLock, TIMEOUT);
+    m_AlexaPresentation->onContextAvailable("");
+
+    std::unique_lock<std::mutex> lk(m);
+    conditionVariable.wait(lk);
+}
+
+TEST_F(AlexaPresentationTest, testTokenListDataSourceFetchRequestEvent) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    auto verifyEvent = [](std::shared_ptr<avsCommon::avs::MessageRequest> request) {
+        verifySendMessage(request, LOAD_TOKEN_LIST_DATA, SAMPLE_TOKEN_DATA_SOURCE_FETCH_REQUEST, NAMESPACE2);
+    };
+    EXPECT_CALL(*m_mockMessageSender, sendMessage(_)).Times(Exactly(1)).WillOnce(Invoke(verifyEvent));
+    // Expect a call to getContext.
+    EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
+        .WillOnce(Invoke([this](
+                             std::shared_ptr<ContextRequesterInterface> contextRequester,
+                             const std::string&,
+                             const std::chrono::milliseconds&) {
+            m_contextTrigger.notify_one();
+            return 0;
+        }));
+
+    m_AlexaPresentation->sendDataSourceFetchRequestEvent(DYNAMIC_TOKEN_LIST, SAMPLE_TOKEN_DATA_SOURCE_FETCH_REQUEST);
     // wait for getContext
     m_contextTrigger.wait_for(exitLock, TIMEOUT);
     m_AlexaPresentation->onContextAvailable("");

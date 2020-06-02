@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 
 import { DeviceMode, IViewportCharacteristics, AnimationQuality } from 'apl-client';
@@ -46,6 +46,8 @@ export interface IDeviceKeys {
     exitKey : IDeviceKey;
     /** Key to go back */
     backKey : IDeviceKey;
+    /** Key to toggle captions */
+    toggleCaptionsKey : IDeviceKey;
 }
 
 /**

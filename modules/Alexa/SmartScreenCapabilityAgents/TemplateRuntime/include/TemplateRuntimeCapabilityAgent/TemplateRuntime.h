@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -128,6 +128,9 @@ public:
     void clearDocument() override;
 
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
+
+    void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
+        override;
 
     void interruptCommandSequence() override;
     /// @}

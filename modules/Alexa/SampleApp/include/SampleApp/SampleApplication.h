@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -34,9 +34,10 @@
 #include <MediaPlayer/MediaPlayer.h>
 #elif defined(ANDROID_MEDIA_PLAYER)
 #include <AndroidSLESMediaPlayer/AndroidSLESMediaPlayer.h>
+#elif defined(UWP_BUILD)
+#include <SSSDKCommon/TestMediaPlayer.h>
 #endif
 
-#include "AplCoreGuiRenderer.h"
 #include "GUI/GUIClient.h"
 #include "GUI/GUIManager.h"
 
@@ -55,6 +56,8 @@ namespace sampleApp {
 using ApplicationMediaPlayer = alexaClientSDK::mediaPlayer::MediaPlayer;
 #elif defined(ANDROID_MEDIA_PLAYER)
 using ApplicationMediaPlayer = mediaPlayer::android::AndroidSLESMediaPlayer;
+#elif defined(UWP_BUILD)
+using ApplicationMediaPlayer = alexaSmartScreenSDK::sssdkCommon::TestMediaPlayer;
 #endif
 
 /// Class to manage the top-level components of the AVS Client Application
@@ -86,7 +89,15 @@ public:
 
     /// Destructor which manages the @c SampleApplication shutdown sequence.
     ~SampleApplication();
+#ifdef UWP_BUILD
+    std::shared_ptr<smartScreenSDKInterfaces::MessageListenerInterface> getMessageSink() {
+        return m_guiMessaging;
+    }
 
+    std::shared_ptr<gui::GUIManager> getGUIManager() {
+        return m_guiManager;
+    }
+#endif
     /**
      * Method to create mediaPlayers for the optional music provider adapters plugged into the SDK.
      *
@@ -246,6 +257,10 @@ private:
 #if defined(ANDROID_MEDIA_PLAYER) || defined(ANDROID_MICROPHONE)
     /// The android OpenSL ES engine used to create media players and microphone.
     std::shared_ptr<applicationUtilities::androidUtilities::AndroidSLESEngine> m_openSlEngine;
+#endif
+
+#ifdef UWP_BUILD
+    std::shared_ptr<smartScreenSDKInterfaces::MessageListenerInterface> m_guiMessaging;
 #endif
 
 #ifdef BLUETOOTH_BLUEZ_PULSEAUDIO_OVERRIDE_ENDPOINTS

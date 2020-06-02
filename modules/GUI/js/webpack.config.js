@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 
 const HtmlWebpackPlugin = require('html-webpack-plugin');
@@ -11,8 +11,7 @@ const SRC = path.resolve(__dirname, 'src');
 const DEST = path.resolve(__dirname, 'dist');
 
 module.exports = {
-    mode: 'development',
-    devtool: 'inline-source-map',
+    mode: 'production',
     context: SRC,
     entry: {
         'main': './main.tsx'

@@ -1,13 +1,9 @@
 add_definitions("-DACSDK_LOG_MODULE=sampleApp")
 set(SampleApp_SOURCES)
 list(APPEND SampleApp_SOURCES
-    AplCoreConnectionManager.cpp
-    AplCoreEngineSDKLogBridge.cpp
-    AplCoreGuiContentDownloadManager.cpp
-    AplCoreGuiRenderer.cpp
-    AplCoreMetrics.cpp
-    AplCoreTextMeasurement.cpp
+    AplClientBridge.cpp
     ConnectionObserver.cpp
+    CachingDownloadManager.cpp
     ConsolePrinter.cpp
     GUILogBridge.cpp
     GUI/GUIClient.cpp
@@ -17,6 +13,8 @@ list(APPEND SampleApp_SOURCES
     LocaleAssetsManager.cpp
     SampleApplication.cpp
     SampleEqualizerModeController.cpp
+    SmartScreenCaptionPresenter.cpp
+    SmartScreenCaptionStateManager.cpp
     main.cpp)
 
 if (PORTAUDIO)
@@ -47,10 +45,12 @@ target_include_directories(SampleApp PUBLIC
     "${ESP_SOURCE_DIR}/include"
     "${PORTAUDIO_INCLUDE_DIR}"
     "${Utils_SOURCE_DIR}/include"
-    "${Communication_SOURCE_DIR/include}")
+    "${Communication_SOURCE_DIR/include}"
+    "${APLClient_SOURCE_DIR/include}")
 
 target_link_libraries(SampleApp
     "${ASDK_LDFLAGS}"
+    APLClient
     Communication
     AlexaPresentation
     SmartScreenClient
@@ -58,6 +58,7 @@ target_link_libraries(SampleApp
     CBLAuthDelegate
     DeviceSettings
     SQLiteStorage
+    SSSDKCommon
     EqualizerImplementations
     TemplateRuntime
     Utils
@@ -133,14 +134,6 @@ elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
       "-Wl,-rpath,${ASDK_LIBRARY_DIRS}")
 endif()
 
-if(NOT APLCORE_INCLUDE_DIR)
-    message(FATAL_ERROR "APLCore Include Dir is required")
-endif()
-
-if(NOT APLCORE_LIB_DIR)
-    message(FATAL_ERROR "APLCore Lib Dir is required")
-endif()
-
 if(NOT YOGA_INCLUDE_DIR)
     message(FATAL_ERROR "Yoga include dir is required")
 endif()
@@ -149,16 +142,56 @@ if(NOT YOGA_LIB_DIR)
     message(FATAL_ERROR "Yoga lib dir is required")
 endif()
 
-if(APL_CORE)
-    target_include_directories(SampleApp PUBLIC
-            "${APLCORE_INCLUDE_DIR}"
-            "${YOGA_INCLUDE_DIR}")
 
-    target_link_libraries(SampleApp ${APLCORE_LIB_DIR}/libapl.a)
-    target_link_libraries(SampleApp ${YOGA_LIB_DIR}/libyogacore.a)
+set(SampleAppTest_SOURCES)
+list(APPEND SampleAppTest_SOURCES
+        AplClientBridge.cpp
+        ConnectionObserver.cpp
+        CachingDownloadManager.cpp
+        ConsolePrinter.cpp
+        GUILogBridge.cpp
+        GUI/GUIClient.cpp
+        GUI/GUIManager.cpp
+        JsonUIManager.cpp
+        KeywordObserver.cpp
+        LocaleAssetsManager.cpp
+        SampleEqualizerModeController.cpp
+        SmartScreenCaptionPresenter.cpp
+        SmartScreenCaptionStateManager.cpp
+        )
 
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error -Wno-reorder")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-reorder")
+add_library(SampleAppTest SHARED ${SampleAppTest_SOURCES})
 
-    add_definitions(-DAPL_CORE)
-endif()
+target_include_directories(SampleAppTest PUBLIC
+        "${SampleApp_INCLUDE_DIR}"
+        "${SampleApp_SOURCE_DIR}/include"
+        "${APLClient_INCLUDE_DIR}"
+        "${ASDK_INCLUDE_DIRS}"
+        "${AudioResources_SOURCE_DIR}/include"
+        "${RegistrationManager_SOURCE_DIR}/include"
+        "${ESP_SOURCE_DIR}/include"
+        "${PORTAUDIO_INCLUDE_DIR}"
+        "${Utils_SOURCE_DIR}/include"
+        "${Communication_SOURCE_DIR/include}"
+        "${APLClient_SOURCE_DIR/include}"
+        "${SmartScreenSDKInterfaces_SOURCE_DIR}/test"
+        "${TemplateRuntime_SOURCE_DIR}/include"
+        "${RAPIDJSON_INCLUDE_DIR}"
+        "${SmartScreenSDKInterfaces_SOURCE_DIR}/include"
+        )
+
+target_link_libraries(SampleAppTest
+        "${ASDK_LDFLAGS}"
+        APLClient
+        Communication
+        AlexaPresentation
+        SmartScreenClient
+        CapabilitiesDelegate
+        CBLAuthDelegate
+        DeviceSettings
+        SQLiteStorage
+        SSSDKCommon
+        EqualizerImplementations
+        TemplateRuntime
+        Utils
+        "${PORTAUDIO_LIB_PATH}")

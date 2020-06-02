@@ -3,6 +3,9 @@ project(ApplicationUtilities LANGUAGES CXX)
 
 include(../build/BuildDefaults.cmake)
 
-add_subdirectory("Communication")
+add_subdirectory("APLClient")
+if (NOT MSVC)
+    add_subdirectory("Communication")
+endif ()
 add_subdirectory("SmartScreenClient")
 

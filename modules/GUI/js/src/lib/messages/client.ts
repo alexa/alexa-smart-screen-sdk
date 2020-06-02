@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 
 import { IBaseOutboundMessage, IAlexaStateChangedMessage, AlexaState, IBaseInboundMessage } from './messages';

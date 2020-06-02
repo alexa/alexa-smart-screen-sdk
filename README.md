@@ -15,7 +15,6 @@ The Alexa Smart Screen SDK depends on the following additional GitHub repos:
 
 You can set up the Alexa Smart Screen SDK by using the following Quick Start Guides:
 * [MacOS Quick Start Guide](https://github.com/alexa/alexa-smart-screen-sdk/wiki/MacOS-Quick-Start-Guide)
-* [Ubuntu Quick Start Guide](https://github.com/alexa/alexa-smart-screen-sdk/wiki/Ubuntu-Quick-Start-Guide)
 * [Raspberry Pi Quick Start Guide](https://github.com/alexa/alexa-smart-screen-sdk/wiki/Raspberry-Pi-Quick-Start-Guide) (Raspbian Stretch)
 
 You can also create your device prototype by using an [Amazon-qualified development kit](https://developer.amazon.com/en-US/alexa/alexa-voice-service/dev-kits) that supports the Smart Screen SDK, such as:
@@ -64,20 +63,28 @@ All Alexa products should adopt the [Security Best Practices for Alexa](https://
 
 ## Optional Configurations
 
+### Add voice chrome
+
+The default implementation provides information on [Alexa state](https://github.com/alexa/alexa-smart-screen-sdk/blob/master/modules/GUI/SDK-GUI-API.md#alexastatechanged), which you can use to create voice chrome. Be sure to follow the [AVS Voice Chrome guidelines](https://developer.amazon.com/docs/alexa-voice-service/ux-design-attention.html#chrome).
+
 ### Run the GUI client with predefined device visual characteristics and GUI client configurations
 
-We provide 4 different sample configuration files of predefined device visual characteristics and GUI client configurations. This can be found under `modules/GUI/config/guiConfigSamples`. To enable a predefined configuration, 
-You can pass any of them as an extra config file argument after the main Smart Screen SDK config file argument when running the Sample App. 
+We provide four different sample configuration files containing predefined device visual characteristics and GUI client configurations. These can be found under `modules/GUI/config/guiConfigSamples`.
+You can pass any of them as an extra config file argument after the main Smart Screen SDK config file argument when running the Sample App, for example:
+```
+    cd <pathTo>/ss-build
+    ./modules/Alexa/SampleApp/src/SampleApp
+        -C <pathTo>/sdk-build/Integration/AlexaClientSDKConfig.json
+        -C <pathTo>/alexa-smart-screen-sdk/modules/GUI/config/SmartScreenSDKConfig.json
+        -C <pathTo>/alexa-smart-screen-sdk/modules/GUI/config/guiConfigSamples/GuiConfigSample_TvOverlayPortrait.json 
+        -L INFO
+```
 
 ### Remote control support
 
-Exit and back remote control functionality is minimally supported by the Smart Screen SDK. The following behaviors are expected to occur:
+Functionality for Exit and Back buttons (as found on a device's physical remote control) is minimally supported by the Smart Screen SDK. The following behaviors are expected to occur on execution of either a `BACK` or `EXIT` [navigationEvent](./modules/GUI/SDK-GUI-API#navigationevent):
 
 * Clear the rendering screen - Exit fully out of the Alexa-presented display so that no static image or layout is left.
 * Release the focus management - Release any focus management that might be held.
 
-Using the predefined device visual characteristics, Esc and B are mapped to Exit and Back respectively.
-
-## Release Notes and Known Issues
-
-For a list of enhancements, bug fixes, and known issues, refer to [CHANGELOG.md](https://github.com/alexa/alexa-smart-screen-sdk/blob/master/CHANGELOG.md).
+Using the default gui client configuration's [device keys](./modules/GUI/config/SmartScreenSDKConfig#device-keys-parameters), `Esc` and `B` are mapped to `EXIT` and `BACK` respectively.

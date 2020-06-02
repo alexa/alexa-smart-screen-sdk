@@ -1,5 +1,5 @@
 /**
- * Copyright 2018-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 import APLRenderer, { IAPLOptions } from "./@types/apl-html/lib/index";
 import { APLClient } from "./APLClient";

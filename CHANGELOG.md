@@ -1,4 +1,29 @@
-### v2.0.2 released 04/14/2019:
+### v2.1.0 released 06/02/2020:
+
+#### Enhancements
+* Upgraded dependency to Device SDK 1.19.1
+* Provided a reference implementation for rendering of captions
+* Support for APL 1.3
+* Added support for visual metrics
+* Moved APL Core integration out of SampleApp into a standalone library
+
+#### Bug fixes
+* Fixed browser warnings caused by short-hand definition of "transition" property
+* Fixed potentially invalid and corrupted data due to using multiple rapidjson allocators
+
+#### Known issues
+* SampleApp screen cut off at the bottom on fullscreen when using emulateDisplayDimensions configuration
+* Display of captions is not in sync with Alexa audio and is as expected
+* Memory leak issue with resetDevice member function in GUIManager
+* Notification cues are not playing
+* Potential memory leak issue with executeCommands directive
+* Skill session remains alive for a short amount of time after exit
+* Control buttons on the Flash briefing page is disabled
+* Buttons on Now Playing display card do not update their visual states when updated by voice
+* Scrolling on General Knowledge display card does not work when the content does not fit into screen
+* Progress bar on Now Playing display card does not reflect the actual audio offset when such information is not provided in RenderPlayerInfo directive 
+
+### v2.0.2 released 04/14/2020:
 
 #### Bug fixes
 * Added support for Raspbian Buster.

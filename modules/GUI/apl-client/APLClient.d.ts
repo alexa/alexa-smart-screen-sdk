@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 export interface RenderingOptionsPayload {
     legacyKaraoke: boolean;
@@ -36,6 +36,12 @@ export interface BaselinePayload extends IComponentPayload {
 export interface DocThemePayload {
     docTheme: string;
 }
+export interface BackgroundPayload {
+    background: APL.IBackground;
+}
+export interface ScreenLockPayload {
+    screenLock: boolean;
+}
 export interface PayloadTypeMap {
     "renderingOptions": RenderingOptionsPayload;
     "measure": MeasurePayload;
@@ -46,6 +52,8 @@ export interface PayloadTypeMap {
     "eventTerminate": EventTerminatePayload;
     "baseline": BaselinePayload;
     "docTheme": DocThemePayload;
+    "background": BackgroundPayload;
+    "screenLock": ScreenLockPayload;
     "ensureLayout": string;
 }
 export interface Message<Type extends keyof PayloadTypeMap> {
@@ -73,6 +81,8 @@ export interface IAPLMessageListener {
     onEventTerminate?(message: Message<"eventTerminate">): void;
     onBaseline?(message: Message<"baseline">): void;
     onDocTheme?(message: Message<"docTheme">): void;
+    onBackground?(message: Message<"background">): void;
+    onScreenLock?(message: Message<"screenLock">): void;
     onEnsureLayout?(message: Message<"ensureLayout">): void;
 }
 /**

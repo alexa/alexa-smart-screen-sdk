@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ static const std::string TAG("RevokeAuthorizationObserver");
 #define LX(event) alexaClientSDK::avsCommon::utils::logger::LogEntry(TAG, event)
 
 RevokeAuthorizationObserver::RevokeAuthorizationObserver(
-    std::shared_ptr<registrationManager::RegistrationManager> manager) :
+    std::shared_ptr<alexaClientSDK::registrationManager::RegistrationManager> manager) :
         m_manager{manager} {
 }
 

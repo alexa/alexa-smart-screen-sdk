@@ -31,3 +31,7 @@
 - [ ] Raspbian Stretch
 - [ ] Raspbian Jessy
 - [ ] Other - tell us more:
+
+### Have you tried the same use case with AVS Device SDK SampleApp?
+- [ ] The issue is not applicable to the AVS Device SDK SampleApp.
+- [ ] The issue is not reproducible on the AVS Device SDK SampleApp.

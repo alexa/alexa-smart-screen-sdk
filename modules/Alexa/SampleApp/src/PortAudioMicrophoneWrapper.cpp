@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -63,9 +63,7 @@ std::unique_ptr<PortAudioMicrophoneWrapper> PortAudioMicrophoneWrapper::create(
 }
 
 PortAudioMicrophoneWrapper::PortAudioMicrophoneWrapper(std::shared_ptr<AudioInputStream> stream) :
-        m_audioInputStream{stream},
-        m_paStream{nullptr},
-        m_isStreaming{false} {
+        m_audioInputStream{stream}, m_paStream{nullptr}, m_isStreaming{false} {
 }
 
 PortAudioMicrophoneWrapper::~PortAudioMicrophoneWrapper() {

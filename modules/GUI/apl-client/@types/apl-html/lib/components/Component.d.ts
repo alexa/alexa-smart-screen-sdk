@@ -1,5 +1,5 @@
 /**
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 import EventEmitter = require("./../../../eventemitter3/index");
 import APLRenderer from '../APLRenderer';
@@ -101,7 +101,7 @@ export declare abstract class Component<PropsType = IGenericPropType> extends Ev
      * Converts a number to css rgba format
      * @param val Number value to convert
      */
-    numberToColor(val: number): string;
+    static numberToColor(val: number): string;
     hasValidBounds(): boolean;
     inflateAndAddChild(index: number, data: string): Component | undefined;
     remove(): boolean;

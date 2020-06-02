@@ -581,6 +581,10 @@ inline void PrintTo(const ::std::wstring& s, ::std::ostream* os) {
 }
 #endif  // GTEST_HAS_STD_WSTRING
 
+#if GTEST_LANG_CXX11
+        inline void PrintTo(std::nullptr_t, ::std::ostream* os) { *os << "(nullptr)"; }
+#endif  // GTEST_LANG_CXX11
+
 #if GTEST_HAS_TR1_TUPLE || GTEST_HAS_STD_TUPLE_
 // Helper function for printing a tuple.  T must be instantiated with
 // a tuple type.

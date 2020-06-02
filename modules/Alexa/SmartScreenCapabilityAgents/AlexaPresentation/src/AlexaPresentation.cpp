@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Amazon Software License (the "License").
  * You may not use this file except in compliance with the License.
@@ -23,6 +23,9 @@
 #include <AVSCommon/AVS/EventBuilder.h>
 #include <AVSCommon/Utils/JSON/JSONUtils.h>
 #include <AVSCommon/Utils/Logger/Logger.h>
+#include <AVSCommon/Utils/Metrics/MetricEventBuilder.h>
+#include <AVSCommon/Utils/Metrics/DataPointStringBuilder.h>
+#include <AVSCommon/Utils/Metrics/DataPointDurationBuilder.h>
 
 #include "AlexaPresentation/AlexaPresentation.h"
 
@@ -45,7 +48,7 @@ static const std::string ALEXAPRESENTATION_CAPABILITY_INTERFACE_TYPE = "AlexaInt
 static const std::string ALEXAPRESENTATIONAPL_CAPABILITY_INTERFACE_NAME = "Alexa.Presentation.APL";
 
 /// AlexaPresentation interface version for Alexa.Presentation.APL
-static const std::string ALEXAPRESENTATIONAPL_CAPABILITY_INTERFACE_VERSION = "1.0";
+static const std::string ALEXAPRESENTATIONAPL_CAPABILITY_INTERFACE_VERSION = "1.1";
 
 /// AlexaPresentation interface name3
 static const std::string ALEXAPRESENTATION_CAPABILITY_INTERFACE_NAME = "Alexa.Presentation";
@@ -84,8 +87,26 @@ static const std::string RENDER_DOCUMENT{"RenderDocument"};
 /// The name for ExecuteCommand directive.
 static const std::string EXECUTE_COMMAND{"ExecuteCommands"};
 
+/// The name for SendIndexListData directive.
+static const std::string SEND_INDEX_LIST_DATA{"SendIndexListData"};
+
+/// The name for UpdateIndexListData directive.
+static const std::string UPDATE_INDEX_LIST_DATA{"UpdateIndexListData"};
+
+/// The name for SendTokenListData directive.
+static const std::string SEND_TOKEN_LIST_DATA{"SendTokenListData"};
+
 /// The name for UserEvent event.
 static const std::string USER_EVENT{"UserEvent"};
+
+/// The name for LoadIndexListData event.
+static const std::string LOAD_INDEX_LIST_DATA{"LoadIndexListData"};
+
+/// The name for LoadTokenListData event.
+static const std::string LOAD_TOKEN_LIST_DATA{"LoadTokenListData"};
+
+/// The name for RuntimeError event.
+static const std::string RUNTIME_ERROR{"RuntimeError"};
 
 /// The name for DocumentDismissed event.
 static const std::string DOCUMENT_DISMISSED{"Dismissed"};
@@ -95,6 +116,15 @@ static const NamespaceAndName DOCUMENT{ALEXA_PRESENTATION_APL_NAMESPACE, RENDER_
 
 /// The ExecuteCommand directive signature.
 static const NamespaceAndName COMMAND{ALEXA_PRESENTATION_APL_NAMESPACE, EXECUTE_COMMAND};
+
+/// The SendIndexListData directive signature.
+static const NamespaceAndName INDEX_LIST_DATA{ALEXA_PRESENTATION_APL_NAMESPACE, SEND_INDEX_LIST_DATA};
+
+/// The UpdateIndexListData directive signature.
+static const NamespaceAndName INDEX_LIST_UPDATE{ALEXA_PRESENTATION_APL_NAMESPACE, UPDATE_INDEX_LIST_DATA};
+
+/// The SendTokenListData directive signature.
+static const NamespaceAndName TOKEN_LIST_DATA{ALEXA_PRESENTATION_APL_NAMESPACE, SEND_TOKEN_LIST_DATA};
 
 /// Name of the runtime configuration.
 static const std::string RUNTIME_CONFIG = "runtime";
@@ -117,6 +147,12 @@ static const std::string COMMANDS_FIELD = "commands";
 /// Tag for finding the visual context information sent from the runtime as part of event context.
 static const std::string VISUAL_CONTEXT_NAME{"RenderedDocumentState"};
 
+/// Dynamic index list data source type
+static const std::string DYNAMIC_INDEX_LIST{"dynamicIndexList"};
+
+/// Dynamic token list data source type
+static const std::string DYNAMIC_TOKEN_LIST{"dynamicTokenList"};
+
 /// Default timeout for clearing the RenderDocument display card when there is no interaction happening.
 static const std::chrono::milliseconds DEFAULT_DOCUMENT_INTERACTION_TIMEOUT_MS{30000};
 
@@ -124,11 +160,24 @@ static const std::chrono::milliseconds DEFAULT_DOCUMENT_INTERACTION_TIMEOUT_MS{3
 static const avsCommon::avs::NamespaceAndName RENDERED_DOCUMENT_STATE{ALEXA_PRESENTATION_APL_NAMESPACE,
                                                                       VISUAL_CONTEXT_NAME};
 
-const std::string AlexaPresentation::NON_APL_DOCUMENT_TOKEN = "NonAPLDocumentToken";
+std::map<AlexaPresentation::MetricEvent, std::string> AlexaPresentation::MetricsDataPointNames = {
+    {AlexaPresentation::MetricEvent::RENDER_DOCUMENT, "AlexaPresentation.RenderDocument.TimeTaken"},
+    {AlexaPresentation::MetricEvent::LAYOUT, "View.Layout.TimeTaken"},
+    {AlexaPresentation::MetricEvent::INFLATE, "APL.Inflate.TimeTaken"},
+    {AlexaPresentation::MetricEvent::TEXT_MEASURE_COUNT, "APL.TextMeasurement.Count"},
+    {AlexaPresentation::MetricEvent::DROP_FRAME, "View.DropFrame.Count"}};
+
+static const std::string ACTIVITY_RENDER_DOCUMENT = "AlexaPresentation.renderDocument";
+static const std::string ACTIVITY_RENDER_DOCUMENT_FAIL = "AlexaPresentation.renderDocument.fail";
+static const std::string ACTIVITY_VIEW_LAYOUT = "AlexaPresentation.viewLayout";
+static const std::string ACTIVITY_INFLATE_APL = "AlexaPresentation.inflateAPL";
+static const std::string ACTIVITY_TEXT_MEASURE = "AlexaPresentation.textMeasure";
+static const std::string ACTIVITY_DROP_FRAME = "AlexaPresentation.dropFrame";
 
 std::shared_ptr<AlexaPresentation> AlexaPresentation::create(
     std::shared_ptr<avsCommon::sdkInterfaces::FocusManagerInterface> focusManager,
     std::shared_ptr<avsCommon::sdkInterfaces::ExceptionEncounteredSenderInterface> exceptionSender,
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder,
     std::shared_ptr<avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
     std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface> contextManager,
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> visualStateProvider) {
@@ -152,8 +201,8 @@ std::shared_ptr<AlexaPresentation> AlexaPresentation::create(
         return nullptr;
     }
 
-    std::shared_ptr<AlexaPresentation> alexaPresentation(
-        new AlexaPresentation(focusManager, exceptionSender, messageSender, contextManager, visualStateProvider));
+    std::shared_ptr<AlexaPresentation> alexaPresentation(new AlexaPresentation(
+        focusManager, exceptionSender, metricRecorder, messageSender, contextManager, visualStateProvider));
 
     if (!alexaPresentation->initialize()) {
         ACSDK_ERROR(LX("createFailed").d("reason", "Initialization error."));
@@ -211,6 +260,18 @@ void AlexaPresentation::handleDirective(std::shared_ptr<DirectiveInfo> info) {
         handleRenderDocumentDirective(info);
     } else if (info->directive->getNamespace() == COMMAND.nameSpace && info->directive->getName() == COMMAND.name) {
         handleExecuteCommandDirective(info);
+    } else if (
+        info->directive->getNamespace() == INDEX_LIST_DATA.nameSpace &&
+        info->directive->getName() == INDEX_LIST_DATA.name) {
+        handleDynamicListDataDirective(info, DYNAMIC_INDEX_LIST);
+    } else if (
+        info->directive->getNamespace() == INDEX_LIST_UPDATE.nameSpace &&
+        info->directive->getName() == INDEX_LIST_UPDATE.name) {
+        handleDynamicListDataDirective(info, DYNAMIC_INDEX_LIST);
+    } else if (
+        info->directive->getNamespace() == TOKEN_LIST_DATA.nameSpace &&
+        info->directive->getName() == TOKEN_LIST_DATA.name) {
+        handleDynamicListDataDirective(info, DYNAMIC_TOKEN_LIST);
     } else {
         handleUnknownDirective(info);
     }
@@ -226,6 +287,9 @@ DirectiveHandlerConfiguration AlexaPresentation::getConfiguration() const {
 
     configuration[DOCUMENT] = BlockingPolicy(BlockingPolicy::MEDIUM_VISUAL, true);
     configuration[COMMAND] = BlockingPolicy(BlockingPolicy::MEDIUMS_AUDIO_AND_VISUAL, true);
+    configuration[INDEX_LIST_DATA] = BlockingPolicy(BlockingPolicy::MEDIUM_VISUAL, false);
+    configuration[INDEX_LIST_UPDATE] = BlockingPolicy(BlockingPolicy::MEDIUM_VISUAL, false);
+    configuration[TOKEN_LIST_DATA] = BlockingPolicy(BlockingPolicy::MEDIUM_VISUAL, false);
     return configuration;
 }
 
@@ -313,6 +377,7 @@ void AlexaPresentation::removeObserver(
 AlexaPresentation::AlexaPresentation(
     std::shared_ptr<avsCommon::sdkInterfaces::FocusManagerInterface> focusManager,
     std::shared_ptr<avsCommon::sdkInterfaces::ExceptionEncounteredSenderInterface> exceptionSender,
+    std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder,
     std::shared_ptr<avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
     std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface> contextManager,
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> visualStateProvider) :
@@ -326,7 +391,8 @@ AlexaPresentation::AlexaPresentation(
         m_contextManager{contextManager},
         m_visualStateProvider{visualStateProvider},
         m_APLVersion{},
-        m_documentInteractionState{AlexaPresentation::InteractionState::INACTIVE} {
+        m_documentInteractionState{AlexaPresentation::InteractionState::INACTIVE},
+        m_metricRecorder{metricRecorder} {
     m_executor = std::make_shared<alexaClientSDK::avsCommon::utils::threading::Executor>();
     m_capabilityConfigurations.insert(getAlexaPresentationCapabilityConfiguration());
 }
@@ -378,6 +444,30 @@ std::shared_ptr<CapabilityConfiguration> AlexaPresentation::getAlexaPresentation
 void AlexaPresentation::sendUserEvent(const std::string& payload) {
     m_executor->submit([this, payload]() {
         m_events.push(std::make_pair(AlexaPresentationEvents::APL_USER_EVENT, payload));
+        m_contextManager->getContext(shared_from_this());
+    });
+}
+
+void AlexaPresentation::sendDataSourceFetchRequestEvent(const std::string& type, const std::string& payload) {
+    if (type == DYNAMIC_INDEX_LIST) {
+        m_executor->submit([this, payload]() {
+            m_events.push(std::make_pair(AlexaPresentationEvents::APL_LOAD_INDEX_LIST_DATA, payload));
+            m_contextManager->getContext(shared_from_this());
+        });
+    } else if (type == DYNAMIC_TOKEN_LIST) {
+        m_executor->submit([this, payload]() {
+            m_events.push(std::make_pair(AlexaPresentationEvents::APL_LOAD_TOKEN_LIST_DATA, payload));
+            m_contextManager->getContext(shared_from_this());
+        });
+    } else {
+        ACSDK_WARN(LX("sendDataSourceFetchRequestEventIgnored").d("reason", "Trying to process unknown data source."));
+        return;
+    }
+}
+
+void AlexaPresentation::sendRuntimeErrorEvent(const std::string& payload) {
+    m_executor->submit([this, payload]() {
+        m_events.push(std::make_pair(AlexaPresentationEvents::APL_RUNTIME_ERROR, payload));
         m_contextManager->getContext(shared_from_this());
     });
 }
@@ -518,6 +608,65 @@ void AlexaPresentation::handleExecuteCommandDirective(std::shared_ptr<DirectiveI
     });
 }
 
+void AlexaPresentation::handleDynamicListDataDirective(
+    std::shared_ptr<DirectiveInfo> info,
+    const std::string& sourceType) {
+    ACSDK_DEBUG5(LX(__func__));
+
+    m_executor->submit([this, info, sourceType]() {
+        ACSDK_DEBUG9(
+            LX("handleDynamicListDataDirectiveInExecutor").sensitive("payload", info->directive->getPayload()));
+        rapidjson::Document payload;
+        if (!parseDirectivePayload(info, &payload)) {
+            return;
+        }
+
+        std::string presentationToken;
+        if (!jsonUtils::retrieveValue(payload, PRESENTATION_TOKEN, &presentationToken)) {
+            ACSDK_ERROR(LX("handleDynamicListDataDirectiveFailedInExecutor").d("reason", "NoPresentationToken"));
+            sendExceptionEncounteredAndReportFailed(info, "missing presentationToken");
+            return;
+        }
+
+        if (!m_lastDisplayedDirective) {
+            ACSDK_ERROR(LX("handleDynamicListDataDirectiveFailedInExecutor")
+                            .d("reason", "No display directive before call to DynamicListData directive."));
+            sendExceptionEncounteredAndReportFailed(info, "missing previous rendering directive");
+            return;
+        }
+
+        rapidjson::Document renderedPayload;
+        if (!parseDirectivePayload(m_lastDisplayedDirective, &renderedPayload)) {
+            sendExceptionEncounteredAndReportFailed(info, "Parse error of previous render directive");
+            ACSDK_ERROR(LX("handleDynamicListDataDirectiveFailedInExecutor")
+                            .d("reason", "Could not parse the last displayed directive."));
+
+            return;
+        }
+
+        std::string renderedPresentationToken;
+        if (!jsonUtils::retrieveValue(renderedPayload, PRESENTATION_TOKEN, &renderedPresentationToken)) {
+            sendExceptionEncounteredAndReportFailed(info, "Missing presentationToken in last display directive.");
+            ACSDK_ERROR(LX("handleDynamicListDataDirectiveFailedInExecutor")
+                            .d("reason", "No presentationToken in the last displayed directive."));
+            return;
+        }
+
+        if (presentationToken != renderedPresentationToken) {
+            sendExceptionEncounteredAndReportFailed(
+                info, "token mismatch between DynamicListData and last rendering directive.");
+            ACSDK_ERROR(
+                LX("handleDynamicListDataDirectiveFailedInExecutor")
+                    .d("reason",
+                       "presentationToken in DynamicListData does not match the one from last displayed directive."));
+            return;
+        }
+
+        // Core will do checks for us for content of it, so just pass through.
+        executeDynamicListDataEvent(info, sourceType);
+    });
+}
+
 void AlexaPresentation::handleUnknownDirective(std::shared_ptr<DirectiveInfo> info) {
     ACSDK_ERROR(LX("requestedToHandleUnknownDirective")
                     .d("reason", "unknownDirective")
@@ -589,6 +738,8 @@ void AlexaPresentation::executeRenderDocumentCallbacks(bool isClearCard) {
                      .d("isClear", isClearCard)
                      .d("windowId", windowId));
 
+    startMetricsEvent(MetricEvent::RENDER_DOCUMENT);
+
     for (auto& observer : m_observers) {
         if (isClearCard) {
             observer->clearDocument();
@@ -633,6 +784,24 @@ void AlexaPresentation::executeCommandEvent(std::shared_ptr<DirectiveInfo> info)
     for (auto& observer : m_observers) {
         observer->executeCommands(info->directive->getPayload(), info->directive->getMessageId());
     }
+}
+
+void AlexaPresentation::dataSourceUpdateEvent(std::shared_ptr<DirectiveInfo> info, const std::string& sourceType) {
+    ACSDK_DEBUG5(LX(__func__));
+
+    if (m_lastDisplayedDirective->directive->getNamespace() != ALEXA_PRESENTATION_APL_NAMESPACE &&
+        m_lastDisplayedDirective->directive->getName() != RENDER_DOCUMENT) {
+        sendExceptionEncounteredAndReportFailed(info, "APL document that requires data source update is not rendered.");
+        ACSDK_ERROR(LX("dataSourceUpdateEventFailed")
+                        .d("reason", "Cannot do DataSource update when an APL document is not rendered."));
+        return;
+    }
+
+    for (auto& observer : m_observers) {
+        observer->dataSourceUpdate(sourceType, info->directive->getPayload(), info->directive->getMessageId());
+    }
+
+    setHandlingCompleted(info);
 }
 
 void AlexaPresentation::executeClearCard() {
@@ -876,6 +1045,19 @@ void AlexaPresentation::executeExecuteCommandEvent(
     m_state = nextState;
 }
 
+void AlexaPresentation::executeDynamicListDataEvent(
+    const std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityAgent::DirectiveInfo> info,
+    const std::string& sourceType) {
+    switch (m_state) {
+        case smartScreenSDKInterfaces::State::DISPLAYING:
+            dataSourceUpdateEvent(info, sourceType);
+            break;
+        default:
+            // Do nothing
+            break;
+    }
+}
+
 std::unordered_set<std::shared_ptr<avsCommon::avs::CapabilityConfiguration>> AlexaPresentation::
     getCapabilityConfigurations() {
     return m_capabilityConfigurations;
@@ -912,6 +1094,33 @@ void AlexaPresentation::onContextAvailable(const std::string& jsonContext) {
 
                     ACSDK_DEBUG9(LX("onContextAvailable : Send UserEvent to AVS."));
                     m_messageSender->sendMessage(userEventMessage);
+                    break;
+                }
+                case AlexaPresentationEvents::APL_LOAD_INDEX_LIST_DATA: {
+                    auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
+                        ALEXA_PRESENTATION_APL_NAMESPACE, LOAD_INDEX_LIST_DATA, "", event.second, jsonContext);
+                    auto fetchRequestEvent = std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
+
+                    ACSDK_DEBUG9(LX("onContextAvailable : Send DataSourceFetchRequest event to AVS."));
+                    m_messageSender->sendMessage(fetchRequestEvent);
+                    break;
+                }
+                case AlexaPresentationEvents::APL_LOAD_TOKEN_LIST_DATA: {
+                    auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
+                        ALEXA_PRESENTATION_APL_NAMESPACE, LOAD_TOKEN_LIST_DATA, "", event.second, jsonContext);
+                    auto fetchRequestEvent = std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
+
+                    ACSDK_DEBUG9(LX("onContextAvailable : Send DataSourceFetchRequest event to AVS."));
+                    m_messageSender->sendMessage(fetchRequestEvent);
+                    break;
+                }
+                case AlexaPresentationEvents::APL_RUNTIME_ERROR: {
+                    auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
+                        ALEXA_PRESENTATION_APL_NAMESPACE, RUNTIME_ERROR, "", event.second, jsonContext);
+                    auto runtimeErrorEvent = std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
+
+                    ACSDK_DEBUG9(LX("onContextAvailable : Send RuntimeError event to AVS."));
+                    m_messageSender->sendMessage(runtimeErrorEvent);
                     break;
                 }
                 case AlexaPresentationEvents::APL_DISMISSED: {
@@ -994,7 +1203,7 @@ void AlexaPresentation::processRenderDocumentResult(
 
         ACSDK_DEBUG3(LX("processRenderDocumentResultExecutor").d("token", token).d("result", result));
 
-        if (token == NON_APL_DOCUMENT_TOKEN) {
+        if (token == getNonAPLDocumentToken()) {
             // There is no need to perform further checks if this document is not APL
             return;
         }
@@ -1011,6 +1220,8 @@ void AlexaPresentation::processRenderDocumentResult(
             setHandlingCompleted(m_lastDisplayedDirective);
         } else {
             sendExceptionEncounteredAndReportFailed(m_lastDisplayedDirective, "Renderer failed: " + error);
+            resetMetricsEvent(MetricEvent::RENDER_DOCUMENT);
+            endMetricsEvent(MetricEvent::RENDER_DOCUMENT, ACTIVITY_RENDER_DOCUMENT_FAIL);
         }
 
         if (DialogUXState::IDLE == m_dialogUxState && InteractionState::INACTIVE == m_documentInteractionState) {
@@ -1119,6 +1330,180 @@ void AlexaPresentation::executeResetActivityTracker() {
     m_activeSources.clear();
     m_documentInteractionState = InteractionState::INACTIVE;
     executeStopTimer();
+}
+
+const std::string AlexaPresentation::getNonAPLDocumentToken() {
+    return "NonAPLDocumentToken";
+}
+
+void AlexaPresentation::startMetricsEvent(MetricEvent metricEvent) {
+    switch (metricEvent) {
+        case MetricEvent::RENDER_DOCUMENT:
+        case MetricEvent::LAYOUT:
+        case MetricEvent::INFLATE:
+            m_currentActiveTimePoints[metricEvent] = std::chrono::steady_clock::now();
+            break;  // Timer Metric events
+        case MetricEvent::TEXT_MEASURE_COUNT:
+        case MetricEvent::DROP_FRAME: {
+            if (m_currentActiveCountPoints.find(metricEvent) == m_currentActiveCountPoints.end()) {
+                m_currentActiveCountPoints[metricEvent] = 0;
+            }
+            ++m_currentActiveCountPoints[metricEvent];  // always increment by one
+            break;                                      // Count Metric events
+        }
+        default:
+            break;
+    }
+}
+
+void AlexaPresentation::triggerMetricsEventWithData(
+    MetricEvent metricEvent,
+    uint64_t count,
+    const std::string& activityName) {
+    switch (metricEvent) {
+        case MetricEvent::TEXT_MEASURE_COUNT:
+        case MetricEvent::DROP_FRAME: {
+            if (m_currentActiveCountPoints.find(metricEvent) == m_currentActiveCountPoints.end()) {
+                m_currentActiveCountPoints[metricEvent] = 0;
+            }
+            m_currentActiveCountPoints[metricEvent] = count;
+            endMetricsEvent(metricEvent, activityName);
+            break;
+        }
+        default:
+            ACSDK_DEBUG3(LX(__func__).m("Incorrect event-type for data"));
+            break;
+    }
+}
+
+void AlexaPresentation::triggerMetricsEventWithData(
+    MetricEvent metricEvent,
+    std::chrono::steady_clock::time_point& tp,
+    const std::string& activityName) {
+    switch (metricEvent) {
+        case MetricEvent::RENDER_DOCUMENT:
+        case MetricEvent::LAYOUT:
+        case MetricEvent::INFLATE:
+            m_currentActiveTimePoints[metricEvent] = tp;
+            endMetricsEvent(metricEvent, activityName);
+            break;
+        default:
+            ACSDK_DEBUG3(LX(__func__).m("Incorrect event-type for data"));
+            break;
+    }
+}
+
+void AlexaPresentation::resetMetricsEvent(MetricEvent metricEvent) {
+    switch (metricEvent) {
+        case MetricEvent::RENDER_DOCUMENT:
+        case MetricEvent::LAYOUT:
+        case MetricEvent::INFLATE: {
+            m_currentActiveTimePoints.erase(metricEvent);
+            break;  // Timer Metric events
+        }
+        case MetricEvent::TEXT_MEASURE_COUNT:
+        case MetricEvent::DROP_FRAME: {
+            m_currentActiveCountPoints.erase(metricEvent);
+            break;  // Count Metric events
+        }
+        default:
+            break;
+    }
+}
+void AlexaPresentation::endMetricsEvent(MetricEvent metricEvent, const std::string& activityName) {
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricEvent> event;
+    switch (metricEvent) {
+        case MetricEvent::RENDER_DOCUMENT:
+        case MetricEvent::LAYOUT:
+        case MetricEvent::INFLATE: {
+            auto endTP = std::chrono::duration_cast<std::chrono::milliseconds>(
+                m_currentActiveTimePoints.find(metricEvent) != m_currentActiveTimePoints.end()
+                    ? std::chrono::steady_clock::now() - m_currentActiveTimePoints[metricEvent]
+                    : std::chrono::milliseconds(0));
+
+            event = alexaClientSDK::avsCommon::utils::metrics::MetricEventBuilder{}
+                        .setActivityName(activityName)
+                        .setPriority(alexaClientSDK::avsCommon::utils::metrics::Priority::HIGH)
+                        .addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointDurationBuilder(endTP)
+                                          .setName(MetricsDataPointNames[metricEvent])
+                                          .build())
+                        .addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointStringBuilder{}
+                                          .setName("APL_TOKEN")
+                                          .setValue(m_lastRenderedAPLToken.c_str())
+                                          .build())
+                        .build();
+            m_currentActiveTimePoints.erase(metricEvent);
+            break;  // Timer Metric events
+        }
+        case MetricEvent::TEXT_MEASURE_COUNT:
+        case MetricEvent::DROP_FRAME: {
+            event = alexaClientSDK::avsCommon::utils::metrics::MetricEventBuilder{}
+                        .setActivityName(activityName)
+                        .setPriority(alexaClientSDK::avsCommon::utils::metrics::Priority::HIGH)
+                        .addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointCounterBuilder()
+                                          .setName(MetricsDataPointNames[metricEvent])
+                                          .increment(m_currentActiveCountPoints[metricEvent])
+                                          .build())
+                        .addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointStringBuilder{}
+                                          .setName("APL_TOKEN")
+                                          .setValue(m_lastRenderedAPLToken.c_str())
+                                          .build())
+                        .build();
+
+            m_currentActiveCountPoints.erase(metricEvent);
+            break;  // Count Metric events
+        }
+        default:
+            break;
+    }
+
+    if (m_metricRecorder != nullptr) {
+        std::lock_guard<std::mutex> lock{m_MetricsRecorderMutex};
+        m_metricRecorder->recordMetric(event);
+    }  // lock out of scope
+}
+
+void AlexaPresentation::recordRenderComplete() {
+    ACSDK_DEBUG5(LX(__func__));
+    /* The view layout was drawn */
+    endMetricsEvent(MetricEvent::LAYOUT, ACTIVITY_VIEW_LAYOUT);
+
+    /* Document was rendered */
+    endMetricsEvent(MetricEvent::RENDER_DOCUMENT, ACTIVITY_RENDER_DOCUMENT);
+}
+
+void AlexaPresentation::recordDropFrameCount(uint64_t dropFrameCount) {
+    triggerMetricsEventWithData(MetricEvent::DROP_FRAME, dropFrameCount, ACTIVITY_DROP_FRAME);
+}
+
+void AlexaPresentation::recordAPLEvent(APLClient::AplRenderingEvent event) {
+    switch (event) {
+        case APLClient::AplRenderingEvent::INFLATE_BEGIN: {
+            /* Document will start inflating now */
+            startMetricsEvent(MetricEvent::INFLATE);
+
+            break;
+        }
+        case APLClient::AplRenderingEvent::INFLATE_END: {
+            /* APL Core engine completed the context inflate */
+            endMetricsEvent(MetricEvent::INFLATE, ACTIVITY_INFLATE_APL);
+
+            /* Text measurement ends after the document is inflated  */
+            endMetricsEvent(MetricEvent::TEXT_MEASURE_COUNT, ACTIVITY_TEXT_MEASURE);
+
+            /* Start of the view layout draw*/
+            startMetricsEvent(MetricEvent::LAYOUT);
+
+            break;
+        }
+        case APLClient::AplRenderingEvent::TEXT_MEASURE: {
+            /* Text measurement was performed on the document */
+            startMetricsEvent(MetricEvent::TEXT_MEASURE_COUNT);
+            break;
+        }
+        default:
+            ACSDK_DEBUG3(LX(__func__).m("Unhandled event type"));
+    }
 }
 
 }  // namespace alexaPresentation

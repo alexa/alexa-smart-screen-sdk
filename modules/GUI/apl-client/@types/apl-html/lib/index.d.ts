@@ -1,11 +1,11 @@
 /// <reference path="dts/Module.d.ts" />
 /**
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  */
 import './assets/css/fonts.css';
 import APLRenderer from './APLRenderer';
 export default APLRenderer;
-export { IAPLOptions, IViewportCharacteristics, IEnvironment, ISendEvent, DeviceMode, ViewportShape } from './APLRenderer';
+export { IAPLOptions, IViewportCharacteristics, IEnvironment, ISendEvent, IDataSourceFetchRequest, DeviceMode, ViewportShape } from './APLRenderer';
 export { Content } from './Content';
 export { commandFactory } from './CommandFactory';
 export { componentFactory } from './ComponentFactory';

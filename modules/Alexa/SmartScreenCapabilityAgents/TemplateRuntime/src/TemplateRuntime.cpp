@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -251,6 +251,11 @@ void TemplateRuntime::clearDocument() {
 }
 
 void TemplateRuntime::executeCommands(const std::string& jsonPayload, const std::string& token) {
+}
+void TemplateRuntime::dataSourceUpdate(
+    const std::string& sourceType,
+    const std::string& jsonPayload,
+    const std::string& token) {
 }
 void TemplateRuntime::interruptCommandSequence() {
 }

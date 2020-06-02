@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 #include <AVSCommon/Utils/Timing/Timer.h>
 
 #include <Utils/SmartScreenSDKVersion.h>
+#include "SampleApp/Messages/GUIClientMessage.h"
 
 #include "SampleApp/GUI/GUIClient.h"
 
@@ -65,6 +66,15 @@ static const std::string MESSAGE_TYPE_LOG_EVENT("logEvent");
 /// The message type for device window state.
 static const std::string MESSAGE_TYPE_DEVICE_WINDOW_STATE("deviceWindowState");
 
+/// The message type for device window state.
+static const std::string MESSAGE_TYPE_RENDER_COMPLETE("renderComplete");
+
+/// The message type for display metrics event
+static const std::string MESSAGE_TYPE_DISPLAY_METRICS("displayMetrics");
+
+/// The message type for toggling captions.
+static const std::string MESSAGE_TYPE_TOGGLE_CAPTIONS("toggleCaptions");
+
 /// Key for isSupported.
 static const std::string IS_SUPPORTED_TAG("isSupported");
 
@@ -98,6 +108,9 @@ static const std::string ERROR_TAG("error");
 /// The event json key in the message.
 static const std::string EVENT_TAG("event");
 
+/// The drop frame count json key in the message.
+static const std::string DROP_FRAME_COUNT_TAG("dropFrameCount");
+
 /// Interface name to use for focus requests.
 static const std::string APL_INTERFACE("Alexa.Presentation.APL");
 
@@ -111,7 +124,7 @@ static const std::string TABLE_NAME{"GUIClient"};
 static const std::string APL_MAX_VERSION_DB_KEY{"APLMaxVersion"};
 
 /// Initial APL version to use at the first run and before any  GUI client is connected.
-static const std::string INITIAL_APL_MAX_VERSION{"1.2"};
+static const std::string INITIAL_APL_MAX_VERSION{"1.3"};
 
 /// The key in our config file to find the root of GUI configuration
 static const std::string GUI_CONFIGURATION_ROOT_KEY = "gui";
@@ -242,7 +255,8 @@ GUIClient::GUIClient(
         m_errorState{false},
         m_APLMaxVersion{APLMaxVersion},
         m_shouldRestart{false},
-        m_miscStorage{miscStorage} {
+        m_miscStorage{miscStorage},
+        m_captionManager{SmartScreenCaptionStateManager(miscStorage)} {
     m_messageHandlers.emplace(
         MESSAGE_TYPE_TAP_TO_TALK, [this](rapidjson::Document& payload) { executeHandleTapToTalk(payload); });
     m_messageHandlers.emplace(
@@ -272,6 +286,12 @@ GUIClient::GUIClient(
     m_messageHandlers.emplace(MESSAGE_TYPE_DEVICE_WINDOW_STATE, [this](rapidjson::Document& payload) {
         executeHandleDeviceWindowState(payload);
     });
+    m_messageHandlers.emplace(
+        MESSAGE_TYPE_RENDER_COMPLETE, [this](rapidjson::Document& payload) { executeHandleRenderComplete(payload); });
+    m_messageHandlers.emplace(
+        MESSAGE_TYPE_DISPLAY_METRICS, [this](rapidjson::Document& payload) { executeHandleDisplayMetrics(payload); });
+    m_messageHandlers.emplace(
+        MESSAGE_TYPE_TOGGLE_CAPTIONS, [this](rapidjson::Document& payload) { m_captionManager.toggleCaptions(); });
 }
 
 void GUIClient::doShutdown() {
@@ -279,8 +299,7 @@ void GUIClient::doShutdown() {
     stop();
     m_executor.shutdown();
     m_guiManager.reset();
-    m_aplCoreConnectionManager.reset();
-    m_aplCoreGuiRenderer.reset();
+    m_aplClientBridge.reset();
     m_messageListener.reset();
     m_observer.reset();
     m_miscStorage.reset();
@@ -294,28 +313,18 @@ void GUIClient::setGUIManager(
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIServerInterface> guiManager) {
     ACSDK_DEBUG3(LX(__func__));
     m_executor.submit([this, guiManager]() {
-        if (!m_aplCoreConnectionManager) {
-            ACSDK_ERROR(LX("setGUIManagerFailed").d("reason", "nullAplCoreConnectionManager"));
-            return;
-        }
-        if (!m_aplCoreGuiRenderer) {
-            ACSDK_ERROR(LX("setGUIManagerFailed").d("reason", "nullAplCoreGuiRenderer"));
+        if (!m_aplClientBridge) {
+            ACSDK_ERROR(LX("setGUIManagerFailed").d("reason", "nullAplRenderer"));
             return;
         }
         m_guiManager = guiManager;
-        m_aplCoreConnectionManager->setGuiManager(guiManager);
-        m_aplCoreGuiRenderer->setGuiManager(guiManager);
+        m_aplClientBridge->setGUIManager(guiManager);
     });
 }
 
-void GUIClient::setAplCoreConnectionManager(std::shared_ptr<AplCoreConnectionManager> aplCoreConnectionManager) {
+void GUIClient::setAplClientBridge(std::shared_ptr<AplClientBridge> aplClientBridge) {
     ACSDK_DEBUG3(LX(__func__));
-    m_executor.submit([this, aplCoreConnectionManager]() { m_aplCoreConnectionManager = aplCoreConnectionManager; });
-}
-
-void GUIClient::setAplCoreGuiRenderer(std::shared_ptr<AplCoreGuiRenderer> aplCoreGuiRenderer) {
-    ACSDK_DEBUG3(LX(__func__));
-    m_executor.submit([this, aplCoreGuiRenderer]() { m_aplCoreGuiRenderer = aplCoreGuiRenderer; });
+    m_executor.submit([this, aplClientBridge]() { m_aplClientBridge = aplClientBridge; });
 }
 
 bool GUIClient::acquireFocus(
@@ -433,15 +442,24 @@ void GUIClient::onMessage(const std::string& jsonPayload) {
 }
 
 void GUIClient::executeCommands(const std::string& command, const std::string& token) {
-    m_executor.submit([this, command, token]() { m_aplCoreGuiRenderer->executeCommands(command, token); });
+    m_executor.submit([this, command, token]() { m_aplClientBridge->executeCommands(command, token); });
+}
+
+void GUIClient::dataSourceUpdate(
+    const std::string& sourceType,
+    const std::string& jsonPayload,
+    const std::string& token) {
+    m_executor.submit([this, sourceType, jsonPayload, token]() {
+        m_aplClientBridge->dataSourceUpdate(sourceType, jsonPayload, token);
+    });
 }
 
 void GUIClient::provideState(const unsigned int stateRequestToken) {
-    m_executor.submit([this, stateRequestToken]() { m_aplCoreConnectionManager->provideState(stateRequestToken); });
+    m_executor.submit([this, stateRequestToken]() { m_aplClientBridge->provideState(stateRequestToken); });
 }
 
 void GUIClient::interruptCommandSequence() {
-    m_executor.submit([this]() { m_aplCoreGuiRenderer->interruptCommandSequence(); });
+    m_executor.submit([this]() { m_aplClientBridge->interruptCommandSequence(); });
 }
 
 void GUIClient::executeHandleTapToTalk(rapidjson::Document& message) {
@@ -621,7 +639,7 @@ void GUIClient::executeHandleRenderStaticDocument(rapidjson::Document& message) 
         return;
     }
 
-    m_aplCoreGuiRenderer->renderDocument(payload, AlexaPresentation::NON_APL_DOCUMENT_TOKEN, windowId);
+    m_aplClientBridge->renderDocument(payload, AlexaPresentation::getNonAPLDocumentToken(), windowId);
 }
 
 void GUIClient::executeHandleExecuteCommands(rapidjson::Document& message) {
@@ -637,7 +655,7 @@ void GUIClient::executeHandleExecuteCommands(rapidjson::Document& message) {
         return;
     }
 
-    m_aplCoreGuiRenderer->executeCommands(payload, token);
+    m_aplClientBridge->executeCommands(payload, token);
 }
 
 void GUIClient::executeHandleActivityEvent(rapidjson::Document& message) {
@@ -672,8 +690,8 @@ void GUIClient::executeHandleNavigationEvent(rapidjson::Document& message) {
 }
 
 void GUIClient::executeHandleAplEvent(rapidjson::Document& message) {
-    if (!m_aplCoreConnectionManager) {
-        ACSDK_ERROR(LX("handleAplEventFailed").d("reason", "APL Core Connection Manager has not been configured"));
+    if (!m_aplClientBridge) {
+        ACSDK_ERROR(LX("handleAplEventFailed").d("reason", "APL Renderer has not been configured"));
         return;
     }
 
@@ -683,7 +701,7 @@ void GUIClient::executeHandleAplEvent(rapidjson::Document& message) {
         return;
     }
 
-    m_aplCoreConnectionManager->onMessage(payload);
+    m_aplClientBridge->onMessage(payload);
 }
 
 void GUIClient::executeHandleDeviceWindowState(rapidjson::Document& message) {
@@ -694,6 +712,32 @@ void GUIClient::executeHandleDeviceWindowState(rapidjson::Document& message) {
     }
 
     m_guiManager->handleDeviceWindowState(payload);
+}
+
+void GUIClient::executeHandleRenderComplete(rapidjson::Document& message) {
+    m_guiManager->handleRenderComplete();
+}
+
+void GUIClient::executeHandleDisplayMetrics(rapidjson::Document& message) {
+    std::string jsonPayload;
+    rapidjson::Document payload;
+    if (!jsonUtils::retrieveValue(message, PAYLOAD_TAG, &jsonPayload)) {
+        ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "payloadNotFound"));
+        return;
+    }
+
+    uint64_t dropFrameCount;
+    if (payload.Parse(jsonPayload).HasParseError()) {
+        ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "payloadParseError"));
+        return;
+    }
+
+    if (!jsonUtils::retrieveValue(payload, DROP_FRAME_COUNT_TAG, &dropFrameCount)) {
+        ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "dropFrameCountNotFound"));
+        return;
+    }
+
+    m_guiManager->handleDisplayMetrics(dropFrameCount);
 }
 
 void GUIClient::setObserver(const std::shared_ptr<MessagingServerObserverInterface>& observer) {
@@ -729,7 +773,7 @@ void GUIClient::onConnectionClosed() {
         if (m_observer) {
             m_observer->onConnectionClosed();
         }
-        m_aplCoreConnectionManager->onConnectionClosed();
+        m_aplClientBridge->onConnectionClosed();
     });
 }
 
@@ -743,7 +787,7 @@ void GUIClient::renderTemplateCard(
 void GUIClient::clearTemplateCard() {
     ACSDK_DEBUG5(LX("clearTemplateCard"));
     m_executor.submit([this]() {
-        m_aplCoreGuiRenderer->clearDocument();
+        m_aplClientBridge->clearDocument();
 
         auto message = messages::ClearRenderTemplateCardMessage();
         executeSendMessage(message);
@@ -752,13 +796,13 @@ void GUIClient::clearTemplateCard() {
 
 void GUIClient::renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) {
     m_executor.submit(
-        [this, jsonPayload, token, windowId]() { m_aplCoreGuiRenderer->renderDocument(jsonPayload, token, windowId); });
+        [this, jsonPayload, token, windowId]() { m_aplClientBridge->renderDocument(jsonPayload, token, windowId); });
 }
 
 void GUIClient::clearDocument() {
     ACSDK_DEBUG5(LX("clearDocument"));
     m_executor.submit([this]() {
-        m_aplCoreGuiRenderer->clearDocument();
+        m_aplClientBridge->clearDocument();
 
         auto message = messages::ClearDocumentMessage();
         executeSendMessage(message);
@@ -778,6 +822,15 @@ void GUIClient::clearPlayerInfoCard() {
 
     auto message = messages::ClearPlayerInfoCardMessage();
     sendMessage(message);
+}
+
+void GUIClient::renderCaptions(const std::string& payload) {
+    if (m_captionManager.areCaptionsEnabled()) {
+        ACSDK_DEBUG5(LX("renderCaptions"));
+
+        auto message = messages::RenderCaptionsMessage(payload);
+        sendMessage(message);
+    }
 }
 
 std::string GUIClient::getMaxAPLVersion() {
@@ -820,7 +873,7 @@ void GUIClient::sendInitRequestAndWait() {
     });
 
     ACSDK_DEBUG3(LX("start").m("InitResponse received"));
-    m_aplCoreConnectionManager->onConnectionOpened();
+    m_aplClientBridge->onConnectionOpened();
 }
 
 void GUIClient::executeSendGuiConfiguration() {
@@ -838,8 +891,18 @@ void GUIClient::executeSendGuiConfiguration() {
     // Get the ConfigurationNode contains appConfig.
     auto appConfig = configurationGui[APPCONFIG_CONFIGURATION_ROOT_KEY];
 
-    auto message = messages::GuiConfigurationMessage(visualCharacteristics.serialize(), appConfig.serialize());
+    auto appConfigString = appConfig.serialize();
+    auto visualCharacteristicsString = visualCharacteristics.serialize();
+
+#ifndef _MSC_VER
+    auto message = messages::GuiConfigurationMessage(visualCharacteristicsString, appConfigString);
     sendMessage(message);
+#else
+    auto payloadWithHeader = R"({"type": "guiConfiguration", "payload": {"visualCharacteristics": )" +
+                             visualCharacteristicsString + R"(, "appConfig": )" + appConfigString + R"(}})";
+
+    writeMessage(payloadWithHeader);
+#endif
 }
 
 bool GUIClient::executeProcessInitResponse(const rapidjson::Document& message) {

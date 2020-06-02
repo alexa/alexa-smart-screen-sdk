@@ -1,5 +1,5 @@
 /*
- * Copyright 2018-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
 
+#include <APLClient/AplRenderingEvent.h>
 #include "ActivityEvent.h"
 #include "NavigationEvent.h"
 
@@ -48,6 +49,21 @@ public:
      * @param userEventPayload the user event payload.
      */
     virtual void handleUserEvent(std::string userEventPayload) = 0;
+
+    /**
+     * Handle DataSourceFetchRequestEvent.
+     *
+     * @param type type of DataSource asking for fetch.
+     * @param payload event payload.
+     */
+    virtual void handleDataSourceFetchRequestEvent(std::string type, std::string payload) = 0;
+
+    /**
+     * Handle RuntimeError event.
+     *
+     * @param payload event payload.
+     */
+    virtual void handleRuntimeErrorEvent(std::string payload) = 0;
 
     /**
      * Handle visual context received in a message.
@@ -132,6 +148,35 @@ public:
      * @param payload The device window state payload.
      */
     virtual void handleDeviceWindowState(std::string payload) = 0;
+
+    /**
+     * Gets Device Time Zone Offset.
+     */
+    virtual std::chrono::milliseconds getDeviceTimezoneOffset() = 0;
+
+    /**
+     * Force exit to reset focus state and clear card.
+     */
+    virtual void forceExit() = 0;
+
+    /**
+     * Handle render complete event received in a message.
+     */
+    virtual void handleRenderComplete() = 0;
+
+    /**
+     * Handle display metrics event received in a message.
+     *
+     * @param dropFrameCount Count of the frames dropped
+     */
+    virtual void handleDisplayMetrics(uint64_t dropFrameCount) = 0;
+
+    /**
+     * Handle APL context inflate started event.
+     *
+     * @param event The event in context
+     */
+    virtual void handleAPLEvent(APLClient::AplRenderingEvent event) = 0;
 };
 
 }  // namespace smartScreenSDKInterfaces

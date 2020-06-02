@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License").
  * You may not use this file except in compliance with the License.
@@ -25,14 +25,15 @@ namespace sampleApp {
 /**
  * Observes callbacks from revoke authorization requests and notifies the default client.
  */
-class RevokeAuthorizationObserver : public avsCommon::sdkInterfaces::RevokeAuthorizationObserverInterface {
+class RevokeAuthorizationObserver
+        : public alexaClientSDK::avsCommon::sdkInterfaces::RevokeAuthorizationObserverInterface {
 public:
     /**
      * Constructor.
      *
      * @param manager The registration manager providing logout functionality.
      */
-    RevokeAuthorizationObserver(std::shared_ptr<registrationManager::RegistrationManager> manager);
+    RevokeAuthorizationObserver(std::shared_ptr<alexaClientSDK::registrationManager::RegistrationManager> manager);
 
     /// @name RevokeAuthorizationObserverInterface Functions
     /// @{
@@ -41,7 +42,7 @@ public:
 
 private:
     /// The registration manager used to logout.
-    std::shared_ptr<registrationManager::RegistrationManager> m_manager;
+    std::shared_ptr<alexaClientSDK::registrationManager::RegistrationManager> m_manager;
 };
 
 }  // namespace sampleApp
