@@ -30,7 +30,7 @@
 #include <AVSCommon/Utils/RequiresShutdown.h>
 #include <CertifiedSender/CertifiedSender.h>
 #include <ExternalMediaPlayer/ExternalMediaPlayer.h>
-#include <MRM/MRMCapabilityAgent.h>
+#include <acsdkMultiRoomMusic/MRMCapabilityAgent.h>
 #include <RegistrationManager/CustomerDataManager.h>
 #include <Settings/Storage/DeviceSettingStorageInterface.h>
 #include <System/ReportStateHandler.h>

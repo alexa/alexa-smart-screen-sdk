@@ -4,7 +4,7 @@ project(AlexaModule LANGUAGES CXX)
 
 if (NOT MSVC)
 	find_package(PkgConfig)
-	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.19.1)
+	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.20.0)
 else()
 	# No package manager support in MSVC yet. Emulating the same results
 	set(ASDK_INCLUDE_DIRS "${ASDK_INSTALL_PATH}/include")
@@ -17,29 +17,30 @@ else()
         "${ASDK_LIB_DIR}/ADSL.lib"
         "${ASDK_LIB_DIR}/AFML.lib"
         "${ASDK_LIB_DIR}/AIP.lib"
-        "${ASDK_LIB_DIR}/Alerts.lib"
+        "${ASDK_LIB_DIR}/acsdkAlerts.lib"
         "${ASDK_LIB_DIR}/Alexa.lib"
         "${ASDK_LIB_DIR}/ApiGateway.lib"
-        "${ASDK_LIB_DIR}/AudioPlayer.lib"
+        "${ASDK_LIB_DIR}/acsdkAudioPlayer.lib"
         "${ASDK_LIB_DIR}/AudioResources.lib"
         "${ASDK_LIB_DIR}/AVSCommon.lib"
         "${ASDK_LIB_DIR}/AVSSystem.lib"
-        "${ASDK_LIB_DIR}/Bluetooth.lib"
+        "${ASDK_LIB_DIR}/acsdkBluetooth.lib"
         "${ASDK_LIB_DIR}/CapabilitiesDelegate.lib"
         "${ASDK_LIB_DIR}/CBLAuthDelegate.lib"
         "${ASDK_LIB_DIR}/CertifiedSender.lib"
         "${ASDK_LIB_DIR}/ContextManager.lib"
         "${ASDK_LIB_DIR}/DefaultClient.lib"
         "${ASDK_LIB_DIR}/DeviceSettings.lib"
-        "${ASDK_LIB_DIR}/DoNotDisturbCA.lib"
+        "${ASDK_LIB_DIR}/acsdkDoNotDisturb.lib"
         "${ASDK_LIB_DIR}/Endpoints.lib"
         "${ASDK_LIB_DIR}/Equalizer.lib"
         "${ASDK_LIB_DIR}/EqualizerImplementations.lib"
         "${ASDK_LIB_DIR}/ExternalMediaPlayer.lib"
         "${ASDK_LIB_DIR}/InteractionModel.lib"
+        "${ASDK_LIB_DIR}/InterruptModel.lib"
         "${ASDK_LIB_DIR}/KWD.lib"
-        "${ASDK_LIB_DIR}/MRM.lib"
-        "${ASDK_LIB_DIR}/Notifications.lib"
+        "${ASDK_LIB_DIR}/acsdkMultiRoomMusic.lib"
+        "${ASDK_LIB_DIR}/acsdkNotifications.lib"
         "${ASDK_LIB_DIR}/PlaybackController.lib"
         "${ASDK_LIB_DIR}/RegistrationManager.lib"
         "${ASDK_LIB_DIR}/SpeakerManager.lib"

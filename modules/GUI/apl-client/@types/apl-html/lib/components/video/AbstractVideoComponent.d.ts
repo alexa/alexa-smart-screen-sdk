@@ -18,6 +18,8 @@ export interface IVideoProperties extends IComponentProperties {
     [PropertyKey.kPropertyAutoplay]: boolean;
     [PropertyKey.kPropertyScale]: VideoScale;
     [PropertyKey.kPropertySource]: IMediaSource | IMediaSource[];
+    [PropertyKey.kPropertyTrackCurrentTime]: number;
+    [PropertyKey.kPropertyTrackIndex]: number;
 }
 /**
  * @ignore
@@ -37,7 +39,11 @@ export declare abstract class AbstractVideoComponent extends Component<IVideoPro
     protected abstract setScale(scale: VideoScale): any;
     protected abstract setAudioTrack(audioTrack: AudioTrack): any;
     protected abstract setSource(source: IMediaSource | IMediaSource[]): any;
+    protected abstract setTrackCurrentTime(trackCurrentTime: number): any;
+    protected abstract setTrackIndex(trackIndex: number): any;
     private setScaleFromProp;
     private setAudioTrackFromProp;
     private setSourceFromProp;
+    private setTrackCurrentTimeFromProp;
+    private setTrackIndexFromProp;
 }

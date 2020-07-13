@@ -20,6 +20,12 @@
     // The maximum cache size when caching content packages
     // "contentCacheMaxSize": "50"
   },
+  "alexaPresentationCapabilityAgent": {
+    // The minimum state reporting interval in milliseconds for the AlexaPresentation CA
+    // "minStateReportIntervalMs": 600
+    // The interval between checks for context changes
+    // "stateReportCheckIntervalMs": 2000
+  },
   "gui": {
     "appConfig": {
       "description": "TV PTT Device - Fullscreen + Lower Third Panel",

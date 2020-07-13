@@ -100,6 +100,10 @@ export interface IAPLOptions {
     onSendEvent?: (event: ISendEvent) => void;
     /** Callback for Finish command */
     onFinish?: () => void;
+    /** Callback when speakPlayback starts */
+    onSpeakEventEnd?: (type: string) => void;
+    /** Callback when speakPlayback ends */
+    onSpeakEventStart?: (type: string) => void;
     /** Callback for Data Source fetch requests */
     onDataSourceFetchRequest?: (event: IDataSourceFetchRequest) => void;
     /** Callback for pending errors from APLCore Library */

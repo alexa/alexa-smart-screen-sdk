@@ -43,9 +43,12 @@ export declare class Video extends AbstractVideoComponent {
     protected setScale(scale: VideoScale): void;
     protected setAudioTrack(audioTrack: AudioTrack): void;
     protected setSource(source: IMediaSource | IMediaSource[]): void;
+    protected setTrackCurrentTime(trackCurrentTime: number): void;
+    protected setTrackIndex(trackIndex: number): void;
     protected updateMediaState(): void;
     private resetPausePromise();
     private resetPlayPromise();
     private resetLoadPromise();
     private ensureLoaded();
+    destroy(): void;
 }

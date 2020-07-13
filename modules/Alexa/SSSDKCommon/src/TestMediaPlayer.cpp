@@ -72,7 +72,8 @@ avsCommon::utils::mediaPlayer::MediaPlayerInterface::SourceId TestMediaPlayer::s
     const std::string& url,
     std::chrono::milliseconds offset,
     const alexaClientSDK::avsCommon::utils::mediaPlayer::SourceConfig& config,
-    bool repeat) {
+    bool repeat,
+    const alexaClientSDK::avsCommon::utils::mediaPlayer::PlaybackContext& playbackContext) {
     return ++g_sourceId;
 }
 

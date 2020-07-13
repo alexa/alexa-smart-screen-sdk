@@ -16,7 +16,7 @@
 #include <string>
 
 #include <AIP/AudioInputProcessor.h>
-#include <Alerts/AlertsCapabilityAgent.h>
+#include <acsdkAlerts/AlertsCapabilityAgent.h>
 #include <AVSCommon/Utils/Configuration/ConfigurationNode.h>
 #include <AVSCommon/Utils/Logger/Logger.h>
 #include <Settings/Types/LocaleWakeWordsSetting.h>
@@ -100,7 +100,7 @@ std::unique_ptr<DeviceSettingsManager> DeviceSettingsManagerBuilder::build() {
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withAlarmVolumeRampSetting() {
     return withSynchronizedSetting<DeviceSettingsIndex::ALARM_VOLUME_RAMP, SharedAVSSettingProtocol>(
-        alexaClientSDK::capabilityAgents::alerts::AlertsCapabilityAgent::getAlarmVolumeRampMetadata(),
+        alexaClientSDK::acsdkAlerts::AlertsCapabilityAgent::getAlarmVolumeRampMetadata(),
         types::getAlarmVolumeRampDefault());
 }
 
@@ -148,14 +148,14 @@ std::chrono::milliseconds DeviceSettingsManagerBuilder::calculateDeviceTimezoneO
 #ifdef _MSC_VER
     TIME_ZONE_INFORMATION TimeZoneInfo;
     GetTimeZoneInformation(&TimeZoneInfo);
-    auto offsetInMinutes = - TimeZoneInfo.Bias - TimeZoneInfo.DaylightBias;
+    auto offsetInMinutes = -TimeZoneInfo.Bias - TimeZoneInfo.DaylightBias;
     ACSDK_DEBUG9(LX(__func__).m(std::to_string(offsetInMinutes)));
     return std::chrono::minutes(offsetInMinutes);
 #else
-    char *prevTZ = getenv("TZ");
+    char* prevTZ = getenv("TZ");
     setenv("TZ", timeZone.c_str(), 1);
     time_t t = time(NULL);
-    struct tm *structtm = localtime(&t);
+    struct tm* structtm = localtime(&t);
     if (prevTZ) {
         setenv("TZ", prevTZ, 1);
     } else {

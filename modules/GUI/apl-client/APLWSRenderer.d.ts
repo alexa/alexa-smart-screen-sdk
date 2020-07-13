@@ -9,6 +9,10 @@ export interface IAPLWSOptions extends IAPLOptions {
      * The client to use to connect to the APLContent server.
      */
     client: APLClient;
+    /**
+     * List of extension uri's that the renderer will support.
+     */
+    supportedExtensions?: string[];
 }
 /**
  * The main renderer. Create a new one with `const renderer = APLWSRenderer.create(options);`

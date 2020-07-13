@@ -1,10 +1,17 @@
 import APLRenderer from '../APLRenderer';
-import { Component, FactoryFunction } from './Component';
+import { Component, FactoryFunction, IComponentProperties } from './Component';
 import { Scrollable } from './Scrollable';
+import { PropertyKey } from '../enums/PropertyKey';
 /**
  * @ignore
  */
-export declare class ScrollView extends Scrollable {
+export interface IScrollViewProperties extends IComponentProperties {
+    [PropertyKey.kPropertyScrollPosition]: number;
+}
+/**
+ * @ignore
+ */
+export declare class ScrollView extends Scrollable<IScrollViewProperties> {
     constructor(renderer: APLRenderer, component: APL.Component, factory: FactoryFunction, parent?: Component);
     init(): void;
     /**
@@ -13,5 +20,6 @@ export declare class ScrollView extends Scrollable {
      * @memberof ScrollViewComponent
      */
     getChildTopOffset(component: Component): number;
+    setProperties(props: IScrollViewProperties): Promise<void>;
     destroy(): void;
 }

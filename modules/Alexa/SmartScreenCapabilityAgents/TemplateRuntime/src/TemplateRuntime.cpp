@@ -48,7 +48,7 @@ static const std::string TEMPLATERUNTIME_CAPABILITY_INTERFACE_VERSION = "1.1";
 static const std::string TAG{"TemplateRuntime"};
 
 /// The key in our config file to find the root of template runtime configuration.
-static const std::string TEMPLATERUNTIME_CONFIGURATION_ROOT_KEY = "templateRuntime";
+static const std::string TEMPLATERUNTIME_CONFIGURATION_ROOT_KEY = "templateRuntimeCapabilityAgent";
 /// The key in our config file to set the display card timeout value when TTS is in FINISHED state
 static const std::string TEMPLATERUNTIME_TTS_FINISHED_KEY = "displayCardTTSFinishedTimeout";
 /// The key in our config file to set the display card timeout value when AudioPlayer is in FINISHED state

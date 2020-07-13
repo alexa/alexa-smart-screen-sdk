@@ -20,7 +20,7 @@
 #include <AVSCommon/SDKInterfaces/CapabilitiesObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/DialogUXStateObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ConnectionStatusObserverInterface.h>
-#include <AVSCommon/SDKInterfaces/NotificationsObserverInterface.h>
+#include <acsdkNotificationsInterfaces/NotificationsObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/SingleSettingObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/SpeakerManagerObserverInterface.h>
 #include <CBLAuthDelegate/CBLAuthRequesterInterface.h>
@@ -35,7 +35,7 @@ class UIManagerInterface
         , public virtual alexaClientSDK::avsCommon::sdkInterfaces::ConnectionStatusObserverInterface
         , public virtual alexaClientSDK::avsCommon::sdkInterfaces::SingleSettingObserverInterface
         , public virtual alexaClientSDK::avsCommon::sdkInterfaces::SpeakerManagerObserverInterface
-        , public virtual alexaClientSDK::avsCommon::sdkInterfaces::NotificationsObserverInterface
+        , public virtual alexaClientSDK::acsdkNotificationsInterfaces::NotificationsObserverInterface
         , public virtual alexaClientSDK::authorization::cblAuthDelegate::CBLAuthRequesterInterface {
 public:
     virtual ~UIManagerInterface() = default;

@@ -1,3 +1,24 @@
+### v2.2.0 released 07/13/2020:
+
+#### Enhancements
+* Upgraded dependency to Device SDK 1.20.0
+* Optimization for APL package import latency
+
+#### Bug fixes
+* Clean shutdown for device de-registration/logout
+* Proper scaling for GUI so entire window is visible
+* Fixed proper setting of displayCardTTSFinishedTimeout
+* Notification sound cues are now playing
+
+#### Known issues
+* Display of captions is not in sync with Alexa audio and is as expected
+* Memory leak issue with resetDevice member function in GUIManager
+* Potential memory leak issue with executeCommands directive
+* Skill session remains alive for a short amount of time after exit
+* Buttons on Now Playing display card do not update their visual states when updated by voice
+* Scrolling on General Knowledge display card does not work when the content does not fit into screen
+* Progress bar on Now Playing display card does not reflect the actual audio offset when such information is not provided in RenderPlayerInfo directive 
+
 ### v2.1.0 released 06/02/2020:
 
 #### Enhancements

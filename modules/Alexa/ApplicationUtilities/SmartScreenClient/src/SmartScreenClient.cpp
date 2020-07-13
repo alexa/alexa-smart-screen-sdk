@@ -64,6 +64,7 @@
 #endif
 
 #include <AVSCommon/AVS/SpeakerConstants/SpeakerConstants.h>
+#include <InterruptModel/InterruptModel.h>
 #include <System/LocaleHandler.h>
 #include <System/ReportStateHandler.h>
 #include <System/SystemCapabilityProvider.h>
@@ -86,6 +87,12 @@ using namespace alexaClientSDK::avsCommon::avs;
 using namespace alexaClientSDK::avsCommon::sdkInterfaces;
 using namespace alexaClientSDK::avsCommon::sdkInterfaces::endpoints;
 using namespace alexaClientSDK::endpoints;
+
+/// Key for audio channel array configurations in configuration node.
+static const std::string AUDIO_CHANNEL_CONFIG_KEY = "audioChannels";
+
+/// Key for the interrupt model configuration
+static const std::string INTERRUPT_MODEL_CONFIG_KEY = "interruptModel";
 
 /// String to identify log entries originating from this file.
 static const std::string TAG("SmartScreenClient");
@@ -140,11 +147,11 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     std::shared_ptr<EqualizerRuntimeSetup> equalizerRuntimeSetup,
     std::shared_ptr<avsCommon::sdkInterfaces::audio::AudioFactoryInterface> audioFactory,
     std::shared_ptr<avsCommon::sdkInterfaces::AuthDelegateInterface> authDelegate,
-    std::shared_ptr<capabilityAgents::alerts::storage::AlertStorageInterface> alertStorage,
+    std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface> alertStorage,
     std::shared_ptr<certifiedSender::MessageStorageInterface> messageStorage,
-    std::shared_ptr<capabilityAgents::notifications::NotificationsStorageInterface> notificationsStorage,
+    std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsStorageInterface> notificationsStorage,
     std::unique_ptr<settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
-    std::shared_ptr<capabilityAgents::bluetooth::BluetoothStorageInterface> bluetoothStorage,
+    std::shared_ptr<alexaClientSDK::acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
     std::shared_ptr<avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
         alexaDialogStateObservers,
@@ -290,11 +297,11 @@ bool SmartScreenClient::initialize(
     std::shared_ptr<EqualizerRuntimeSetup> equalizerRuntimeSetup,
     std::shared_ptr<avsCommon::sdkInterfaces::audio::AudioFactoryInterface> audioFactory,
     std::shared_ptr<avsCommon::sdkInterfaces::AuthDelegateInterface> authDelegate,
-    std::shared_ptr<capabilityAgents::alerts::storage::AlertStorageInterface> alertStorage,
+    std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface> alertStorage,
     std::shared_ptr<certifiedSender::MessageStorageInterface> messageStorage,
-    std::shared_ptr<capabilityAgents::notifications::NotificationsStorageInterface> notificationsStorage,
+    std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsStorageInterface> notificationsStorage,
     std::shared_ptr<settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
-    std::shared_ptr<capabilityAgents::bluetooth::BluetoothStorageInterface> bluetoothStorage,
+    std::shared_ptr<alexaClientSDK::acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
     std::shared_ptr<avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
         alexaDialogStateObservers,
@@ -509,7 +516,8 @@ bool SmartScreenClient::initialize(
 
     // Create endpoint related objects.
     m_contextManager = contextManager;
-    m_endpointManager = EndpointRegistrationManager::create(m_directiveSequencer, capabilitiesDelegate);
+    m_endpointManager = EndpointRegistrationManager::create(
+        m_directiveSequencer, capabilitiesDelegate, m_deviceInfo.getDefaultEndpointId());
     if (!m_endpointManager) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "endpointRegistrationManagerCreateFailed"));
         return false;
@@ -565,6 +573,20 @@ bool SmartScreenClient::initialize(
      */
     m_audioActivityTracker = afml::AudioActivityTracker::create(contextManager);
 
+    /**
+     *  Interrupt Model object
+     */
+    auto interruptModel = alexaClientSDK::afml::interruptModel::InterruptModel::create(
+        alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode::getRoot()[INTERRUPT_MODEL_CONFIG_KEY]);
+
+    // Read audioChannels configuration from config file
+    std::vector<afml::FocusManager::ChannelConfiguration> audioVirtualChannelConfiguration;
+    if (!afml::FocusManager::ChannelConfiguration::readChannelConfiguration(
+            AUDIO_CHANNEL_CONFIG_KEY, &audioVirtualChannelConfiguration)) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToReadAudioChannelConfiguration"));
+        return false;
+    }
+
     /*
      * Creating the Focus Manager - This component deals with the management of
      * layered audio focus across various
@@ -576,7 +598,11 @@ bool SmartScreenClient::initialize(
      * to the Channel it wishes to play on.
      */
     m_audioFocusManager =
-        std::make_shared<afml::FocusManager>(afml::FocusManager::getDefaultAudioChannels(), m_audioActivityTracker);
+        std::make_shared<afml::FocusManager>(
+            afml::FocusManager::getDefaultAudioChannels(),
+            m_audioActivityTracker,
+            audioVirtualChannelConfiguration,
+            interruptModel);
 
 #ifdef ENABLE_CAPTIONS
     /*
@@ -720,10 +746,10 @@ bool SmartScreenClient::initialize(
     }
 
     // create @c SpeakerInterfaces for each @c Type
-    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAvsSpeakers{speakSpeaker,
-                                                                                            systemSoundSpeaker};
-    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAlertSpeakers{alertsSpeaker,
-                                                                                              notificationsSpeaker};
+    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAvsSpeakers{
+        speakSpeaker, systemSoundSpeaker};
+    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAlertSpeakers{
+        alertsSpeaker, notificationsSpeaker};
     // parse additional Speakers into the right speaker list.
     for (const auto& it : additionalSpeakers) {
         if (avsCommon::sdkInterfaces::ChannelVolumeInterface::Type::AVS_SPEAKER_VOLUME == it.first) {
@@ -791,7 +817,7 @@ bool SmartScreenClient::initialize(
         allAlertChannelVolumeInterfaces.end());
 
     m_speakerManager = capabilityAgents::speakerManager::SpeakerManager::create(
-        allChannelVolumeInterfaces, metricRecorder, contextManager, m_connectionManager, m_exceptionSender);
+        allChannelVolumeInterfaces, contextManager, m_connectionManager, m_exceptionSender, metricRecorder);
     if (!m_speakerManager) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateSpeakerManager"));
         return false;
@@ -802,7 +828,7 @@ bool SmartScreenClient::initialize(
      * implements the AudioPlayer
      * interface of AVS.
      */
-    m_audioPlayer = capabilityAgents::audioPlayer::AudioPlayer::create(
+    m_audioPlayer = alexaClientSDK::acsdkAudioPlayer::AudioPlayer::AudioPlayer::create(
         std::move(audioMediaPlayerFactory),
         m_connectionManager,
         m_audioFocusManager,
@@ -822,7 +848,7 @@ bool SmartScreenClient::initialize(
         return false;
     }
 
-    auto alertRenderer = capabilityAgents::alerts::renderer::Renderer::create(alertsMediaPlayer);
+    auto alertRenderer = alexaClientSDK::acsdkAlerts::renderer::Renderer::create(alertsMediaPlayer);
     if (!alertRenderer) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateAlarmRenderer"));
         return false;
@@ -833,7 +859,7 @@ bool SmartScreenClient::initialize(
      * Agent that implements the Alerts
      * interface of AVS.
      */
-    m_alertsCapabilityAgent = capabilityAgents::alerts::AlertsCapabilityAgent::create(
+    m_alertsCapabilityAgent = alexaClientSDK::acsdkAlerts::AlertsCapabilityAgent::create(
         m_connectionManager,
         m_connectionManager,
         m_certifiedSender,
@@ -856,7 +882,7 @@ bool SmartScreenClient::initialize(
     addConnectionObserver(m_dialogUXStateAggregator);
 
     m_notificationsRenderer =
-        capabilityAgents::notifications::NotificationRenderer::create(notificationsMediaPlayer, m_audioFocusManager);
+        alexaClientSDK::acsdkNotifications::NotificationRenderer::create(notificationsMediaPlayer, m_audioFocusManager);
     if (!m_notificationsRenderer) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateNotificationsRenderer"));
         return false;
@@ -867,7 +893,7 @@ bool SmartScreenClient::initialize(
      * Capability Agent that implements the
      * Notifications interface of AVS.
      */
-    m_notificationsCapabilityAgent = capabilityAgents::notifications::NotificationsCapabilityAgent::create(
+    m_notificationsCapabilityAgent = alexaClientSDK::acsdkNotifications::NotificationsCapabilityAgent::create(
         notificationsStorage,
         m_notificationsRenderer,
         contextManager,
@@ -1221,7 +1247,7 @@ bool SmartScreenClient::initialize(
         auto tempSender = capabilityAgents::system::SoftwareInfoSender::create(
             firmwareVersion,
             sendSoftwareInfoOnConnected,
-            softwareInfoSenderObserver,
+            m_softwareInfoSenderObservers,
             m_connectionManager,
             m_connectionManager,
             m_exceptionSender);
@@ -1243,14 +1269,14 @@ bool SmartScreenClient::initialize(
         auto eventBus = bluetoothDeviceManager->getEventBus();
 
         auto bluetoothMediaInputTransformer =
-            capabilityAgents::bluetooth::BluetoothMediaInputTransformer::create(eventBus, m_playbackRouter);
+            alexaClientSDK::acsdkBluetooth::BluetoothMediaInputTransformer::create(eventBus, m_playbackRouter);
 
         /*
          * Creating the Bluetooth Capability Agent - This component is responsible
          * for handling directives from AVS
          * regarding bluetooth functionality.
          */
-        m_bluetooth = capabilityAgents::bluetooth::Bluetooth::create(
+        m_bluetooth = alexaClientSDK::acsdkBluetooth::Bluetooth::create(
             contextManager,
             m_audioFocusManager,
             m_connectionManager,
@@ -1300,8 +1326,8 @@ bool SmartScreenClient::initialize(
     /**
      * Configure alexa client default endpoint.
      */
-    m_defaultEndpointBuilder = EndpointBuilder::create(
-        m_deviceInfo, m_endpointManager, m_contextManager, m_exceptionSender, m_alexaMessageSender);
+    m_defaultEndpointBuilder =
+        EndpointBuilder::create(m_deviceInfo, m_contextManager, m_exceptionSender, m_alexaMessageSender);
 
     /*
      * Register capability agents and capability configurations.
@@ -1374,6 +1400,13 @@ bool SmartScreenClient::initialize(
         return false;
     }
 
+    if (softwareInfoSenderObserver) {
+        m_softwareInfoSenderObservers.insert(softwareInfoSenderObserver);
+    }
+    if (m_callManager) {
+        m_softwareInfoSenderObservers.insert(m_callManager);
+    }
+
     if (!m_defaultEndpointBuilder->finishDefaultEndpointConfiguration()) {
         ACSDK_ERROR(LX("initializedFailed").d("reason", "defaultEndpointConfigurationFailed"));
         return false;
@@ -1384,22 +1417,45 @@ bool SmartScreenClient::initialize(
 
 void SmartScreenClient::onCapabilitiesStateChange(
     CapabilitiesObserverInterface::State newState,
-    CapabilitiesObserverInterface::Error newError) {
+    CapabilitiesObserverInterface::Error newError,
+    const std::vector<avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& addedOrUpdatedEndpoints,
+    const std::vector<avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints) {
     if (CapabilitiesObserverInterface::State::SUCCESS == newState) {
         m_connectionManager->enable();
     }
 }
 
-void SmartScreenClient::connect() {
-    if (m_defaultEndpointBuilder) {
-        if (!m_defaultEndpointBuilder->buildDefaultEndpoint()) {
-            ACSDK_CRITICAL(LX("connectFailed").d("reason", "couldNotBuildDefaultEndpoint"));
-            return;
+void SmartScreenClient::connect(bool performReset) {
+    if (performReset) {
+        if (m_defaultEndpointBuilder) {
+            // Build default endpoint.
+            auto defaultEndpoint = m_defaultEndpointBuilder->buildDefaultEndpoint();
+            if (!defaultEndpoint) {
+                ACSDK_CRITICAL(LX("connectFailed").d("reason", "couldNotBuildDefaultEndpoint"));
+                return;
+            }
+
+            // Register default endpoint. Only wait for immediate failures and return with a critical error, if so.
+            // Otherwise, the default endpoint will be registered with AVS in the post-connect stage (once
+            // m_connectionManager->enable() is called, below). We should not block on waiting for resultFuture
+            // to be ready, since instead we rely on the post-connect operation and the onCapabilitiesStateChange
+            // callback.
+            auto resultFuture = m_endpointManager->registerEndpoint(std::move(defaultEndpoint));
+            if ((resultFuture.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready)) {
+                auto result = resultFuture.get();
+                if (result != alexaClientSDK::endpoints::EndpointRegistrationManager::RegistrationResult::SUCCEEDED) {
+                    ACSDK_CRITICAL(LX("connectFailed").d("reason", "registrationFailed").d("result", result));
+                    return;
+                }
+            }
+            m_defaultEndpointBuilder.reset();
         }
-        m_defaultEndpointBuilder.reset();
+        // Ensure default endpoint registration is enqueued with @c EndpointRegistrationManager
+        // before proceeding with connection. Otherwise, we risk a race condition where the post-connect operations
+        // are created before the default endpoint is enqueued for publishing to AVS.
+        m_endpointManager->waitForPendingRegistrationsToEnqueue();
+        m_avsGatewayManager->setAVSGatewayAssigner(m_connectionManager);
     }
-    m_endpointManager->disableRegistration();
-    m_avsGatewayManager->setAVSGatewayAssigner(m_connectionManager);
     m_connectionManager->enable();
 }
 
@@ -1490,22 +1546,23 @@ void SmartScreenClient::removeInternetConnectionObserver(
     m_internetConnectionMonitor->removeInternetConnectionObserver(observer);
 }
 
-void SmartScreenClient::addAlertsObserver(std::shared_ptr<capabilityAgents::alerts::AlertObserverInterface> observer) {
+void SmartScreenClient::addAlertsObserver(
+    std::shared_ptr<alexaClientSDK::acsdkAlertsInterfaces::AlertObserverInterface> observer) {
     m_alertsCapabilityAgent->addObserver(observer);
 }
 
 void SmartScreenClient::removeAlertsObserver(
-    std::shared_ptr<capabilityAgents::alerts::AlertObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::acsdkAlertsInterfaces::AlertObserverInterface> observer) {
     m_alertsCapabilityAgent->removeObserver(observer);
 }
 
 void SmartScreenClient::addAudioPlayerObserver(
-    std::shared_ptr<avsCommon::sdkInterfaces::AudioPlayerObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface> observer) {
     m_audioPlayer->addObserver(observer);
 }
 
 void SmartScreenClient::removeAudioPlayerObserver(
-    std::shared_ptr<avsCommon::sdkInterfaces::AudioPlayerObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface> observer) {
     m_audioPlayer->removeObserver(observer);
 }
 
@@ -1524,12 +1581,12 @@ void SmartScreenClient::TemplateRuntimeDisplayCardCleared() {
 }
 
 void SmartScreenClient::addNotificationsObserver(
-    std::shared_ptr<avsCommon::sdkInterfaces::NotificationsObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsObserverInterface> observer) {
     m_notificationsCapabilityAgent->addObserver(observer);
 }
 
 void SmartScreenClient::removeNotificationsObserver(
-    std::shared_ptr<avsCommon::sdkInterfaces::NotificationsObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsObserverInterface> observer) {
     m_notificationsCapabilityAgent->removeObserver(observer);
 }
 
@@ -1559,7 +1616,7 @@ void SmartScreenClient::setCaptionMediaPlayers(
 #endif
 
 void SmartScreenClient::addBluetoothDeviceObserver(
-    std::shared_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothDeviceObserverInterface> observer) {
     if (!m_bluetooth) {
         ACSDK_DEBUG5(LX(__func__).m("bluetooth is disabled, not adding observer"));
         return;
@@ -1568,7 +1625,7 @@ void SmartScreenClient::addBluetoothDeviceObserver(
 }
 
 void SmartScreenClient::removeBluetoothDeviceObserver(
-    std::shared_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothDeviceObserverInterface> observer) {
     if (!m_bluetooth) {
         return;
     }
@@ -1644,7 +1701,12 @@ bool SmartScreenClient::setFirmwareVersion(avsCommon::sdkInterfaces::softwareInf
 
         if (!m_softwareInfoSender) {
             m_softwareInfoSender = capabilityAgents::system::SoftwareInfoSender::create(
-                firmwareVersion, true, nullptr, m_connectionManager, m_connectionManager, m_exceptionSender);
+                firmwareVersion,
+                true,
+                m_softwareInfoSenderObservers,
+                m_connectionManager,
+                m_connectionManager,
+                m_exceptionSender);
             if (m_softwareInfoSender) {
                 return true;
             }
@@ -1734,8 +1796,7 @@ void SmartScreenClient::removeCallStateObserver(
 }
 
 std::unique_ptr<EndpointBuilderInterface> SmartScreenClient::createEndpointBuilder() {
-    return EndpointBuilder::create(
-        m_deviceInfo, m_endpointManager, m_contextManager, m_exceptionSender, m_alexaMessageSender);
+    return EndpointBuilder::create(m_deviceInfo, m_contextManager, m_exceptionSender, m_alexaMessageSender);
 }
 std::shared_ptr<EndpointBuilderInterface> SmartScreenClient::getDefaultEndpointBuilder() {
     return m_defaultEndpointBuilder;

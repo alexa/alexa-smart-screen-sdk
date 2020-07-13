@@ -27,4 +27,6 @@ export declare class VideoHolder extends AbstractVideoComponent {
     protected setScale(scale: VideoScale): void;
     protected setAudioTrack(audioTrack: AudioTrack): void;
     protected setSource(source: IMediaSource | IMediaSource[]): void;
+    protected setTrackCurrentTime(trackCurrentTime: number): void;
+    protected setTrackIndex(trackIndex: number): void;
 }

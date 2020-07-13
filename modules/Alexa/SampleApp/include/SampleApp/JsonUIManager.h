@@ -23,7 +23,7 @@
 #include <AVSCommon/SDKInterfaces/CapabilitiesObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ConnectionStatusObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/DialogUXStateObserverInterface.h>
-#include <AVSCommon/SDKInterfaces/NotificationsObserverInterface.h>
+#include <acsdkNotificationsInterfaces/NotificationsObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/SingleSettingObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/SpeakerInterface.h>
 #include <AVSCommon/SDKInterfaces/SpeakerManagerObserverInterface.h>
@@ -93,7 +93,11 @@ public:
     /// @{
     void onCapabilitiesStateChange(
         alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::State newState,
-        alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError) override;
+        alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError,
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>&
+            addedOrUpdatedEndpoints,
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints)
+        override;
     /// }
 
     /// @name MessagingServerObserverInterface Methods
@@ -252,6 +256,9 @@ private:
 
     /// DeviceInfo object for reporting config information
     std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo> m_deviceInfo;
+
+    // The @c EndpointIdentifier of the default endpoint.
+    alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier m_defaultEndpointId;
 };
 
 }  // namespace sampleApp

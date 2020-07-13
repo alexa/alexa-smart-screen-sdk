@@ -25,7 +25,7 @@
 
 #include <AVSCommon/AVS/CapabilityAgent.h>
 #include <AVSCommon/AVS/CapabilityConfiguration.h>
-#include <AVSCommon/SDKInterfaces/AudioPlayerInterface.h>
+#include <acsdkAudioPlayerInterfaces/AudioPlayerInterface.h>
 #include <AVSCommon/SDKInterfaces/CapabilityConfigurationInterface.h>
 #include <AVSCommon/SDKInterfaces/ContextManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/DialogUXStateObserverInterface.h>
@@ -514,6 +514,16 @@ private:
      */
     void executeResetActivityTracker();
 
+    /**
+     * Checks if a proactive state report is required and requests state if necessary
+     */
+    void executeProactiveStateReport();
+
+    /**
+     * Request a proactive state report on the appropriate thread
+     */
+    void proactiveStateReport();
+
     /// Timer that is responsible for clearing the display on IDLE.
     alexaClientSDK::avsCommon::utils::timing::Timer m_idleTimer;
 
@@ -592,9 +602,6 @@ private:
 
     /// Current document interaction state.
     InteractionState m_documentInteractionState;
-
-    /// This is the worker thread for the @c AlexaPresentation CA.
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor> m_executor;
 
     /// @{
     /// Helper members required for metrics collection
@@ -678,6 +685,27 @@ private:
     /// Stores the currently active count data points
     std::map<MetricEvent, uint64_t> m_currentActiveCountPoints;
     /// @}
+
+    /// The last state which was reported to AVS
+    std::string m_lastReportedState;
+
+    /// The time of the last state report
+    std::chrono::time_point<std::chrono::steady_clock> m_lastReportTime;
+
+    /// The minimum state reporting interval
+    std::chrono::milliseconds m_minStateReportInterval;
+
+    /// The state reporting check interval
+    std::chrono::milliseconds m_stateReportCheckInterval;
+
+    /// Whether the state has been requested from the state provider and we are awaiting the response
+    bool m_stateReportPending;
+
+    /// An internal timer used to check for context changes
+    alexaClientSDK::avsCommon::utils::timing::Timer m_proactiveStateTimer;
+
+    /// This is the worker thread for the @c AlexaPresentation CA.
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor> m_executor;
 };
 
 }  // namespace alexaPresentation

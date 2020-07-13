@@ -166,14 +166,39 @@ void JsonUIManager::onAuthStateChange(AuthObserverInterface::State newState, Aut
 
 void JsonUIManager::onCapabilitiesStateChange(
     CapabilitiesObserverInterface::State newState,
-    CapabilitiesObserverInterface::Error newError) {
-    m_executor.submit([this, newState, newError]() {
-        if ((m_capabilitiesState != newState) && (m_capabilitiesError != newError)) {
-            m_capabilitiesState = newState;
-            m_capabilitiesError = newError;
-            if (CapabilitiesObserverInterface::State::FATAL_ERROR == m_capabilitiesState) {
+    CapabilitiesObserverInterface::Error newError,
+    const std::vector<avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& addedOrUpdatedEndpoints,
+    const std::vector<avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints) {
+    m_executor.submit([this, newState, newError, addedOrUpdatedEndpoints, deletedEndpoints]() {
+        // If one of the added or updated endpointIds is the default endpoint, and the
+        // add/update failed, go into limited mode.
+        // Limited mode is unnecessary if the failure is for non-default endpoints.
+        if (CapabilitiesObserverInterface::State::FATAL_ERROR == newState) {
+            auto it = std::find(addedOrUpdatedEndpoints.begin(), addedOrUpdatedEndpoints.end(), m_defaultEndpointId);
+            if (addedOrUpdatedEndpoints.end() != it) {
                 std::ostringstream oss;
-                oss << "UNRECOVERABLE CAPABILITIES API ERROR: " << m_capabilitiesError;
+                oss << "UNRECOVERABLE CAPABILITIES API ERROR: " << newError;
+                return;
+            } else {
+                std::ostringstream oss;
+                if (!addedOrUpdatedEndpoints.empty()) {
+                    oss << "Failed to register " << addedOrUpdatedEndpoints.size() << " endpoint(s): " << newError;
+                    ConsolePrinter::prettyPrint(oss.str());
+                }
+                if (!deletedEndpoints.empty()) {
+                    oss << "Failed to deregister " << deletedEndpoints.size() << " endpoint(s): " << newError;
+                    ConsolePrinter::prettyPrint(oss.str());
+                }
+            }
+        } else if (CapabilitiesObserverInterface::State::SUCCESS == newState) {
+            std::ostringstream oss;
+            if (!addedOrUpdatedEndpoints.empty()) {
+                oss << "Successfully registered " << addedOrUpdatedEndpoints.size() << " endpoint(s)!";
+                ConsolePrinter::prettyPrint(oss.str());
+            }
+            if (!deletedEndpoints.empty()) {
+                oss << "Successfully deregistered " << deletedEndpoints.size() << " endpoint(s)!";
+                ConsolePrinter::prettyPrint(oss.str());
             }
         }
     });

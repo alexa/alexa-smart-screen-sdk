@@ -60,7 +60,7 @@ const PORT = 8933;
 const APL_MAX_VERSION = '1.3';
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.1';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.2';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
@@ -528,12 +528,7 @@ export class App extends React.Component<any, IAppState> {
             clipPath = this.deviceAppConfig.display.shape === 'ROUND' ? 'circle(50%)' : clipPath;
 
             if (this.deviceAppConfig.scaleToFill) {
-                scale = window.innerWidth / displayPixelDimensions.resolution.value.width;
-                if (width > height) {
-                    scale = window.innerWidth / width;
-                } else {
-                    scale = window.innerHeight / height;
-                }
+                scale = Math.min(window.innerWidth / width, window.innerHeight / height);
             }
         }
 

@@ -26,7 +26,11 @@ if (COMMS)
 endif()
 
 if (CAPTIONS)
-    target_link_libraries(SmartScreenClient CaptionsLib)
+    if (NOT MSVC)
+        target_link_libraries(SmartScreenClient CaptionsLib)
+    else()
+        target_link_libraries(SmartScreenClient "${ASDK_LIB_DIR}/CaptionsLib.lib")
+    endif()
 endif()
 
 if (PCC)

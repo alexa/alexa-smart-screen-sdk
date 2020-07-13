@@ -147,36 +147,36 @@ static const std::string MESSAGE_PAYLOAD_KEY = "payload";
 // clang-format off
 
 /// A RenderDocument directive with APL payload.
- static const std::string DOCUMENT_APL_PAYLOAD = "{"
+static const std::string DOCUMENT_APL_PAYLOAD = "{"
                                                 "\"presentationToken\":\"APL_TOKEN\","
                                                 "\"windowId\":\"WINDOW_ID\","
                                                 "\"document\":\"{}\""
                                                 "}";
 
 /// A 2nd RenderDocument directive with APL payload.
- static const std::string DOCUMENT_APL_PAYLOAD_2 = "{"
+static const std::string DOCUMENT_APL_PAYLOAD_2 = "{"
                                                   "\"presentationToken\":\"APL_TOKEN_2\","
                                                   "\"windowId\":\"WINDOW_ID\","
                                                   "\"document\":\"{}\""
                                                   "}";
 
 /// A malformed RenderDocument directive with APL payload without presentationToken.
- static const std::string DOCUMENT_APL_PAYLOAD_MALFORMED = "{"
+static const std::string DOCUMENT_APL_PAYLOAD_MALFORMED = "{"
                                                           "\"token\":\"APL_TOKEN\""
                                                           "}";
 
 /// A malformed RenderDocument directive with APL payload without document.
- static const std::string DOCUMENT_APL_PAYLOAD_MALFORMED_2 = "{"
+static const std::string DOCUMENT_APL_PAYLOAD_MALFORMED_2 = "{"
                                                             "\"presentationToken\":\"APL_TOKEN\""
                                                             "}";
 
 /// A malformed ExecuteCommand directive with APL payload without commands.
- static const std::string EXECUTE_COMMAND_PAYLOAD_MALFORMED = "{"
+static const std::string EXECUTE_COMMAND_PAYLOAD_MALFORMED = "{"
                                                              "\"presentationToken\":\"APL_TOKEN\""
                                                              "}";
 
 /// A malformed ExecuteCommand directive with APL payload without presentationToken.
- static const std::string EXECUTE_COMMAND_PAYLOAD_MALFORMED_2 = "{"
+static const std::string EXECUTE_COMMAND_PAYLOAD_MALFORMED_2 = "{"
                                                                "\"token\":\"APL_TOKEN\""
                                                                "}";
 
@@ -188,15 +188,22 @@ static const std::string EXECUTE_COMMAND_PAYLOAD = "{"
                                                    "]"
                                                    "}";
 
- static const std::string TIMEOUT_SETTINGS_CONFIG =
- R"({"alexaPresentationCapabilityAgent":{"displayDocumentInteractionIdleTimeout":500}})";
+static const std::string SETTINGS_CONFIG = R"({"alexaPresentationCapabilityAgent":{
+                                                    "displayDocumentInteractionIdleTimeout":500,
+                                                    "minStateReportIntervalMs": 250,
+                                                    "stateReportCheckIntervalMs": 300
+                                                }})";
 
- // Test window ID
-  static const std::string WINDOW_ID = "WINDOW_ID";
+/// Test window ID
+static const std::string WINDOW_ID = "WINDOW_ID";
 
 /// A visual state request token.
- static const unsigned int STATE_REQUEST_TOKEN = 1;
- static std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder;
+static const unsigned int STATE_REQUEST_TOKEN = 1;
+
+/// A state request token for a proactive state request
+static const unsigned int PROACTIVE_STATE_REQUEST_TOKEN = 0;
+
+static std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder;
 
 // clang-format on
 
@@ -292,7 +299,7 @@ protected:
  * Utility function to generate @c ConfigurationNode from JSON string.
  */
 static void setConfig() {
-    auto stream = std::shared_ptr<std::stringstream>(new std::stringstream(TIMEOUT_SETTINGS_CONFIG));
+    auto stream = std::shared_ptr<std::stringstream>(new std::stringstream(SETTINGS_CONFIG));
     JSONStream jsonStream({stream});
     ConfigurationNode::initialize(jsonStream);
 }
@@ -676,6 +683,7 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
     EXPECT_CALL(*m_mockGui, clearDocument()).Times(Exactly(1));
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(_));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
@@ -808,6 +816,7 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsGUIInactive) {
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
     EXPECT_CALL(*m_mockGui, clearDocument()).Times(1);
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(_));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
@@ -897,6 +906,7 @@ TEST_F(AlexaPresentationTest, testAPLFollowedByAPL) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(1);
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(AtLeast(1));
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(_));
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
     m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
@@ -1048,6 +1058,99 @@ TEST_F(AlexaPresentationTest, testTokenListDataSourceFetchRequestEvent) {
 
     std::unique_lock<std::mutex> lk(m);
     conditionVariable.wait(lk);
+}
+
+TEST_F(AlexaPresentationTest, testAPLProactiveStateReportNotSentIfNotRendering) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    // Make sure that this is not called, because no APL is being presented
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(_)).Times(Exactly(0));
+
+    m_contextTrigger.wait_for(exitLock, TIMEOUT);
+    m_executor->waitForSubmittedTasks();
+}
+
+TEST_F(AlexaPresentationTest, testAPLProactiveStateReportSentIfRendering) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->processRenderDocumentResult("APL_TOKEN", true, "");
+    m_executor->waitForSubmittedTasks();
+
+    // At least one state request will come as a result of rendering, depending on timing a second one may be made
+    // by the state reporter
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(_)).Times(Between(1, 2));
+    m_AlexaPresentation->provideState(DOCUMENT, STATE_REQUEST_TOKEN);
+    m_executor->waitForSubmittedTasks();
+
+    // Expect a state reponse for the original provideState request
+    EXPECT_CALL(*m_mockContextManager, provideStateResponse(_, _, _)).Times(Exactly(1));
+    m_AlexaPresentation->onVisualContextAvailable(STATE_REQUEST_TOKEN, "{ 1 }");
+    m_executor->waitForSubmittedTasks();
+
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(_)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockContextManager, provideStateResponse(_, _, _)).Times(Exactly(0));
+    EXPECT_CALL(*m_mockContextManager, reportStateChange(_, _, _)).Times(Exactly(1));
+    // Now wait, and we should get a proactive state change following a different request
+    m_contextTrigger.wait_for(exitLock, std::chrono::milliseconds(400));
+
+    m_AlexaPresentation->onVisualContextAvailable(PROACTIVE_STATE_REQUEST_TOKEN, "{ 2 }");
+    m_executor->waitForSubmittedTasks();
+}
+
+TEST_F(AlexaPresentationTest, testAPLProactiveStateReportNotSentIfStateUnchanged) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->processRenderDocumentResult("APL_TOKEN", true, "");
+    m_executor->waitForSubmittedTasks();
+
+    // At least one state request will come as a result of rendering, depending on timing a second one may be made
+    // by the state reporter
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(_)).Times(Between(1, 2));
+    m_AlexaPresentation->provideState(DOCUMENT, STATE_REQUEST_TOKEN);
+    m_executor->waitForSubmittedTasks();
+
+    // Expect a state reponse for the original provideState request
+    EXPECT_CALL(*m_mockContextManager, provideStateResponse(_, _, _)).Times(Exactly(1));
+    m_AlexaPresentation->onVisualContextAvailable(STATE_REQUEST_TOKEN, "{ 1 }");
+    m_executor->waitForSubmittedTasks();
+
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(_)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockContextManager, provideStateResponse(_, _, _)).Times(Exactly(0));
+    EXPECT_CALL(*m_mockContextManager, reportStateChange(_, _, _)).Times(Exactly(0));
+    // Now wait, and we should get a proactive state change following a different request
+    m_contextTrigger.wait_for(exitLock, std::chrono::milliseconds(400));
+
+    m_AlexaPresentation->onVisualContextAvailable(PROACTIVE_STATE_REQUEST_TOKEN, "{ 1 }");
+    m_executor->waitForSubmittedTasks();
 }
 
 }  // namespace test

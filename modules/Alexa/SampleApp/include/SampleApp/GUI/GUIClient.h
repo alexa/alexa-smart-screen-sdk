@@ -64,6 +64,9 @@
 #include "SampleApp/AplClientBridge.h"
 #include "SampleApp/SampleApplicationReturnCodes.h"
 
+#include <RegistrationManager/CustomerDataHandler.h>
+#include <RegistrationManager/CustomerDataManager.h>
+
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 namespace gui {
@@ -80,6 +83,7 @@ class GUIClient
         , public alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIClientInterface
         , public alexaClientSDK::avsCommon::utils::RequiresShutdown
+        , public alexaClientSDK::registrationManager::CustomerDataHandler
         , public std::enable_shared_from_this<GUIClient>
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::RenderCaptionsInterface {
 public:
@@ -91,12 +95,14 @@ public:
      *
      * @param serverImplementation An implementation of @c MessagingInterface
      * @param miscStorage An implementation of MiscStorageInterface
+     * @param customerDataManager Object that will track the CustomerDataHandler.
      * @note The @c serverImplementation should implement the @c start method in a blocking fashion.
      * @return an instance of GUIClient.
      */
     static std::shared_ptr<GUIClient> create(
         std::shared_ptr<MessagingServerInterface> serverImplementation,
-        const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage);
+        const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
+        const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager);
 
     // @name TemplateRuntimeObserverInterface Functions
     /// @{
@@ -165,11 +171,20 @@ public:
     void onAuthStateChange(AuthObserverInterface::State newState, AuthObserverInterface::Error newError) override;
     /// @}
 
-    /// @name CapabilitiesObserverInterface Function
+    /// @name CapabilitiesObserverInterface Methods
     /// @{
     void onCapabilitiesStateChange(
-        CapabilitiesObserverInterface::State newState,
-        CapabilitiesObserverInterface::Error newError) override;
+        alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::State newState,
+        alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError,
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>&
+            addedOrUpdatedEndpoints,
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints)
+        override;
+    /// }
+
+    /// @name CustomerDataHandler Function
+    /// @{
+    void clearData() override;
     /// @}
 
     /**
@@ -247,7 +262,8 @@ private:
     GUIClient(
         std::shared_ptr<MessagingServerInterface> serverImplementation,
         const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
-        const std::string& APLMaxVersion);
+        const std::string& APLMaxVersion,
+        const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager);
 
     /// Server worker thread.
     void serverThread();

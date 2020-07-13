@@ -24,13 +24,13 @@
 #include <AFML/VisualActivityTracker.h>
 #include <AIP/AudioInputProcessor.h>
 #include <AIP/AudioProvider.h>
-#include <Alerts/AlertsCapabilityAgent.h>
-#include <Alerts/Renderer/Renderer.h>
-#include <Alerts/Storage/AlertStorageInterface.h>
+#include <acsdkAlerts/AlertsCapabilityAgent.h>
+#include <acsdkAlerts/Renderer/Renderer.h>
+#include <acsdkAlerts/Storage/AlertStorageInterface.h>
 #include <Alexa/AlexaInterfaceCapabilityAgent.h>
 #include <Alexa/AlexaInterfaceMessageSender.h>
 #include <ApiGateway/ApiGatewayCapabilityAgent.h>
-#include <AudioPlayer/AudioPlayer.h>
+#include <acsdkAudioPlayer/AudioPlayer.h>
 #include <AVSCommon/AVS/AVSDiscoveryEndpointAttributes.h>
 #include <AVSCommon/AVS/DialogUXStateAggregator.h>
 #include <AVSCommon/AVS/ExceptionEncounteredSender.h>
@@ -39,7 +39,7 @@
 #include <AVSCommon/SDKInterfaces/Audio/EqualizerModeControllerInterface.h>
 #include <AVSCommon/SDKInterfaces/Audio/EqualizerStorageInterface.h>
 #include <AVSCommon/SDKInterfaces/AuthDelegateInterface.h>
-#include <AVSCommon/SDKInterfaces/AudioPlayerObserverInterface.h>
+#include <acsdkAudioPlayerInterfaces/AudioPlayerObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/AVSGatewayManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/CallManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/CapabilitiesDelegateInterface.h>
@@ -64,20 +64,20 @@
 #include <AVSCommon/Utils/MediaPlayer/MediaPlayerInterface.h>
 #include <AVSCommon/Utils/MediaPlayer/MediaPlayerFactoryInterface.h>
 #include <AVSCommon/Utils/Metrics/MetricSinkInterface.h>
-#include <Bluetooth/Bluetooth.h>
-#include <Bluetooth/BluetoothStorageInterface.h>
+#include <acsdkBluetooth/Bluetooth.h>
+#include <acsdkBluetooth/BluetoothStorageInterface.h>
 #include <CertifiedSender/CertifiedSender.h>
 #include <CertifiedSender/SQLiteMessageStorage.h>
-#include <DoNotDisturbCA/DoNotDisturbCapabilityAgent.h>
+#include <acsdkDoNotDisturb/DoNotDisturbCapabilityAgent.h>
 #include <Endpoints/EndpointBuilder.h>
 #include <Endpoints/EndpointRegistrationManager.h>
 #include <Equalizer/EqualizerCapabilityAgent.h>
 #include <EqualizerImplementations/EqualizerController.h>
 #include <ExternalMediaPlayer/ExternalMediaPlayer.h>
 #include <InteractionModel/InteractionModelCapabilityAgent.h>
-#include <MRM/MRMCapabilityAgent.h>
-#include <Notifications/NotificationsCapabilityAgent.h>
-#include <Notifications/NotificationRenderer.h>
+#include <acsdkMultiRoomMusic/MRMCapabilityAgent.h>
+#include <acsdkNotifications/NotificationsCapabilityAgent.h>
+#include <acsdkNotifications/NotificationRenderer.h>
 
 #include <APLClient/AplRenderingEvent.h>
 #include <AlexaPresentation/AlexaPresentation.h>
@@ -267,12 +267,12 @@ public:
         std::shared_ptr<EqualizerRuntimeSetup> equalizerRuntimeSetup,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::AudioFactoryInterface> audioFactory,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AuthDelegateInterface> authDelegate,
-        std::shared_ptr<alexaClientSDK::capabilityAgents::alerts::storage::AlertStorageInterface> alertStorage,
+        std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface> alertStorage,
         std::shared_ptr<alexaClientSDK::certifiedSender::MessageStorageInterface> messageStorage,
-        std::shared_ptr<alexaClientSDK::capabilityAgents::notifications::NotificationsStorageInterface>
+        std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsStorageInterface>
             notificationsStorage,
         std::unique_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
-        std::shared_ptr<alexaClientSDK::capabilityAgents::bluetooth::BluetoothStorageInterface> bluetoothStorage,
+        std::shared_ptr<alexaClientSDK::acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
         std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
             alexaDialogStateObservers,
@@ -312,7 +312,11 @@ public:
     /// @{
     void onCapabilitiesStateChange(
         alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::State newState,
-        alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError) override;
+        alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError,
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>&
+            addedOrUpdatedEndpoints,
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints)
+        override;
     /// }
 
     /// @name ChannelObserverInterface Methods
@@ -325,8 +329,12 @@ public:
     /**
      * Connects the client to AVS. After this call, users can observe the state of the connection asynchronously by
      * using a connectionObserver that was passed in to the create() function.
+     *
+     * @param performReset True if the client wishes to reset the AVS gateway and clear the previous user's
+     * registration status as well on connection.
+     *
      */
-    void connect();
+    void connect(bool performReset = true);
 
     /**
      * Disconnects the client from AVS if it is connected. After the call, users can observer the state of the
@@ -437,15 +445,14 @@ public:
      *
      * @param observer The observer to add.
      */
-    void addAlertsObserver(std::shared_ptr<alexaClientSDK::capabilityAgents::alerts::AlertObserverInterface> observer);
+    void addAlertsObserver(std::shared_ptr<alexaClientSDK::acsdkAlertsInterfaces::AlertObserverInterface> observer);
 
     /**
      * Removes an observer to be notified of alert state changes.
      *
      * @param observer The observer to remove.
      */
-    void removeAlertsObserver(
-        std::shared_ptr<alexaClientSDK::capabilityAgents::alerts::AlertObserverInterface> observer);
+    void removeAlertsObserver(std::shared_ptr<alexaClientSDK::acsdkAlertsInterfaces::AlertObserverInterface> observer);
 
     /**
      * Adds an observer to be notified of @c AudioPlayer state changes. This can be used to be be notified of the @c
@@ -454,7 +461,7 @@ public:
      * @param observer The observer to add.
      */
     void addAudioPlayerObserver(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AudioPlayerObserverInterface> observer);
+        std::shared_ptr<alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface> observer);
 
     /**
      * Removes an observer to be notified of @c AudioPlayer state changes.
@@ -462,7 +469,7 @@ public:
      * @param observer The observer to remove.
      */
     void removeAudioPlayerObserver(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AudioPlayerObserverInterface> observer);
+        std::shared_ptr<alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface> observer);
 
     /**
      * Adds an observer to be notified of alexa presentation changes.
@@ -507,7 +514,7 @@ public:
      * @param observer The observer to add.
      */
     void addNotificationsObserver(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::NotificationsObserverInterface> observer);
+        std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsObserverInterface> observer);
 
     /**
      * Removes an observer to be notified of IndicatorState changes.
@@ -515,7 +522,7 @@ public:
      * @param observer The observer to remove.
      */
     void removeNotificationsObserver(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::NotificationsObserverInterface> observer);
+        std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsObserverInterface> observer);
 
     /**
      * Adds an observer to be notified of ExternalMediaPlayer changes
@@ -543,8 +550,7 @@ public:
      * @param observer The @c BluetoothDeviceObserverInterface to add.
      */
     void addBluetoothDeviceObserver(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceObserverInterface>
-            observer);
+        std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothDeviceObserverInterface> observer);
 
     /**
      * Removes an observer to be notified of bluetooth device changes.
@@ -552,8 +558,7 @@ public:
      * @param observer The @c BluetoothDeviceObserverInterface to remove.
      */
     void removeBluetoothDeviceObserver(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceObserverInterface>
-            observer);
+        std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothDeviceObserverInterface> observer);
 
 #ifdef ENABLE_CAPTIONS
     /**
@@ -992,12 +997,12 @@ private:
         std::shared_ptr<EqualizerRuntimeSetup> equalizerRuntimeSetup,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::AudioFactoryInterface> audioFactory,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AuthDelegateInterface> authDelegate,
-        std::shared_ptr<alexaClientSDK::capabilityAgents::alerts::storage::AlertStorageInterface> alertStorage,
+        std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface> alertStorage,
         std::shared_ptr<alexaClientSDK::certifiedSender::MessageStorageInterface> messageStorage,
-        std::shared_ptr<alexaClientSDK::capabilityAgents::notifications::NotificationsStorageInterface>
+        std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsStorageInterface>
             notificationsStorage,
         std::shared_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
-        std::shared_ptr<alexaClientSDK::capabilityAgents::bluetooth::BluetoothStorageInterface> bluetoothStorage,
+        std::shared_ptr<alexaClientSDK::acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
         std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
             alexaDialogStateObservers,
@@ -1070,7 +1075,7 @@ private:
     std::shared_ptr<alexaClientSDK::capabilityAgents::speechSynthesizer::SpeechSynthesizer> m_speechSynthesizer;
 
     /// The audio player.
-    std::shared_ptr<alexaClientSDK::capabilityAgents::audioPlayer::AudioPlayer> m_audioPlayer;
+    std::shared_ptr<alexaClientSDK::acsdkAudioPlayer::AudioPlayer> m_audioPlayer;
 
     /// The external media player.
     std::shared_ptr<alexaClientSDK::capabilityAgents::externalMediaPlayer::ExternalMediaPlayer> m_externalMediaPlayer;
@@ -1086,21 +1091,20 @@ private:
         m_apiGatewayCapabilityAgent;
 
     /// The alerts capability agent.
-    std::shared_ptr<alexaClientSDK::capabilityAgents::alerts::AlertsCapabilityAgent> m_alertsCapabilityAgent;
+    std::shared_ptr<alexaClientSDK::acsdkAlerts::AlertsCapabilityAgent> m_alertsCapabilityAgent;
 
     /// The bluetooth capability agent.
-    std::shared_ptr<alexaClientSDK::capabilityAgents::bluetooth::Bluetooth> m_bluetooth;
+    std::shared_ptr<alexaClientSDK::acsdkBluetooth::Bluetooth> m_bluetooth;
 
     /// The interaction model capability agent.
     std::shared_ptr<alexaClientSDK::capabilityAgents::interactionModel::InteractionModelCapabilityAgent>
         m_interactionCapabilityAgent;
 
     /// The notifications renderer.
-    std::shared_ptr<alexaClientSDK::capabilityAgents::notifications::NotificationRenderer> m_notificationsRenderer;
+    std::shared_ptr<alexaClientSDK::acsdkNotifications::NotificationRenderer> m_notificationsRenderer;
 
     /// The notifications capability agent.
-    std::shared_ptr<alexaClientSDK::capabilityAgents::notifications::NotificationsCapabilityAgent>
-        m_notificationsCapabilityAgent;
+    std::shared_ptr<alexaClientSDK::acsdkNotifications::NotificationsCapabilityAgent> m_notificationsCapabilityAgent;
 
     /// The user inactivity monitor.
     std::shared_ptr<alexaClientSDK::capabilityAgents::system::UserInactivityMonitor> m_userInactivityMonitor;
@@ -1199,6 +1203,11 @@ private:
 
     /// Device Timezone Offset in milliseconds.
     std::chrono::milliseconds m_deviceTimeZoneOffset;
+
+    /// A set of SoftwareInfoSenderObservers.
+    std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SoftwareInfoSenderObserverInterface>>
+        m_softwareInfoSenderObservers;
+
 #ifdef ENABLE_COMMS_AUDIO_PROXY
     /// The CallAudioDeviceProxy used to work with audio proxy audio driver of CommsLib.
     std::shared_ptr<alexaClientSDK::capabilityAgents::callManager::CallAudioDeviceProxy> m_callAudioDeviceProxy;

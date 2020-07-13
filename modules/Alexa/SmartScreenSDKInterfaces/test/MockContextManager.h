@@ -76,6 +76,12 @@ public:
             const alexaClientSDK::avsCommon::avs::CapabilityTag& capabilityIdentifier,
             std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::StateProviderInterface> stateProvider));
     MOCK_METHOD1(removeStateProvider, void(const alexaClientSDK::avsCommon::avs::CapabilityTag& capabilityIdentifier));
+    MOCK_METHOD3(
+        getContextWithoutReportableStateProperties,
+        alexaClientSDK::avsCommon::sdkInterfaces::ContextRequestToken(
+            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextRequesterInterface> contextRequester,
+            const std::string& endpointId,
+            const std::chrono::milliseconds& timeout));
 };
 
 }  // namespace test

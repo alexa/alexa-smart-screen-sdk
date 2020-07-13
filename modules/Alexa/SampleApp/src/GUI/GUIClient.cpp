@@ -17,6 +17,7 @@
 #include <AVSCommon/Utils/Timing/Timer.h>
 
 #include <Utils/SmartScreenSDKVersion.h>
+#include <RegistrationManager/CustomerDataManager.h>
 #include "SampleApp/Messages/GUIClientMessage.h"
 
 #include "SampleApp/GUI/GUIClient.h"
@@ -204,7 +205,6 @@ static bool openStorage(const std::shared_ptr<MiscStorageInterface>& miscStorage
                             .d("component", COMPONENT_NAME));
             return false;
         }
-
         if (!saveAPLMaxVersionInStorage(miscStorage, INITIAL_APL_MAX_VERSION)) {
             return false;
         }
@@ -224,31 +224,38 @@ static std::string getAPLMaxVersionFromStorage(const std::shared_ptr<MiscStorage
 
 std::shared_ptr<GUIClient> GUIClient::create(
     std::shared_ptr<MessagingServerInterface> serverImplementation,
-    const std::shared_ptr<MiscStorageInterface>& miscStorage) {
+    const std::shared_ptr<MiscStorageInterface>& miscStorage,
+    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager) {
     if (!serverImplementation) {
         ACSDK_ERROR(LX("createFailed").d("reason", "nullServerImplementation"));
         return nullptr;
     }
-
     if (!openStorage(miscStorage)) {
         ACSDK_ERROR(LX("createFailed").d("reason", "nullMiscStorage"));
         return nullptr;
     }
 
+    if (!customerDataManager) {
+        ACSDK_ERROR(LX("createFailed").d("reason", "nullCustomerDataManager"));
+        return nullptr;
+    }
     std::string APLMaxVersion = getAPLMaxVersionFromStorage(miscStorage);
     if (APLMaxVersion.empty()) {
         ACSDK_ERROR(LX("createFailed").d("reason", "couldn't find saved APLMaxVersion"));
         return nullptr;
     }
 
-    return std::shared_ptr<GUIClient>(new GUIClient(serverImplementation, miscStorage, APLMaxVersion));
+    return std::shared_ptr<GUIClient>(
+        new GUIClient(serverImplementation, miscStorage, APLMaxVersion, customerDataManager));
 }
 
 GUIClient::GUIClient(
     std::shared_ptr<MessagingServerInterface> serverImplementation,
     const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
-    const std::string& APLMaxVersion) :
+    const std::string& APLMaxVersion,
+    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager) :
         RequiresShutdown{"GUIClient"},
+        CustomerDataHandler{customerDataManager},
         m_serverImplementation{serverImplementation},
         m_hasServerStarted{false},
         m_initMessageReceived{false},
@@ -809,6 +816,13 @@ void GUIClient::clearDocument() {
     });
 }
 
+void GUIClient::clearData() {
+    ACSDK_DEBUG5(LX(__func__));
+    if (!m_miscStorage->clearTable(COMPONENT_NAME, TABLE_NAME)) {
+        ACSDK_ERROR(LX("clearTableFailed").d("reason", "unable to clear the table from the database"));
+    }
+}
+
 void GUIClient::renderPlayerInfoCard(
     const std::string& jsonPayload,
     smartScreenSDKInterfaces::AudioPlayerInfo info,
@@ -957,7 +971,9 @@ void GUIClient::onAuthStateChange(AuthObserverInterface::State newState, AuthObs
 
 void GUIClient::onCapabilitiesStateChange(
     CapabilitiesObserverInterface::State newState,
-    CapabilitiesObserverInterface::Error newError) {
+    CapabilitiesObserverInterface::Error newError,
+    const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& addedOrUpdatedEndpoints,
+    const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints) {
     m_limitedInteraction = m_limitedInteraction || (newState == CapabilitiesObserverInterface::State::FATAL_ERROR);
 }
 

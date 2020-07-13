@@ -39,6 +39,7 @@ using namespace avsCommon::sdkInterfaces;
 using namespace avsCommon::utils;
 using namespace avsCommon::utils::configuration;
 using namespace avsCommon::utils::json;
+using namespace alexaClientSDK::avsCommon::utils::timing;
 
 /// AlexaPresentation capability constants
 /// AlexaPresentation interface type
@@ -64,6 +65,12 @@ static const std::string ALEXAPRESENTATION_CONFIGURATION_ROOT_KEY = "alexaPresen
 
 /// The key in our config file to set the display card timeout value for RenderDocument case
 static const std::string ALEXAPRESENTATION_DOCUMENT_INTERACTION_KEY = "displayDocumentInteractionIdleTimeout";
+
+/// The key in our config file to set the minimum time in ms between reporting proactive state report events
+static const std::string ALEXAPRESENTATION_MIN_STATE_REPORT_INTERVAL_KEY = "minStateReportIntervalMs";
+
+/// The key in our config file to set the time in ms between proactive state report checks - 0 disables the feature
+static const std::string ALEXAPRESENTATION_STATE_REPORT_CHECK_INTERVAL_KEY = "stateReportCheckIntervalMs";
 
 /**
  * Create a LogEntry using this file's TAG and the specified event string.
@@ -174,6 +181,12 @@ static const std::string ACTIVITY_INFLATE_APL = "AlexaPresentation.inflateAPL";
 static const std::string ACTIVITY_TEXT_MEASURE = "AlexaPresentation.textMeasure";
 static const std::string ACTIVITY_DROP_FRAME = "AlexaPresentation.dropFrame";
 
+/// Default minimum interval between state reports
+static std::chrono::milliseconds DEFAULT_MIN_STATE_REPORT_INTERVAL_MS{600};
+
+/// Default interval between proactive state report checks - disabled by default
+static std::chrono::milliseconds DEFAULT_STATE_REPORT_CHECK_INTERVAL_MS{0};
+
 std::shared_ptr<AlexaPresentation> AlexaPresentation::create(
     std::shared_ptr<avsCommon::sdkInterfaces::FocusManagerInterface> focusManager,
     std::shared_ptr<avsCommon::sdkInterfaces::ExceptionEncounteredSenderInterface> exceptionSender,
@@ -225,6 +238,37 @@ bool AlexaPresentation::initialize() {
         ALEXAPRESENTATION_DOCUMENT_INTERACTION_KEY,
         &m_sdkConfiguredDocumentInteractionTimeout,
         DEFAULT_DOCUMENT_INTERACTION_TIMEOUT_MS);
+
+    configurationRoot.getDuration<std::chrono::milliseconds>(
+        ALEXAPRESENTATION_MIN_STATE_REPORT_INTERVAL_KEY,
+        &m_minStateReportInterval,
+        DEFAULT_MIN_STATE_REPORT_INTERVAL_MS);
+
+    configurationRoot.getDuration<std::chrono::milliseconds>(
+        ALEXAPRESENTATION_STATE_REPORT_CHECK_INTERVAL_KEY,
+        &m_stateReportCheckInterval,
+        DEFAULT_STATE_REPORT_CHECK_INTERVAL_MS);
+
+    if (m_stateReportCheckInterval.count() == 0) {
+        ACSDK_DEBUG0(LX(__func__).m("Proactive state report timer disabled"));
+    } else {
+        if (m_stateReportCheckInterval < m_minStateReportInterval) {
+            ACSDK_WARN(
+                LX(__func__).m("State check interval cannot be less than minimum reporting interval, setting check "
+                               "interval to minimum report interval"));
+            m_stateReportCheckInterval = m_minStateReportInterval;
+        }
+
+        ACSDK_DEBUG0(LX(__func__)
+                         .d("minStateReportIntervalMs", m_minStateReportInterval.count())
+                         .d("stateReportCheckIntervalMs", m_stateReportCheckInterval.count()));
+
+        m_proactiveStateTimer.start(
+            m_stateReportCheckInterval,
+            Timer::PeriodType::ABSOLUTE,
+            Timer::FOREVER,
+            std::bind(&AlexaPresentation::proactiveStateReport, this));
+    }
 
     return true;
 }
@@ -392,7 +436,10 @@ AlexaPresentation::AlexaPresentation(
         m_visualStateProvider{visualStateProvider},
         m_APLVersion{},
         m_documentInteractionState{AlexaPresentation::InteractionState::INACTIVE},
-        m_metricRecorder{metricRecorder} {
+        m_metricRecorder{metricRecorder},
+        m_lastReportTime{std::chrono::steady_clock::now()},
+        m_minStateReportInterval{DEFAULT_MIN_STATE_REPORT_INTERVAL_MS},
+        m_stateReportPending{false} {
     m_executor = std::make_shared<alexaClientSDK::avsCommon::utils::threading::Executor>();
     m_capabilityConfigurations.insert(getAlexaPresentationCapabilityConfiguration());
 }
@@ -473,6 +520,7 @@ void AlexaPresentation::sendRuntimeErrorEvent(const std::string& payload) {
 }
 
 void AlexaPresentation::doShutdown() {
+    m_proactiveStateTimer.stop();
     m_executor->shutdown();
 
     doClearExecuteCommand("AlexaPresentationShuttingDown");
@@ -1165,6 +1213,7 @@ void AlexaPresentation::executeProvideState(unsigned int stateRequestToken) {
         m_visualStateProvider->provideState(stateRequestToken);
     } else {
         m_contextManager->setState(RENDERED_DOCUMENT_STATE, "", StateRefreshPolicy::SOMETIMES, stateRequestToken);
+        m_lastReportedState.clear();
     }
 }
 
@@ -1172,7 +1221,28 @@ void AlexaPresentation::onVisualContextAvailable(const unsigned int requestToken
     ACSDK_DEBUG3(LX(__func__).d("requestToken", requestToken));
     m_executor->submit([this, requestToken, payload]() {
         ACSDK_DEBUG3(LX("onVisualContextAvailableExecutor"));
-        m_contextManager->setState(RENDERED_DOCUMENT_STATE, payload, StateRefreshPolicy::ALWAYS, requestToken);
+        CapabilityState state;
+        state.valuePayload = payload;
+        m_lastReportTime = std::chrono::steady_clock::now();
+        m_stateReportPending = false;
+        if (0 == requestToken) {
+            // Proactive state report
+            if (m_lastReportedState != payload) {
+                m_contextManager->reportStateChange(
+                    RENDERED_DOCUMENT_STATE, state, AlexaStateChangeCauseType::ALEXA_INTERACTION);
+                m_lastReportedState = payload;
+            }
+        } else {
+            if (m_lastDisplayedDirective && !m_lastRenderedAPLToken.empty() &&
+                ALEXA_PRESENTATION_APL_NAMESPACE == m_lastDisplayedDirective->directive->getNamespace()) {
+                m_contextManager->provideStateResponse(RENDERED_DOCUMENT_STATE, state, requestToken);
+                m_lastReportedState = payload;
+            } else {
+                // Since requesting the state, APL is no longer being displayed
+                m_contextManager->setState(RENDERED_DOCUMENT_STATE, "", StateRefreshPolicy::SOMETIMES, requestToken);
+                m_lastReportedState.clear();
+            }
+        }
     });
 }
 
@@ -1218,6 +1288,7 @@ void AlexaPresentation::processRenderDocumentResult(
 
         if (result) {
             setHandlingCompleted(m_lastDisplayedDirective);
+            executeProactiveStateReport();
         } else {
             sendExceptionEncounteredAndReportFailed(m_lastDisplayedDirective, "Renderer failed: " + error);
             resetMetricsEvent(MetricEvent::RENDER_DOCUMENT);
@@ -1261,6 +1332,7 @@ void AlexaPresentation::processExecuteCommandsResult(
         }
 
         m_lastExecuteCommandTokenAndDirective.first.clear();
+        executeProactiveStateReport();
     });
 }
 
@@ -1322,6 +1394,7 @@ void AlexaPresentation::processActivityEvent(
                 // Not possible as returned above.
                 break;
         }
+        executeProactiveStateReport();
     });
 }
 
@@ -1504,6 +1577,26 @@ void AlexaPresentation::recordAPLEvent(APLClient::AplRenderingEvent event) {
         default:
             ACSDK_DEBUG3(LX(__func__).m("Unhandled event type"));
     }
+}
+
+void AlexaPresentation::executeProactiveStateReport() {
+    if (m_stateReportCheckInterval.count() == 0 || !m_lastDisplayedDirective || m_lastRenderedAPLToken.empty() ||
+        ALEXA_PRESENTATION_APL_NAMESPACE != m_lastDisplayedDirective->directive->getNamespace()) {
+        // Not rendering APL or reporting disabled, do not request a state report
+        return;
+    }
+
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<double, std::milli> duration = now - m_lastReportTime;
+
+    if (!m_stateReportPending && duration.count() > m_minStateReportInterval.count()) {
+        m_stateReportPending = true;
+        m_visualStateProvider->provideState(0);
+    }
+}
+
+void AlexaPresentation::proactiveStateReport() {
+    m_executor->submit([this] { executeProactiveStateReport(); });
 }
 
 }  // namespace alexaPresentation

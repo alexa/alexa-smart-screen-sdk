@@ -686,7 +686,9 @@ void GUIManager::onAuthStateChange(AuthObserverInterface::State newState, AuthOb
 
 void GUIManager::onCapabilitiesStateChange(
     CapabilitiesObserverInterface::State newState,
-    CapabilitiesObserverInterface::Error newError) {
+    CapabilitiesObserverInterface::Error newError,
+    const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& addedOrUpdatedEndpoints,
+    const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints) {
 }
 
 void GUIManager::provideState(const unsigned int stateRequestToken) {

@@ -102,15 +102,15 @@
 #include <AVSCommon/Utils/Logger/Logger.h>
 #include <AVSCommon/Utils/Logger/LoggerSinkManager.h>
 #include <AVSCommon/Utils/Network/InternetConnectionMonitor.h>
-#include <Alerts/Storage/SQLiteAlertStorage.h>
+#include <acsdkAlerts/Storage/SQLiteAlertStorage.h>
 #include <Audio/AudioFactory.h>
-#include <Bluetooth/BasicDeviceConnectionRule.h>
-#include <Bluetooth/SQLiteBluetoothStorage.h>
+#include <acsdkBluetooth/BasicDeviceConnectionRule.h>
+#include <acsdkBluetooth/SQLiteBluetoothStorage.h>
 #include <CBLAuthDelegate/CBLAuthDelegate.h>
 #include <CBLAuthDelegate/SQLiteCBLAuthDelegateStorage.h>
 #include <CapabilitiesDelegate/CapabilitiesDelegate.h>
 #include <CapabilitiesDelegate/Storage/SQLiteCapabilitiesDelegateStorage.h>
-#include <Notifications/SQLiteNotificationsStorage.h>
+#include <acsdkNotifications/SQLiteNotificationsStorage.h>
 #ifdef ENABLE_CAPTIONS
 #include <SampleApp/SmartScreenCaptionPresenter.h>
 #endif
@@ -136,6 +136,7 @@
 
 #include "SampleApp/JsonUIManager.h"
 #include "SampleApp/LocaleAssetsManager.h"
+#include "InterruptModel/config/InterruptModelConfiguration.h"
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -480,6 +481,9 @@ bool SampleApplication::initialize(
         configJsonStreams.push_back(configInFile);
     }
 
+    // add the InterruptModel Configuration
+    configJsonStreams.push_back(alexaClientSDK::afml::interruptModel::InterruptModelConfiguration::getConfig());
+
     if (!avsCommon::avs::initialization::AlexaClientSDKInit::initialize(configJsonStreams)) {
         ACSDK_CRITICAL(LX("Failed to initialize SDK!"));
         return false;
@@ -654,15 +658,14 @@ bool SampleApplication::initialize(
 
     // Creating the alert storage object to be used for rendering and storing alerts.
     auto alertStorage =
-        alexaClientSDK::capabilityAgents::alerts::storage::SQLiteAlertStorage::create(config, audioFactory->alerts());
+        alexaClientSDK::acsdkAlerts::storage::SQLiteAlertStorage::create(config, audioFactory->alerts());
 
     // Creating the message storage object to be used for storing message to be sent later.
     auto messageStorage = alexaClientSDK::certifiedSender::SQLiteMessageStorage::create(config);
 
     // Creating notifications storage object to be used for storing notification indicators.
 
-    auto notificationsStorage =
-        alexaClientSDK::capabilityAgents::notifications::SQLiteNotificationsStorage::create(config);
+    auto notificationsStorage = alexaClientSDK::acsdkNotifications::SQLiteNotificationsStorage::create(config);
 
     // Creating new device settings storage object to be used for storing AVS Settings.
 
@@ -670,7 +673,7 @@ bool SampleApplication::initialize(
 
     // Creating bluetooth storage object to be used for storing uuid to mac mappings for devices.
 
-    auto bluetoothStorage = alexaClientSDK::capabilityAgents::bluetooth::SQLiteBluetoothStorage::create(config);
+    auto bluetoothStorage = alexaClientSDK::acsdkBluetooth::SQLiteBluetoothStorage::create(config);
 
 #ifdef KWD
     bool wakeWordEnabled = true;
@@ -715,7 +718,14 @@ bool SampleApplication::initialize(
 #endif  // ENABLE_WEBSOCKET_SSL
 
 #endif  // UWP_BUILD
-    m_guiClient = gui::GUIClient::create(webSocketServer, miscStorage);
+
+    /*
+     * Creating customerDataManager which will be used by the registrationManager and all classes that extend
+     * CustomerDataHandler
+     */
+    auto customerDataManager = std::make_shared<registrationManager::CustomerDataManager>();
+
+    m_guiClient = gui::GUIClient::create(webSocketServer, miscStorage, customerDataManager);
 
     if (!m_guiClient) {
         ACSDK_CRITICAL(LX("Creation of GUIClient failed!"));
@@ -732,7 +742,11 @@ bool SampleApplication::initialize(
     sampleAppConfig.getString(CONTENT_CACHE_MAX_SIZE_KEY, &maxCacheSize, DEFAULT_CONTENT_CACHE_MAX_SIZE);
 
     auto contentDownloadManager = std::make_shared<CachingDownloadManager>(
-        httpContentFetcherFactory, std::stol(cachePeriodInSeconds), std::stol(maxCacheSize));
+        httpContentFetcherFactory,
+        std::stol(cachePeriodInSeconds),
+        std::stol(maxCacheSize),
+        miscStorage,
+        customerDataManager);
 
     int maxNumberOfConcurrentDownloads;
     sampleAppConfig.getInt(
@@ -745,7 +759,7 @@ bool SampleApplication::initialize(
         ACSDK_ERROR(LX("Invalid values for maxNumberOfConcurrentDownloads"));
     }
 
-    auto parameters = AplClientBridgeParameter{.maxNumberOfConcurrentDownloads = maxNumberOfConcurrentDownloads};
+    auto parameters = AplClientBridgeParameter{maxNumberOfConcurrentDownloads};
     auto aplRenderer = AplClientBridge::create(contentDownloadManager, m_guiClient, parameters);
 
     m_guiClient->setAplClientBridge(aplRenderer);
@@ -760,12 +774,6 @@ bool SampleApplication::initialize(
      */
     auto captionPresenter = std::make_shared<alexaSmartScreenSDK::sampleApp::SmartScreenCaptionPresenter>(m_guiClient);
 #endif
-
-    /*
-     * Creating customerDataManager which will be used by the registrationManager and all classes that extend
-     * CustomerDataHandler
-     */
-    auto customerDataManager = std::make_shared<registrationManager::CustomerDataManager>();
 
 #ifdef ENABLE_PCC
     auto phoneCaller = std::make_shared<alexaSmartScreenSDK::sampleApp::PhoneCaller>();
@@ -907,7 +915,7 @@ bool SampleApplication::initialize(
     std::unordered_set<
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceConnectionRuleInterface>>
         enabledConnectionRules;
-    enabledConnectionRules.insert(alexaClientSDK::capabilityAgents::bluetooth::BasicDeviceConnectionRule::create());
+    enabledConnectionRules.insert(alexaClientSDK::acsdkBluetooth::BasicDeviceConnectionRule::create());
 
 #ifdef BLUETOOTH_BLUEZ
     auto eventBus = std::make_shared<avsCommon::utils::bluetooth::BluetoothEventBus>();
@@ -1158,8 +1166,8 @@ SampleApplication::createApplicationMediaPlayer(
      */
     auto mediaPlayer = alexaClientSDK::mediaPlayer::MediaPlayer::create(
         httpContentFetcherFactory, enableEqualizer, name, enableLiveMode);
-    return {mediaPlayer,
-            std::static_pointer_cast<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface>(mediaPlayer)};
+    return {
+        mediaPlayer, std::static_pointer_cast<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface>(mediaPlayer)};
 #elif defined(ANDROID_MEDIA_PLAYER)
     // TODO - Add support of live mode to AndroidSLESMediaPlayer (ACSDK-2530).
     auto mediaPlayer = mediaPlayer::android::AndroidSLESMediaPlayer::create(

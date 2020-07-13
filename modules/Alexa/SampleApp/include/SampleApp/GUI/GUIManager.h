@@ -19,7 +19,7 @@
 #include <Audio/MicrophoneInterface.h>
 #include <AFML/FocusManager.h>
 #include <AVSCommon/AVS/FocusState.h>
-#include <AVSCommon/SDKInterfaces/AudioPlayerObserverInterface.h>
+#include <acsdkAudioPlayerInterfaces/AudioPlayerObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/AuthObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/CapabilitiesObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
@@ -62,7 +62,7 @@ class GUIManager
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIServerInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::AlexaPresentationObserverInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::TemplateRuntimeObserverInterface
-        , public alexaClientSDK::avsCommon::sdkInterfaces::AudioPlayerObserverInterface
+        , public alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface
         , public alexaClientSDK::avsCommon::utils::RequiresShutdown {
 public:
     /**
@@ -129,7 +129,11 @@ public:
     /// @{
     void onCapabilitiesStateChange(
         alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::State newState,
-        alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError) override;
+        alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError,
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>&
+            addedOrUpdatedEndpoints,
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints)
+        override;
     /// }
 
     /// @name VisualContextProvider interface Methods

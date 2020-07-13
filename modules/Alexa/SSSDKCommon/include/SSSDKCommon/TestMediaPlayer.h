@@ -78,7 +78,9 @@ public:
         std::chrono::milliseconds offset = std::chrono::milliseconds::zero(),
         const alexaClientSDK::avsCommon::utils::mediaPlayer::SourceConfig& config =
             alexaClientSDK::avsCommon::utils::mediaPlayer::emptySourceConfig(),
-        bool repeat = false) override;
+        bool repeat = false,
+        const alexaClientSDK::avsCommon::utils::mediaPlayer::PlaybackContext& playbackContext =
+            alexaClientSDK::avsCommon::utils::mediaPlayer::PlaybackContext()) override;
 
     bool play(alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface::SourceId id) override;
 

@@ -20,6 +20,8 @@
 
 #include "SampleApp/CachingDownloadManager.h"
 
+#include <RegistrationManager/CustomerDataManager.h>
+
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
@@ -40,15 +42,60 @@ static const std::chrono::milliseconds WAIT_FOR_ACTIVITY_TIMEOUT{100};
 static const std::chrono::minutes FETCH_TIMEOUT{5};
 /// The number of bytes read from the attachment with each read in the read loop.
 static const size_t CHUNK_SIZE(1024);
+/// Component name for SmartScreenSampleApp
+static const std::string COMPONENT_NAME = "SmartScreenSampleApp";
+/// Table name for APL packages
+static const std::string TABLE_NAME = "Packages";
+/// Delimiter to separate package content and import time, since we currently have only one column for value in misc
+/// storage
+static const std::string DELIMITER = "||||";
 
 CachingDownloadManager::CachingDownloadManager(
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::HTTPContentFetcherInterfaceFactoryInterface>
         httpContentFetcherInterfaceFactoryInterface,
     unsigned long cachePeriodInSeconds,
-    unsigned long maxCacheSize) :
+    unsigned long maxCacheSize,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
+    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager) :
+        CustomerDataHandler{customerDataManager},
         m_contentFetcherFactory{httpContentFetcherInterfaceFactoryInterface},
         m_cachePeriod{std::chrono::seconds(cachePeriodInSeconds)},
-        m_maxCacheSize{maxCacheSize} {
+        m_maxCacheSize{maxCacheSize},
+        m_miscStorage(miscStorage) {
+    bool doesTableExist = false;
+    if (!m_miscStorage->tableExists(COMPONENT_NAME, TABLE_NAME, &doesTableExist)) {
+        ACSDK_ERROR(LX(__func__).m("Cannot check for table existence."));
+    }
+
+    if (!doesTableExist) {
+        if (!m_miscStorage->createTable(
+                COMPONENT_NAME,
+                TABLE_NAME,
+                alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface::KeyType::STRING_KEY,
+                alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface::ValueType::STRING_VALUE)) {
+            ACSDK_ERROR(LX(__func__).m("Cannot create table for storing APL packages."));
+        }
+    } else {
+        std::unordered_map<std::string, std::string> packageMap;
+        if (!m_miscStorage->load(COMPONENT_NAME, TABLE_NAME, &packageMap)) {
+            ACSDK_ERROR(LX(__func__).m("Cannot load downloaded packages."));
+        }
+        for (auto kvp : packageMap) {
+            size_t delimiterPos = kvp.second.find(DELIMITER);
+            if (delimiterPos == std::string::npos) {
+                ACSDK_ERROR(LX(__func__).m("Package content for " + kvp.first + " is corrupted."));
+            } else {
+                auto timeStamp = kvp.second.substr(0, delimiterPos);
+                auto packageContent = kvp.second.substr(delimiterPos + DELIMITER.length());
+                auto importTime =
+                    std::chrono::time_point<std::chrono::system_clock>(std::chrono::seconds(std::stol(timeStamp)));
+                if (std::chrono::system_clock::now() - importTime < m_cachePeriod) {
+                    ACSDK_DEBUG9(LX(__func__).m("Loaded package " + kvp.first + " from misc storage"));
+                    cachedContentMap[kvp.first] = CachedContent(importTime, packageContent);
+                }
+            }
+        }
+    }
 }
 
 CachingDownloadManager::CachedContent::CachedContent(
@@ -70,12 +117,29 @@ std::string CachingDownloadManager::retrieveContent(const std::string& source) {
     }
 
     std::string content = downloadFromSource(source);
+    auto cachedContent = CachedContent(std::chrono::system_clock::now(), content);
     ACSDK_DEBUG9(LX("retrieveContent").d("contentSource", "downloadedFromSource"));
-    const std::lock_guard<std::mutex> lock(cachedContentMapMutex);
-    cachedContentMap[source] = CachedContent(std::chrono::system_clock::now(), content);
-    cleanUpCache();
 
+    {
+        const std::lock_guard<std::mutex> lock(cachedContentMapMutex);
+        cachedContentMap[source] = cachedContent;
+        cleanUpCache();
+    }
+
+    writeToStorage(source, cachedContent);
     return content;
+}
+
+void CachingDownloadManager::writeToStorage(
+    std::string source,
+    alexaSmartScreenSDK::sampleApp::CachingDownloadManager::CachedContent content) {
+    m_executor.submit([this, source, content] {
+        if (!m_miscStorage->put(COMPONENT_NAME, TABLE_NAME, source, cachedContentToString(content, DELIMITER))) {
+            ACSDK_ERROR(LX(__func__).m("Failed to write package to disk storage."));
+        } else {
+            ACSDK_DEBUG9(LX(__func__).m("Successfully stored " + source + " to disk"));
+        }
+    });
 }
 
 void CachingDownloadManager::cleanUpCache() {
@@ -84,9 +148,9 @@ void CachingDownloadManager::cleanUpCache() {
 
     for (auto it = cachedContentMap.begin(); it != cachedContentMap.end();) {
         if ((std::chrono::system_clock::now() - it->second.importTime) > m_cachePeriod) {
+            removeFromStorage(it->first);
             it = cachedContentMap.erase(it);
             ACSDK_DEBUG9(LX("cleanUpCache").d("deletedCacheEntry", "entryExpired"));
-
         } else {
             if (it->second.importTime < oldestTime) {
                 oldestTime = it->second.importTime;
@@ -100,6 +164,23 @@ void CachingDownloadManager::cleanUpCache() {
         cachedContentMap.erase(oldestSource);
         ACSDK_DEBUG9(LX("cleanUpCache").d("deletedCacheEntry", "maxCacheSizeReached"));
     }
+}
+
+void CachingDownloadManager::clearData() {
+    ACSDK_DEBUG5(LX(__func__));
+    if (!m_miscStorage->clearTable(COMPONENT_NAME, TABLE_NAME)) {
+        ACSDK_ERROR(LX("clearTableFailed").d("reason", "unable to clear the table from the database"));
+    }
+}
+
+void CachingDownloadManager::removeFromStorage(std::string source) {
+    m_executor.submit([this, source] {
+        if (!m_miscStorage->remove(COMPONENT_NAME, TABLE_NAME, source)) {
+            ACSDK_ERROR(LX(__func__).m("Failed to remove package " + source + " from disk."));
+        } else {
+            ACSDK_DEBUG9(LX(__func__).m("Removed package " + source + " from disk."));
+        }
+    });
 }
 
 std::string CachingDownloadManager::downloadFromSource(const std::string& source) {
