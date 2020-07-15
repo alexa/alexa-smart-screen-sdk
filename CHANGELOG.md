@@ -17,7 +17,10 @@
 * Skill session remains alive for a short amount of time after exit
 * Buttons on Now Playing display card do not update their visual states when updated by voice
 * Scrolling on General Knowledge display card does not work when the content does not fit into screen
-* Progress bar on Now Playing display card does not reflect the actual audio offset when such information is not provided in RenderPlayerInfo directive 
+* Progress bar on Now Playing display card does not reflect the actual audio offset when such information is not provided in RenderPlayerInfo directive
+
+#### Notes
+* The AVS Device SDK must be built with an additional flag: `-DRAPIDJSON_MEM_OPTIMIZATION=OFF`
 
 ### v2.1.0 released 06/02/2020:
 
