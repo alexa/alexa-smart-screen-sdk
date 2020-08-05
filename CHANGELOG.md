@@ -1,3 +1,8 @@
+### v2.2.1 released 08/05/2020:
+
+#### Bug fixes
+* Locked version for csstype
+
 ### v2.2.0 released 07/13/2020:
 
 #### Enhancements
