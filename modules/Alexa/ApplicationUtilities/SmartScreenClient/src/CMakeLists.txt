@@ -5,6 +5,7 @@ add_library(SmartScreenClient SHARED
     SmartScreenClient.cpp
     EqualizerRuntimeSetup.cpp
     DeviceSettingsManagerBuilder.cpp)
+
 target_include_directories(SmartScreenClient PUBLIC
     "${SmartScreenClient_SOURCE_DIR}/include"
     "${AlexaPresentation_SOURCE_DIR}/include"
@@ -12,7 +13,6 @@ target_include_directories(SmartScreenClient PUBLIC
     "${VisualCharacteristics_SOURCE_DIR}/include"
     "${ASDK_INCLUDE_DIRS}"
     "${SQLITE_INCLUDE_DIRS}")
-
 
 if(BLUETOOTH_BLUEZ)
     target_link_libraries(SmartScreenClient
@@ -31,6 +31,11 @@ if (CAPTIONS)
     else()
         target_link_libraries(SmartScreenClient "${ASDK_LIB_DIR}/CaptionsLib.lib")
     endif()
+endif()
+
+if (METRICS_EXTENSION)
+    target_include_directories(SmartScreenClient PUBLIC "${MetricsExtension_SOURCE_DIR}/include")
+    target_link_libraries(SmartScreenClient "MetricsExtension")
 endif()
 
 if (PCC)

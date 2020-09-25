@@ -18,6 +18,7 @@
 #include <SampleApp/Messages/GUIClientMessage.h>
 #include "SampleApp/AplClientBridge.h"
 #include "SampleApp/CachingDownloadManager.h"
+#include "SampleApp/DownloadMonitor.h"
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -31,6 +32,7 @@ using namespace alexaClientSDK::avsCommon::utils::libcurlUtils;
 using namespace alexaClientSDK::avsCommon::utils::sds;
 using namespace alexaClientSDK::avsCommon::utils::timing;
 using namespace smartScreenSDKInterfaces;
+using namespace APLClient::Extensions;
 
 /// Default string to attach to mainTemplate parameters.
 static const std::string DEFAULT_PARAM_VALUE = "{}";
@@ -39,9 +41,12 @@ std::shared_ptr<AplClientBridge> AplClientBridge::create(
     std::shared_ptr<CachingDownloadManager> contentDownloadManager,
     std::shared_ptr<smartScreenSDKInterfaces::GUIClientInterface> guiClient,
     AplClientBridgeParameter parameters) {
-    std::shared_ptr<AplClientBridge> renderer(new AplClientBridge(contentDownloadManager, guiClient, parameters));
-    renderer->m_aplClient.reset(new APLClient::AplClientBinding(renderer));
-    return renderer;
+    std::shared_ptr<AplClientBridge> aplClientBridge(
+        new AplClientBridge(contentDownloadManager, guiClient, parameters));
+    aplClientBridge->m_aplClient.reset(new APLClient::AplClientBinding(aplClientBridge));
+    aplClientBridge->m_aplClientRenderer = aplClientBridge->m_aplClient->createRenderer("");
+    aplClientBridge->loadExtensions();
+    return aplClientBridge;
 }
 
 AplClientBridge::AplClientBridge(
@@ -52,9 +57,27 @@ AplClientBridge::AplClientBridge(
         m_guiClient{guiClient},
         m_renderQueued{false},
         m_parameters{parameters} {
+    m_playerActivityState = alexaClientSDK::avsCommon::avs::PlayerActivity::FINISHED;
 }
 
-void AplClientBridge::sendMessage(const std::string& payload) {
+void AplClientBridge::loadExtensions() {
+    ACSDK_DEBUG9(LX(__func__));
+
+    // AudioPlayer Extension
+    m_audioPlayerExtension = std::make_shared<AudioPlayer::AplAudioPlayerExtension>(shared_from_this());
+
+    // Backstack Extension
+    m_backstackExtension = std::make_shared<Backstack::AplBackstackExtension>(shared_from_this());
+
+    addExtensions({m_audioPlayerExtension, m_backstackExtension});
+}
+
+void AplClientBridge::addExtensions(std::unordered_set<std::shared_ptr<AplCoreExtensionInterface>> extensions) {
+    ACSDK_DEBUG9(LX(__func__));
+    m_executor.submit([this, extensions] { m_aplClientRenderer->addExtensions(extensions); });
+}
+
+void AplClientBridge::sendMessage(const std::string& token, const std::string& payload) {
     ACSDK_DEBUG9(LX(__func__));
 
     auto aplCoreMessage = messages::AplCoreMessage(payload);
@@ -69,7 +92,9 @@ void AplClientBridge::resetViewhost(const std::string& token) {
 
 std::string AplClientBridge::downloadResource(const std::string& source) {
     ACSDK_DEBUG9(LX(__func__));
-    return m_contentDownloadManager->retrieveContent(source);
+    auto downloadMetricsEmitter = m_aplClient->createDownloadMetricsEmitter();
+    auto observer = std::make_shared<DownloadMonitor>(downloadMetricsEmitter);
+    return m_contentDownloadManager->retrieveContent(source, observer);
 }
 
 std::chrono::milliseconds AplClientBridge::getTimezoneOffset() {
@@ -77,17 +102,17 @@ std::chrono::milliseconds AplClientBridge::getTimezoneOffset() {
     return m_guiManager->getDeviceTimezoneOffset();
 }
 
-void AplClientBridge::onActivityStarted(const std::string& source) {
+void AplClientBridge::onActivityStarted(const std::string& token, const std::string& source) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit([this, source] { m_guiManager->handleActivityEvent(source, ActivityEvent::ACTIVATED); });
 }
 
-void AplClientBridge::onActivityEnded(const std::string& source) {
+void AplClientBridge::onActivityEnded(const std::string& token, const std::string& source) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit([this, source] { m_guiManager->handleActivityEvent(source, ActivityEvent::DEACTIVATED); });
 }
 
-void AplClientBridge::onSendEvent(const std::string& event) {
+void AplClientBridge::onSendEvent(const std::string& token, const std::string& event) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit([this, event] { m_guiManager->handleUserEvent(event); });
 }
@@ -102,30 +127,49 @@ void AplClientBridge::onRenderDocumentComplete(const std::string& token, bool re
     m_executor.submit([this, token, result, error] { m_guiManager->handleRenderDocumentResult(token, result, error); });
 }
 
-void AplClientBridge::onVisualContextAvailable(unsigned int stateRequestToken, const std::string& context) {
+void AplClientBridge::onVisualContextAvailable(
+    const std::string& token,
+    unsigned int stateRequestToken,
+    const std::string& context) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit(
         [this, stateRequestToken, context] { m_guiManager->handleVisualContext(stateRequestToken, context); });
 }
 
-void AplClientBridge::onSetDocumentIdleTimeout(const std::chrono::milliseconds& timeout) {
+void AplClientBridge::onSetDocumentIdleTimeout(const std::string& token, const std::chrono::milliseconds& timeout) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit([this, timeout] { m_guiManager->setDocumentIdleTimeout(timeout); });
 }
 
-void AplClientBridge::onFinish() {
+void AplClientBridge::onFinish(const std::string& token) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit([this] { m_guiManager->forceExit(); });
 }
 
-void AplClientBridge::onRuntimeErrorEvent(const std::string& payload) {
+void AplClientBridge::onRuntimeErrorEvent(const std::string& token, const std::string& payload) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit([this, payload] { m_guiManager->handleRuntimeErrorEvent(payload); });
 }
 
-void AplClientBridge::onDataSourceFetchRequestEvent(const std::string& type, const std::string& payload) {
+void AplClientBridge::onDataSourceFetchRequestEvent(
+    const std::string& token,
+    const std::string& type,
+    const std::string& payload) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit([this, type, payload] { m_guiManager->handleDataSourceFetchRequestEvent(type, payload); });
+}
+
+void AplClientBridge::onExtensionEvent(
+    const std::string& uri,
+    const std::string& name,
+    const std::string& source,
+    const std::string& params,
+    unsigned int event,
+    std::shared_ptr<AplCoreExtensionEventCallbackResultInterface> resultCallback) {
+    ACSDK_DEBUG9(LX(__func__));
+    m_executor.submit([this, uri, name, source, params, event, resultCallback] {
+        m_aplClientRenderer->onExtensionEvent(uri, name, source, params, event, resultCallback);
+    });
 }
 
 void AplClientBridge::logMessage(APLClient::LogLevel level, const std::string& source, const std::string& message) {
@@ -169,7 +213,7 @@ void AplClientBridge::onConnectionClosed() {
 
 void AplClientBridge::provideState(const unsigned int stateRequestToken) {
     ACSDK_DEBUG9(LX(__func__));
-    m_executor.submit([this, stateRequestToken] { m_aplClient->requestVisualContext(stateRequestToken); });
+    m_executor.submit([this, stateRequestToken] { m_aplClientRenderer->requestVisualContext(stateRequestToken); });
 }
 
 void AplClientBridge::onUpdateTimer() {
@@ -181,7 +225,11 @@ void AplClientBridge::onUpdateTimer() {
 
     m_executor.submit([this] {
         m_renderQueued = false;
-        m_aplClient->onUpdateTick();
+        m_aplClientRenderer->onUpdateTick();
+        if (m_audioPlayerExtension && m_guiManager &&
+            alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING == m_playerActivityState) {
+            m_audioPlayerExtension->updatePlaybackProgress(m_guiManager->getAudioItemOffset().count());
+        }
     });
 }
 
@@ -204,24 +252,36 @@ void AplClientBridge::renderDocument(
             return;
         }
 
-        m_aplClient->renderDocument(
+        // When rendering a new document, add the current active document state to backstack (if it should be cached)
+        if (m_backstackExtension && m_backstackExtension->shouldCacheActiveDocument()) {
+            if (auto documentState = m_aplClientRenderer->getActiveDocumentState()) {
+                m_backstackExtension->addDocumentStateToBackstack(documentState);
+            }
+        }
+
+        m_aplClientRenderer->renderDocument(
             extractDocument(document), extractData(document), extractSupportedViewports(document), token);
     });
 }
 
 void AplClientBridge::clearDocument() {
     ACSDK_DEBUG9(LX(__func__));
-    m_executor.submit([this] { m_aplClient->clearDocument(); });
+    m_executor.submit([this] {
+        m_aplClientRenderer->clearDocument("");
+        if (m_backstackExtension) {
+            m_backstackExtension->reset();
+        }
+    });
 }
 
 void AplClientBridge::executeCommands(const std::string& jsonPayload, const std::string& token) {
     ACSDK_DEBUG9(LX(__func__));
-    m_executor.submit([this, jsonPayload, token] { m_aplClient->executeCommands(jsonPayload, token); });
+    m_executor.submit([this, jsonPayload, token] { m_aplClientRenderer->executeCommands(jsonPayload, token); });
 }
 
 void AplClientBridge::interruptCommandSequence() {
     ACSDK_DEBUG9(LX(__func__));
-    m_executor.submit([this] { m_aplClient->interruptCommandSequence(); });
+    m_executor.submit([this] { m_aplClientRenderer->interruptCommandSequence(); });
 }
 
 void AplClientBridge::dataSourceUpdate(
@@ -229,19 +289,36 @@ void AplClientBridge::dataSourceUpdate(
     const std::string& jsonPayload,
     const std::string& token) {
     ACSDK_DEBUG9(LX(__func__));
-    m_executor.submit(
-        [this, sourceType, jsonPayload, token] { m_aplClient->dataSourceUpdate(sourceType, jsonPayload, token); });
+    m_executor.submit([this, sourceType, jsonPayload, token] {
+        m_aplClientRenderer->dataSourceUpdate(sourceType, jsonPayload, token);
+    });
 }
 
 void AplClientBridge::onMessage(const std::string& message) {
     ACSDK_DEBUG9(LX(__func__));
 
-    if (m_aplClient->shouldHandleMessage(message)) {
-        m_executor.submit([this, message] { m_aplClient->handleMessage(message); });
+    if (m_aplClientRenderer->shouldHandleMessage(message)) {
+        m_executor.submit([this, message] { m_aplClientRenderer->handleMessage(message); });
     }
 }
 
-void AplClientBridge::onRenderingEvent(APLClient::AplRenderingEvent event) {
+bool AplClientBridge::handleBack() {
+    if (m_backstackExtension) {
+        return m_backstackExtension->handleBack();
+    }
+    return false;
+}
+
+void AplClientBridge::onPresentationSessionChanged() {
+    ACSDK_DEBUG9(LX(__func__));
+    m_executor.submit([this] {
+        if (m_backstackExtension) {
+            m_backstackExtension->reset();
+        }
+    });
+}
+
+void AplClientBridge::onRenderingEvent(const std::string& token, APLClient::AplRenderingEvent event) {
     ACSDK_DEBUG9(LX(__func__));
     m_executor.submit([this, event] { m_guiManager->handleAPLEvent(event); });
 }
@@ -268,7 +345,6 @@ std::string AplClientBridge::extractData(const rapidjson::Document& document) {
     rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
     document["datasources"].Accept(writer);
     return sb.GetString();
-    return sb.GetString();
 }
 
 std::string AplClientBridge::extractSupportedViewports(const rapidjson::Document& document) {
@@ -289,6 +365,65 @@ std::string AplClientBridge::extractSupportedViewports(const rapidjson::Document
 
 int AplClientBridge::getMaxNumberOfConcurrentDownloads() {
     return m_parameters.maxNumberOfConcurrentDownloads;
+}
+
+void AplClientBridge::onRestoreDocumentState(std::shared_ptr<APLClient::AplDocumentState> documentState) {
+    m_executor.submit([this, documentState]() { m_aplClientRenderer->restoreDocumentState(documentState); });
+}
+
+void AplClientBridge::onPlayerActivityChanged(
+    alexaClientSDK::avsCommon::avs::PlayerActivity state,
+    const Context& context) {
+    m_executor.submit([this, state, context]() {
+        m_playerActivityState = state;
+        if (m_audioPlayerExtension) {
+            m_audioPlayerExtension->updatePlayerActivity(
+                playerActivityToString(m_playerActivityState), context.offset.count());
+        }
+    });
+}
+
+void AplClientBridge::onAudioPlayerPlay() {
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this]() { m_guiManager->handlePlaybackPlay(); });
+}
+
+void AplClientBridge::onAudioPlayerPause() {
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this]() { m_guiManager->handlePlaybackPause(); });
+}
+
+void AplClientBridge::onAudioPlayerNext() {
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this]() { m_guiManager->handlePlaybackNext(); });
+}
+
+void AplClientBridge::onAudioPlayerPrevious() {
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this]() { m_guiManager->handlePlaybackPrevious(); });
+}
+
+void AplClientBridge::onAudioPlayerSeekToPosition(int offsetInMilliseconds) {
+    ACSDK_DEBUG3(LX(__func__));
+}
+
+void AplClientBridge::onAudioPlayerSkipForward() {
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this]() { m_guiManager->handlePlaybackSkipForward(); });
+}
+
+void AplClientBridge::onAudioPlayerSkipBackward() {
+    ACSDK_DEBUG3(LX(__func__));
+    m_executor.submit([this]() { m_guiManager->handlePlaybackSkipBackward(); });
+}
+
+void AplClientBridge::onAudioPlayerToggle(const std::string& name, bool checked) {
+    ACSDK_DEBUG3(LX(__func__).d("toggle", name).d("checked", checked));
+    m_executor.submit([this, name, checked]() { m_guiManager->handlePlaybackToggle(name, checked); });
+}
+
+APLClient::AplRenderingEventObserverPtr AplClientBridge::getAplRenderingEventObserver() {
+    return m_aplClientRenderer;
 }
 
 }  // namespace sampleApp

@@ -23,9 +23,11 @@
 #include <AVSCommon/SDKInterfaces/AuthObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/CapabilitiesObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
+#include <AVSCommon/SDKInterfaces/FocusManagerObserverInterface.h>
 #include <AVSCommon/Utils/RequiresShutdown.h>
 
 #include <APLClient/AplRenderingEvent.h>
+#include <APLClient/AplRenderingEventObserver.h>
 #include <AlexaPresentation/AlexaPresentation.h>
 #include <TemplateRuntimeCapabilityAgent/TemplateRuntime.h>
 
@@ -58,11 +60,13 @@ class GUIManager
         : public alexaClientSDK::avsCommon::sdkInterfaces::AuthObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface
+        , public alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIServerInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::AlexaPresentationObserverInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::TemplateRuntimeObserverInterface
         , public alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface
+        , public alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface
         , public alexaClientSDK::avsCommon::utils::RequiresShutdown {
 public:
     /**
@@ -106,6 +110,7 @@ public:
 
     /// @name AlexaPresentationObserverInterface Functions
     /// @{
+
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
 
     void clearDocument() override;
@@ -116,6 +121,13 @@ public:
         override;
 
     void interruptCommandSequence() override;
+
+    void onPresentationSessionChanged() override;
+
+    void onRenderDirectiveReceived(const std::chrono::steady_clock::time_point& receiveTime) override;
+
+    void onRenderingAborted() override;
+
     /// @}
 
     /// @name AuthObserverInterface Methods
@@ -136,7 +148,7 @@ public:
         override;
     /// }
 
-    /// @name VisualContextProvider interface Methods
+    /// @name VisualStateProviderInterface Methods
     /// @{
     void provideState(const unsigned int stateRequestToken) override;
     /// }
@@ -146,29 +158,32 @@ public:
     void handleTapToTalk() override;
 
     void handleHoldToTalk() override;
-    /// }
 
-    /// @name AudioPlayerObserverInterface methods
-    /// @{
-    void onPlayerActivityChanged(alexaClientSDK::avsCommon::avs::PlayerActivity state, const Context& context) override;
-    /// }
-
-    /**
-     * Toggles the microphone state if the Sample App was built with wake word. When the microphone is turned off, the
-     * app enters a privacy mode in which it stops recording audio data from the microphone, thus disabling Alexa waking
-     * up due to wake word. Note however that hold-to-talk and tap-to-talk modes will still work by recording
-     * microphone data temporarily until a user initiated interaction is complete. If this app was built without wake
-     * word then this will do nothing as the microphone is already off.
-     */
     void handleMicrophoneToggle() override;
 
+    void handlePlaybackPlay() override;
+
+    void handlePlaybackPause() override;
+
+    void handlePlaybackNext() override;
+
+    void handlePlaybackPrevious() override;
+
+    void handlePlaybackSkipForward() override;
+
+    void handlePlaybackSkipBackward() override;
+
+    void handlePlaybackToggle(const std::string& name, bool checked) override;
+
     void handleUserEvent(std::string userEventPayload) override;
+
+    void onUserEvent() override;
+
+    void handleVisualContext(uint64_t token, std::string payload) override;
 
     void handleDataSourceFetchRequestEvent(std::string type, std::string payload) override;
 
     void handleRuntimeErrorEvent(std::string payload) override;
-
-    void handleVisualContext(uint64_t token, std::string payload) override;
 
     bool handleFocusAcquireRequest(
         std::string channelName,
@@ -201,6 +216,22 @@ public:
     void handleAPLEvent(APLClient::AplRenderingEvent event) override;
 
     void handleDisplayMetrics(uint64_t dropFrameCount) override;
+
+    void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric> &metrics) override;
+
+    std::chrono::milliseconds getDeviceTimezoneOffset() override;
+
+    std::chrono::milliseconds getAudioItemOffset() override;
+    /// }
+
+    /// @name FocusManagerObserverInterface methods
+    /// @{
+    void onFocusChanged(const std::string& channelName, alexaClientSDK::avsCommon::avs::FocusState newFocus) override;
+    /// }
+
+    /// @name AudioPlayerObserverInterface methods
+    /// @{
+    void onPlayerActivityChanged(alexaClientSDK::avsCommon::avs::PlayerActivity state, const Context& context) override;
     /// }
 
     /**
@@ -208,11 +239,25 @@ public:
      */
     void onDialogUXStateChanged(DialogUXState newState) override;
 
+    /// @name AudioInputProcessorObserverInterface methods.
+    /// @{
+    void onStateChanged(AudioInputProcessorObserverInterface::State state) override;
+    /// @}
+
     /**
      * Set smart screen client
      * @param client The input smart screen client
      */
     void setClient(std::shared_ptr<smartScreenClient::SmartScreenClient> client);
+
+    /**
+     * Sets an observer to notify of APL rendering event
+     *
+     * @param observer The event observer to notify
+     */
+    void setAplRenderingEventObserver(APLClient::AplRenderingEventObserverPtr observer);
+    void onMetricRecorderAvailable(
+        std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) override;
 
 #ifdef UWP_BUILD
     void inputAudioFile(const std::string& audioFile);
@@ -250,83 +295,19 @@ private:
     /// @}
 
     /**
-     * An internal function to stop the foreground activity
+     * Internal function for handling a @c NavigationEvent::BACK event
      */
-    void executeStopForegroundActivity();
+    void executeBackNavigation();
 
     /**
-     * Send UserEvent to AVS.
-     *
-     * @param payload - The payload for the UserEvent event as defined by AVS.
+     * Internal function for handling a @c NavigationEvent::EXIT event
      */
-    void sendUserEvent(const std::string& payload);
-
-    /**
-     * Should be called whenever a user presses 'PLAY' for playback.
-     */
-    void playbackPlay();
-
-    /**
-     * Should be called whenever a user presses 'PAUSE' for playback.
-     */
-    void playbackPause();
-
-    /**
-     * Should be called whenever a user presses 'NEXT' for playback.
-     */
-    void playbackNext();
-
-    /**
-     * Should be called whenever a user presses 'PREVIOUS' for playback.
-     */
-    void playbackPrevious();
-
-    /**
-     * Should be called whenever a user presses 'SKIP_FORWARD' for playback.
-     */
-    void playbackSkipForward();
-
-    /**
-     * Should be called whenever a user presses 'SKIP_BACKWARD' for playback.
-     */
-    void playbackSkipBackward();
-
-    /**
-     * sends Gui Toggle event
-     * @param toggleType The toggle button for which we send the event.
-     * @param Action Does this operation toggles on or off
-     */
-    void sendGuiToggleEvent(alexaClientSDK::avsCommon::avs::PlaybackToggle toggleType, const bool action);
+    void executeExitNavigation();
 
     /**
      * Should be called when setting value is selected by the user.
      */
     void changeSetting(const std::string& key, const std::string& value);
-
-    /**
-     * Should be called whenever a user presses 'SHUFFLE' for playback.
-     */
-    void playbackShuffle();
-
-    /**
-     * Should be called whenever a user presses 'LOOP' for playback.
-     */
-    void playbackLoop();
-
-    /**
-     * Should be called whenever a user presses 'REPEAT' for playback.
-     */
-    void playbackRepeat();
-
-    /**
-     * Should be called whenever a user presses 'THUMBS_UP' for playback.
-     */
-    void playbackThumbsUp();
-
-    /**
-     * Should be called whenever a user presses 'THUMBS_DOWN' for playback.
-     */
-    void playbackThumbsDown();
 
     /**
      * Update the firmware version.
@@ -360,11 +341,6 @@ private:
      */
     void stopCall();
 
-    /**
-     * Gets Device Time Zone Offset.
-     */
-    std::chrono::milliseconds getDeviceTimezoneOffset() override;
-
 #ifdef ENABLE_PCC
     /**
      * PhoneCallController commands
@@ -395,6 +371,11 @@ private:
      * A reference to the smart screen client.
      */
     std::shared_ptr<alexaSmartScreenSDK::smartScreenClient::SmartScreenClient> m_ssClient;
+
+    /**
+     * The observer to notify on APL rendering events.
+     */
+    APLClient::AplRenderingEventObserverPtr m_aplRenderingEventObserver;
 
     /**
      * An internal executor that performs execution of callable objects passed to it sequentially but asynchronously.
@@ -442,6 +423,18 @@ private:
     /// The @c PlayerActivity of the @c AudioPlayer
     alexaClientSDK::avsCommon::avs::PlayerActivity m_playerActivityState;
     /// @}
+
+    /// The last state reported by AudioInputProcessor.
+    alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface::State m_audioInputProcessorState;
+
+    /// Map of channel focus states by channelName.
+    std::unordered_map<std::string, alexaClientSDK::avsCommon::avs::FocusState>  m_channelFocusStates;
+
+    /// Utility flag used for clearing Alert Channel when Foregrounded.
+    bool m_clearAlertChannelOnForegrounded;
+
+    /// Utility flag used for clearing PlayerInfo card on Content Channel focus lost.
+    bool m_clearPlayerInfoCardOnContentFocusLost;
 };
 
 }  // namespace gui

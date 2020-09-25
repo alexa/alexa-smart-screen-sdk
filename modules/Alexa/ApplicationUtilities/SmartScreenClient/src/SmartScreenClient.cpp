@@ -26,6 +26,10 @@
 #include <Metrics/MetricRecorder.h>
 #endif
 
+#ifdef METRICS_EXTENSION
+#include <MetricsExtension/MetricsExtension.h>
+#endif
+
 #include <SystemSoundPlayer/SystemSoundPlayer.h>
 
 #ifdef ENABLE_CAPTIONS
@@ -93,6 +97,9 @@ static const std::string AUDIO_CHANNEL_CONFIG_KEY = "audioChannels";
 
 /// Key for the interrupt model configuration
 static const std::string INTERRUPT_MODEL_CONFIG_KEY = "interruptModel";
+
+/// Key for the metrics extension configuration
+static const std::string METRICS_CONFIG_KEY = "metricsExtension";
 
 /// String to identify log entries originating from this file.
 static const std::string TAG("SmartScreenClient");
@@ -597,12 +604,11 @@ bool SmartScreenClient::initialize(
      * Capability Agent will require the Focus Manager in order to request access
      * to the Channel it wishes to play on.
      */
-    m_audioFocusManager =
-        std::make_shared<afml::FocusManager>(
-            afml::FocusManager::getDefaultAudioChannels(),
-            m_audioActivityTracker,
-            audioVirtualChannelConfiguration,
-            interruptModel);
+    m_audioFocusManager = std::make_shared<afml::FocusManager>(
+        afml::FocusManager::getDefaultAudioChannels(),
+        m_audioActivityTracker,
+        audioVirtualChannelConfiguration,
+        interruptModel);
 
 #ifdef ENABLE_CAPTIONS
     /*
@@ -681,10 +687,15 @@ bool SmartScreenClient::initialize(
 
     std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder;
 #ifdef ACSDK_ENABLE_METRICS_RECORDING
+#ifdef METRICS_EXTENSION
+    auto metricsCfg = alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode::getRoot()[METRICS_CONFIG_KEY];
+    metricRecorder = metrics::MetricsExtension::create(metricsCfg).initializeMetricsRecorder().getMetricsRecorder();
+#else
     auto recorderImpl = std::make_shared<alexaClientSDK::metrics::implementations::MetricRecorder>();
     recorderImpl->addSink(std::move(metricSinkInterface));
     metricRecorder = recorderImpl;
-#endif
+#endif  // METRICS_EXTENSION
+#endif  // ACSDK_ENABLE_METRICS_RECORDING
 
     /*
      * Creating the Speech Synthesizer - This component is the Capability Agent
@@ -746,10 +757,10 @@ bool SmartScreenClient::initialize(
     }
 
     // create @c SpeakerInterfaces for each @c Type
-    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAvsSpeakers{
-        speakSpeaker, systemSoundSpeaker};
-    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAlertSpeakers{
-        alertsSpeaker, notificationsSpeaker};
+    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAvsSpeakers{speakSpeaker,
+                                                                                            systemSoundSpeaker};
+    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAlertSpeakers{alertsSpeaker,
+                                                                                              notificationsSpeaker};
     // parse additional Speakers into the right speaker list.
     for (const auto& it : additionalSpeakers) {
         if (avsCommon::sdkInterfaces::ChannelVolumeInterface::Type::AVS_SPEAKER_VOLUME == it.first) {
@@ -1360,6 +1371,7 @@ bool SmartScreenClient::initialize(
     m_defaultEndpointBuilder->withCapability(m_interactionCapabilityAgent, m_interactionCapabilityAgent);
     m_defaultEndpointBuilder->withCapability(m_alexaPresentation, m_alexaPresentation);
     m_defaultEndpointBuilder->withCapability(m_templateRuntime, m_templateRuntime);
+    m_defaultEndpointBuilder->withCapabilityConfiguration(m_visualCharacteristics);
     m_defaultEndpointBuilder->withCapabilityConfiguration(m_visualActivityTracker);
 
     m_defaultEndpointBuilder->withCapability(m_notificationsCapabilityAgent, m_notificationsCapabilityAgent);
@@ -1467,20 +1479,20 @@ std::string SmartScreenClient::getAVSGateway() {
     return m_connectionManager->getAVSGateway();
 }
 
-// === Workaround start ===
-/*
+/// === Workaround start ===
+/**
  * In order to support multi-turn interactions SDK processes SpeechSynthesizer audio context in special way. This
- * leads to skill context not been cleared on cloud side when we ask for exit. In order to fix that we should grab
+ * leads to skill context not been cleared on cloud side when we locally exit. In order to fix that we should grab
  * DIALOG channel by interface processed in normal way and proceed as before.
  * More global AVS C++ SDK solution to be implemented later.
  */
 /// Interface name to use for focus requests.
 static const std::string APL_INTERFACE("Alexa.Presentation.APL");
 
-void SmartScreenClient::forceExit() {
-    ACSDK_DEBUG5(LX(__func__).m("Force Exit"));
+void SmartScreenClient::forceClearDialogChannelFocus() {
+    ACSDK_DEBUG5(LX(__func__).m("Force Clear Dialog Channel"));
     m_audioFocusManager->acquireChannel(
-        avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME, shared_from_this(), APL_INTERFACE);
+            avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME, shared_from_this(), APL_INTERFACE);
 }
 
 void SmartScreenClient::onFocusChanged(
@@ -1489,10 +1501,29 @@ void SmartScreenClient::onFocusChanged(
     if (newFocus == alexaClientSDK::avsCommon::avs::FocusState::FOREGROUND) {
         stopForegroundActivity();
         m_audioInputProcessor->resetState();
-        clearCard();
     }
 }
-// === Workaround end ===
+/// === Workaround end ===
+
+/**
+ * This function is called when the user clicks on an APL card in response to an Expect Speech,
+ * setting the state of AIP to IDLE
+ */
+void SmartScreenClient::onUserEvent(alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface::State state) {
+    ACSDK_DEBUG0(LX(__func__).m(AudioInputProcessorObserverInterface::stateToString(state)));
+    if(state == AudioInputProcessorObserverInterface::State::EXPECTING_SPEECH){
+        m_audioInputProcessor->resetState();
+    }
+}
+
+void SmartScreenClient::forceExit() {
+    ACSDK_DEBUG5(LX(__func__).m("Force Exit"));
+    clearAllExecuteCommands();
+    clearCard();
+    stopAllActivities();
+    forceClearDialogChannelFocus();
+}
+
 void SmartScreenClient::clearCard() {
     m_alexaPresentation->clearCard();
     m_templateRuntime->clearCard();
@@ -1500,6 +1531,10 @@ void SmartScreenClient::clearCard() {
 
 void SmartScreenClient::stopForegroundActivity() {
     m_audioFocusManager->stopForegroundActivity();
+}
+
+void SmartScreenClient::stopAllActivities() {
+    m_audioFocusManager->stopAllActivities();
 }
 
 void SmartScreenClient::localStopActiveAlert() {
@@ -1514,6 +1549,16 @@ void SmartScreenClient::addAlexaDialogStateObserver(
 void SmartScreenClient::removeAlexaDialogStateObserver(
     std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface> observer) {
     m_dialogUXStateAggregator->removeObserver(observer);
+}
+
+void SmartScreenClient::addAlexaAudioInputStateObserver(
+        std::shared_ptr<avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface> observer) {
+    m_audioInputProcessor->addObserver(observer);
+}
+
+void SmartScreenClient::removeAlexaAudioInputStateObserver(
+        std::shared_ptr<avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface> observer) {
+    m_audioInputProcessor->removeObserver(observer);
 }
 
 void SmartScreenClient::addMessageObserver(
@@ -1679,6 +1724,18 @@ std::shared_ptr<registrationManager::RegistrationManager> SmartScreenClient::get
 
 std::shared_ptr<equalizer::EqualizerController> SmartScreenClient::getEqualizerController() {
     return m_equalizerController;
+}
+
+void SmartScreenClient::addFocusManagersObserver(
+        const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface> &observer) {
+    m_audioFocusManager->addObserver(observer);
+    m_visualFocusManager->addObserver(observer);
+}
+
+void SmartScreenClient::removeFocusManagersObserver(
+        const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface> &observer) {
+    m_audioFocusManager->removeObserver(observer);
+    m_visualFocusManager->removeObserver(observer);
 }
 
 void SmartScreenClient::addSpeakerManagerObserver(
@@ -1882,6 +1939,7 @@ void SmartScreenClient::setDocumentIdleTimeout(std::chrono::milliseconds timeout
 }
 
 void SmartScreenClient::clearAllExecuteCommands() {
+    // TODO: ARC-570 consider cleaning the commands on CommandsSequencer
     m_alexaPresentation->clearAllExecuteCommands();
 }
 
@@ -1909,6 +1967,10 @@ void SmartScreenClient::removeSpeechSynthesizerObserver(
 
 std::chrono::milliseconds SmartScreenClient::getDeviceTimezoneOffset() {
     return m_deviceTimeZoneOffset;
+}
+
+std::chrono::milliseconds SmartScreenClient::getAudioItemOffset() {
+    return m_audioPlayer->getAudioItemOffset();
 }
 
 void SmartScreenClient::handleRenderComplete(bool isAlexaPresentationPresenting) {

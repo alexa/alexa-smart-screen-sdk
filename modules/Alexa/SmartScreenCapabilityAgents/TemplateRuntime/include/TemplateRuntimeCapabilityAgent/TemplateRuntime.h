@@ -123,7 +123,10 @@ public:
 
     /// @name AlexaPresentationObserverInterface Functions
     /// @{
-    void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
+    void renderDocument(
+            const std::string& jsonPayload,
+            const std::string& token,
+            const std::string& windowId) override;
 
     void clearDocument() override;
 
@@ -133,6 +136,8 @@ public:
         override;
 
     void interruptCommandSequence() override;
+
+    void onPresentationSessionChanged() override;
     /// @}
 
     /**
@@ -408,9 +413,6 @@ private:
 
     /// The currently active smartScreenSDKInterfaces::NonPlayerInfoDisplayType
     smartScreenSDKInterfaces::NonPlayerInfoDisplayType m_activeNonPlayerInfoType;
-
-    /// A flag to check if player info is updated or not.
-    bool m_isPlayerInfoCardUpdated;
 
     /// The current focus state of the @c TemplateRuntime on the visual channel.
     alexaClientSDK::avsCommon::avs::FocusState m_focus;

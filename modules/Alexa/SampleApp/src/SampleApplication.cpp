@@ -760,9 +760,9 @@ bool SampleApplication::initialize(
     }
 
     auto parameters = AplClientBridgeParameter{maxNumberOfConcurrentDownloads};
-    auto aplRenderer = AplClientBridge::create(contentDownloadManager, m_guiClient, parameters);
+    auto aplClientBridge = AplClientBridge::create(contentDownloadManager, m_guiClient, parameters);
 
-    m_guiClient->setAplClientBridge(aplRenderer);
+    m_guiClient->setAplClientBridge(aplClientBridge);
 
     if (!m_guiClient->start()) {
         return false;
@@ -1024,6 +1024,7 @@ bool SampleApplication::initialize(
         micWrapper,
         alexaClientSDK::capabilityAgents::aip::AudioProvider::null());
 #endif  // KWD
+    m_guiManager->setAplRenderingEventObserver(aplClientBridge->getAplRenderingEventObserver());
 
     /*
      * Creating the SmartScreenClient - this component serves as an out-of-box default object that instantiates and
@@ -1123,7 +1124,10 @@ bool SampleApplication::initialize(
     smartScreenClient->addTemplateRuntimeObserver(m_guiManager);
     smartScreenClient->addAlexaPresentationObserver(m_guiManager);
     smartScreenClient->addAlexaDialogStateObserver(m_guiManager);
+    smartScreenClient->addAlexaAudioInputStateObserver(m_guiManager);
     smartScreenClient->addAudioPlayerObserver(m_guiManager);
+    smartScreenClient->addFocusManagersObserver(m_guiManager);
+    smartScreenClient->addAudioPlayerObserver(aplClientBridge);
     m_guiManager->setClient(smartScreenClient);
     m_guiClient->setGUIManager(m_guiManager);
 

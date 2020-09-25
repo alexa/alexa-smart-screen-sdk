@@ -13,6 +13,8 @@
  * permissions and limitations under the License.
  */
 
+#include <vector>
+
 #include <AVSCommon/Utils/JSON/JSONUtils.h>
 #include <AVSCommon/Utils/Timing/Timer.h>
 
@@ -125,7 +127,7 @@ static const std::string TABLE_NAME{"GUIClient"};
 static const std::string APL_MAX_VERSION_DB_KEY{"APLMaxVersion"};
 
 /// Initial APL version to use at the first run and before any  GUI client is connected.
-static const std::string INITIAL_APL_MAX_VERSION{"1.3"};
+static const std::string INITIAL_APL_MAX_VERSION{"1.4"};
 
 /// The key in our config file to find the root of GUI configuration
 static const std::string GUI_CONFIGURATION_ROOT_KEY = "gui";
@@ -466,7 +468,12 @@ void GUIClient::provideState(const unsigned int stateRequestToken) {
 }
 
 void GUIClient::interruptCommandSequence() {
+    m_guiManager->onUserEvent();
     m_executor.submit([this]() { m_aplClientBridge->interruptCommandSequence(); });
+}
+
+void GUIClient::onPresentationSessionChanged() {
+    m_executor.submit([this]() { m_aplClientBridge->onPresentationSessionChanged(); });
 }
 
 void GUIClient::executeHandleTapToTalk(rapidjson::Document& message) {
@@ -726,25 +733,69 @@ void GUIClient::executeHandleRenderComplete(rapidjson::Document& message) {
 }
 
 void GUIClient::executeHandleDisplayMetrics(rapidjson::Document& message) {
-    std::string jsonPayload;
-    rapidjson::Document payload;
-    if (!jsonUtils::retrieveValue(message, PAYLOAD_TAG, &jsonPayload)) {
+    if (!message.HasMember(PAYLOAD_TAG)) {
         ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "payloadNotFound"));
         return;
     }
 
-    uint64_t dropFrameCount;
-    if (payload.Parse(jsonPayload).HasParseError()) {
-        ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "payloadParseError"));
-        return;
-    }
+    const auto& payload = message[PAYLOAD_TAG];
 
-    if (!jsonUtils::retrieveValue(payload, DROP_FRAME_COUNT_TAG, &dropFrameCount)) {
-        ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "dropFrameCountNotFound"));
-        return;
-    }
+    if (payload.IsArray()) {
+        std::vector<APLClient::DisplayMetric> metrics;
+        for (rapidjson::SizeType i = 0; i < payload.Size(); i++) {
+            const auto& jsonMetric = payload[i];
+            APLClient::DisplayMetric metric;
+            std::string kind;
 
-    m_guiManager->handleDisplayMetrics(dropFrameCount);
+            if (!jsonUtils::retrieveValue(jsonMetric, "kind", &kind)) {
+                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "missingMetricKind"));
+                return;
+            }
+
+            if (kind == "timer") {
+                metric.kind = APLClient::DisplayMetricKind::kTimer;
+            } else if (kind == "counter") {
+                metric.kind = APLClient::DisplayMetricKind::kCounter;
+            } else {
+                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "unsupportedMetricKind"));
+                return;
+            }
+
+            if (!jsonUtils::retrieveValue(jsonMetric, "name", &metric.name)) {
+                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "missingMetricName"));
+                return;
+            }
+
+            rapidjson::Value::ConstMemberIterator iterator;
+            if (!jsonUtils::findNode(jsonMetric, "value", &iterator)) {
+                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "missingMetricValue"));
+                return;
+            }
+
+            double d_value = 0;
+            uint64_t i_value = 0;
+            if (iterator->value.IsDouble() && jsonUtils::retrieveValue(jsonMetric, "value", &d_value)) {
+                metric.value = static_cast<uint64_t>(d_value);
+            } else if (iterator->value.IsUint64() && jsonUtils::retrieveValue(jsonMetric, "value", &i_value)) {
+                metric.value = static_cast<uint64_t>(i_value);
+            } else {
+                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "incorrectTypeOrValue"));
+                return;
+            }
+
+            metrics.emplace_back(metric);
+        }
+        m_guiManager->handleDisplayMetrics(metrics);
+    } else {
+        // Deprecated, retained for backward compatibility only while the viewhost is updated
+        uint64_t dropFrameCount;
+        if (!jsonUtils::retrieveValue(payload, DROP_FRAME_COUNT_TAG, &dropFrameCount)) {
+            ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "dropFrameCountNotFound"));
+            return;
+        }
+
+        m_guiManager->handleDisplayMetrics(dropFrameCount);
+    }
 }
 
 void GUIClient::setObserver(const std::shared_ptr<MessagingServerObserverInterface>& observer) {
@@ -821,6 +872,9 @@ void GUIClient::clearData() {
     if (!m_miscStorage->clearTable(COMPONENT_NAME, TABLE_NAME)) {
         ACSDK_ERROR(LX("clearTableFailed").d("reason", "unable to clear the table from the database"));
     }
+    if (!m_miscStorage->deleteTable(COMPONENT_NAME, TABLE_NAME)) {
+        ACSDK_ERROR(LX("deleteTableFailed").d("reason", "unable to delete the table from the database"));
+    }
 }
 
 void GUIClient::renderPlayerInfoCard(
@@ -847,6 +901,13 @@ void GUIClient::renderCaptions(const std::string& payload) {
     }
 }
 
+bool GUIClient::handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::NavigationEvent event) {
+    if (smartScreenSDKInterfaces::NavigationEvent::BACK == event) {
+        return m_aplClientBridge->handleBack();
+    }
+    return false;
+}
+
 std::string GUIClient::getMaxAPLVersion() {
     return m_APLMaxVersion;
 }
@@ -854,6 +915,7 @@ std::string GUIClient::getMaxAPLVersion() {
 void GUIClient::onLogout() {
     m_shouldRestart = true;
     m_cond.notify_all();
+    clearData();
 }
 
 SampleAppReturnCode GUIClient::run() {

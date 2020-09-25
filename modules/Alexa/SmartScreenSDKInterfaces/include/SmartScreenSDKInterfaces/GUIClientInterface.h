@@ -73,6 +73,13 @@ public:
      * @param message The message to be wrriten.
      */
     virtual void sendMessage(MessageInterface& message) = 0;
+
+    /**
+     * Handle an @c NavigationEvent
+     * @param event The @c NavigationEvent to handle.
+     * @return True if the event was successfully handled by the client.
+     */
+    virtual bool handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::NavigationEvent event) = 0;
 };
 
 }  // namespace smartScreenSDKInterfaces

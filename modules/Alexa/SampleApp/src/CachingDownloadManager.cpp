@@ -49,6 +49,8 @@ static const std::string TABLE_NAME = "Packages";
 /// Delimiter to separate package content and import time, since we currently have only one column for value in misc
 /// storage
 static const std::string DELIMITER = "||||";
+/// The number of retries when downloading a package from source
+static const int DOWNLOAD_FROM_SOURCE_RETRY_ATTEMPTS = 3;
 
 CachingDownloadManager::CachingDownloadManager(
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::HTTPContentFetcherInterfaceFactoryInterface>
@@ -100,33 +102,45 @@ CachingDownloadManager::CachingDownloadManager(
 
 CachingDownloadManager::CachedContent::CachedContent(
     std::chrono::system_clock::time_point importTime,
-    std::string content) {
+    const std::string& content) {
     this->importTime = importTime;
     this->content = content;
 }
 
-std::string CachingDownloadManager::retrieveContent(const std::string& source) {
+std::string CachingDownloadManager::retrieveContent(const std::string& source, std::shared_ptr<Observer> observer) {
     {
         const std::lock_guard<std::mutex> lock(cachedContentMapMutex);
         if (cachedContentMap.find(source) != cachedContentMap.end()) {
             if ((std::chrono::system_clock::now() - cachedContentMap[source].importTime) < m_cachePeriod) {
                 ACSDK_DEBUG9(LX("retrieveContent").d("contentSource", "returnedFromCache"));
+                if (observer) {
+                    observer->onCacheHit();
+                }
                 return cachedContentMap[source].content;
             }
         }
     }
 
-    std::string content = downloadFromSource(source);
-    auto cachedContent = CachedContent(std::chrono::system_clock::now(), content);
-    ACSDK_DEBUG9(LX("retrieveContent").d("contentSource", "downloadedFromSource"));
+    std::string content;
 
-    {
-        const std::lock_guard<std::mutex> lock(cachedContentMapMutex);
-        cachedContentMap[source] = cachedContent;
-        cleanUpCache();
+    for (int i = 0; i < DOWNLOAD_FROM_SOURCE_RETRY_ATTEMPTS; i++) {
+        content = downloadFromSource(source, observer);
+        ACSDK_DEBUG9(LX("retrieveContent").d("contentSource", "downloadedFromSource"));
+
+        if (!content.empty()) {
+            auto cachedContent = CachedContent(std::chrono::system_clock::now(), content);
+            {
+                const std::lock_guard<std::mutex> lock(cachedContentMapMutex);
+                cachedContentMap[source] = cachedContent;
+                cleanUpCache();
+            }
+
+            writeToStorage(source, cachedContent);
+            return content;
+        }
     }
+    ACSDK_ERROR(LX("retrieveContent").d("contentSource", "downloadedFromSourceFailedAllRetries"));
 
-    writeToStorage(source, cachedContent);
     return content;
 }
 
@@ -183,20 +197,30 @@ void CachingDownloadManager::removeFromStorage(std::string source) {
     });
 }
 
-std::string CachingDownloadManager::downloadFromSource(const std::string& source) {
+std::string CachingDownloadManager::downloadFromSource(const std::string& source, std::shared_ptr<Observer> observer) {
+    if (observer) {
+        observer->onDownloadStarted();
+    }
     auto contentFetcher = m_contentFetcherFactory->create(source);
     contentFetcher->getContent(HTTPContentFetcherInterface::FetchOptions::ENTIRE_BODY);
 
     HTTPContentFetcherInterface::Header header = contentFetcher->getHeader(nullptr);
     if (!header.successful) {
         ACSDK_ERROR(LX(__func__).sensitive("source", source).m("getHeaderFailed"));
+        if (observer) {
+            observer->onDownloadFailed();
+        }
         return "";
     }
 
     if (!isStatusCodeSuccess(header.responseCode)) {
         ACSDK_ERROR(LX("downloadFromSourceFailed")
                         .d("statusCode", header.responseCode)
+                        .sensitive("url", source)
                         .d("reason", "nonSuccessStatusCodeFromGetHeader"));
+        if (observer) {
+            observer->onDownloadFailed();
+        }
         return "";
     }
 
@@ -211,6 +235,9 @@ std::string CachingDownloadManager::downloadFromSource(const std::string& source
 
     if (!contentFetcher->getBody(streamWriter)) {
         ACSDK_ERROR(LX("downloadFromSourceFailed").d("reason", "getBodyFailed"));
+        if (observer) {
+            observer->onDownloadFailed();
+        }
         return "";
     }
 
@@ -226,11 +253,17 @@ std::string CachingDownloadManager::downloadFromSource(const std::string& source
 
     if (FETCH_TIMEOUT <= elapsedTime) {
         ACSDK_ERROR(LX("downloadFromSourceFailed").d("reason", "waitTimeout"));
+        if (observer) {
+            observer->onDownloadFailed();
+        }
         return "";
     }
 
     if (HTTPContentFetcherInterface::State::ERROR == contentFetcherState) {
         ACSDK_ERROR(LX("downloadFromSourceFailed").d("reason", "receivingBodyFailed"));
+        if (observer) {
+            observer->onDownloadFailed();
+        }
         return "";
     }
 
@@ -270,15 +303,23 @@ std::string CachingDownloadManager::downloadFromSource(const std::string& source
             case AttachmentReader::ReadStatus::ERROR_BYTES_LESS_THAN_WORD_SIZE:
             case AttachmentReader::ReadStatus::ERROR_INTERNAL:
                 ACSDK_ERROR(LX("downloadFromSourceFailed").d("reason", "readError"));
+                if (observer) {
+                    observer->onDownloadFailed();
+                }
                 return "";
         }
         if (0 == bytesRead) {
             ACSDK_DEBUG9(LX("downloadFromSource").m("alreadyReadAllBytes"));
+        } else if (observer) {
+            observer->onBytesRead(bytesRead);
         }
     }
 
     ACSDK_DEBUG9(LX("downloadFromSource").d("URL", contentFetcher->getUrl()));
 
+    if (observer) {
+        observer->onDownloadComplete();
+    }
     return content;
 }
 

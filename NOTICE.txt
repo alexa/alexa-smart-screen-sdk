@@ -14,10 +14,18 @@ of the Amazon Software License is located at:
 
   http://aws.amazon.com/asl/
 
+The Alexa logo may only be used to represent the Alexa brand as described in the  AVS UX Logo and Brand guidance.
+
+You may not use the Alexa logo except in compliance with the AVS UX Logo and Brand guidance.
+
+A copy of this guidance is located at:
+
+  https://developer.amazon.com/docs/alexa-voice-service/logo-and-brand.html
+
 Components NOT listed above are licensed under the Apache License, Version 2.0 (the "License"):
 
 You may not use this file except in compliance with the License. A copy of
-the License is located at
+the License is located at:
 
   http://aws.amazon.com/apache2.0/
 

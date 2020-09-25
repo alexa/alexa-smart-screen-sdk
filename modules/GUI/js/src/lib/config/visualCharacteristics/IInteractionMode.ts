@@ -24,4 +24,5 @@ export interface IInteractionMode {
     touch : InteractionSupportType;
     keyboard : InteractionSupportType;
     video : InteractionSupportType;
+    dialog : InteractionSupportType;
 }

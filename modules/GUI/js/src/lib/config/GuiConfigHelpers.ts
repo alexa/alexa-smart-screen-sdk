@@ -13,7 +13,8 @@ import {
     IDeviceAppConfig,
     AudioInputInitiator,
     IGuiConfig,
-    IAPLRendererWindowConfig
+    IAPLRendererWindowConfig,
+    AplAudioPlayerExtensionUri
 } from './IDeviceAppConfig';
 import { IInteractionMode } from './visualCharacteristics/IInteractionMode';
 import { IVisualCharacteristics } from './visualCharacteristics/IVisualCharacteristics';
@@ -231,6 +232,12 @@ const createDeviceAppConfig = (
         // use default window config for render player info
         if (rendererWindowConfig.id === deviceAppConfig.defaultWindowId) {
             deviceAppConfig.renderPlayerInfoWindowConfig = rendererWindowConfig;
+            // ensure that the player info window supports the Apl AudioPlayer Extension
+            let supportedExtensions = deviceAppConfig.renderPlayerInfoWindowConfig.supportedExtensions || [];
+            if (!supportedExtensions.includes(AplAudioPlayerExtensionUri)) {
+                supportedExtensions.push(AplAudioPlayerExtensionUri);
+            }
+            deviceAppConfig.renderPlayerInfoWindowConfig.supportedExtensions = supportedExtensions;
         }
     }
 

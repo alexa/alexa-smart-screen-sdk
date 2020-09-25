@@ -19,6 +19,7 @@
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
 
 #include <APLClient/AplRenderingEvent.h>
+#include <APLClient/DisplayMetric.h>
 #include "ActivityEvent.h"
 #include "NavigationEvent.h"
 
@@ -39,9 +40,50 @@ public:
     virtual void handleHoldToTalk() = 0;
 
     /**
-     * Handle the MicrophoneToggle event.
+     * Toggles the microphone state if the Sample App was built with wake word. When the microphone is turned off, the
+     * app enters a privacy mode in which it stops recording audio data from the microphone, thus disabling Alexa waking
+     * up due to wake word. Note however that hold-to-talk and tap-to-talk modes will still work by recording
+     * microphone data temporarily until a user initiated interaction is complete. If this app was built without wake
+     * word then this will do nothing as the microphone is already off.
      */
     virtual void handleMicrophoneToggle() = 0;
+
+    /**
+     * Handle playback 'PLAY' event.
+     */
+    virtual void handlePlaybackPlay() = 0;
+
+    /**
+     * Handle playback 'PAUSE' event.
+     */
+    virtual void handlePlaybackPause() = 0;
+
+    /**
+     * Handle playback 'NEXT' event.
+     */
+    virtual void handlePlaybackNext() = 0;
+
+    /**
+     * Handle playback 'PREVIOUS' event.
+     */
+    virtual void handlePlaybackPrevious() = 0;
+
+    /**
+     * Handle playback 'SKIP_FORWARD' event.
+     */
+    virtual void handlePlaybackSkipForward() = 0;
+
+    /**
+     * Handle playback 'SKIP_BACKWARD' event.
+     */
+    virtual void handlePlaybackSkipBackward() = 0;
+
+    /**
+     * Handle playback 'TOGGLE' event.
+     * @param name name of the TOGGLE.
+     * @param checked checked state of the TOGGLE.
+     */
+    virtual void handlePlaybackToggle(const std::string& name, bool checked) = 0;
 
     /**
      * Handle userEvent by parsing out payload from message.
@@ -155,6 +197,14 @@ public:
     virtual std::chrono::milliseconds getDeviceTimezoneOffset() = 0;
 
     /**
+     * Gets Active AudioItem Audio Offset.
+     */
+    virtual std::chrono::milliseconds getAudioItemOffset() = 0;
+
+
+    virtual void onUserEvent() = 0;
+
+    /**
      * Force exit to reset focus state and clear card.
      */
     virtual void forceExit() = 0;
@@ -170,6 +220,13 @@ public:
      * @param dropFrameCount Count of the frames dropped
      */
     virtual void handleDisplayMetrics(uint64_t dropFrameCount) = 0;
+
+    /**
+     * Handle display metrics event received in a message.
+     *
+     * @param metrics the recorded metrics
+     */
+    virtual void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric> &metrics) = 0;
 
     /**
      * Handle APL context inflate started event.

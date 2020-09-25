@@ -1,7 +1,17 @@
-### v2.2.1 released 08/05/2020:
-
+### v2.3.0 released 09/24/2020:
+ 
+#### Enhancements
+* Upgraded dependency to Device SDK 1.20.1 [https://github.com/alexa/avs-device-sdk/tree/v1.20.1]
+* Support for APL 1.4 [https://aplspec.aka.corp.amazon.com/release-1.4/html/index.html#apl-specification-1-4]
+* Added APL Telemetry Support
+* TV Overlay Portrait is no longer supported
+* Added support for APL Extensions [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html#apl-extensions-and-the-backstack]
+ 
 #### Bug fixes
-* Locked version for csstype
+* Correctly handle GUI state when presenting content over attenuated PlayerInfo card
+* Lock JS dependency version - using package-lock.json
+* Fixed alexa state on touch event
+* Fixed import content failure cache update
 
 ### v2.2.0 released 07/13/2020:
 

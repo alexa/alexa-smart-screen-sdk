@@ -16,6 +16,9 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_CACHINGDOWNLOADMANAGER_H_
 #define ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_CACHINGDOWNLOADMANAGER_H_
 
+#include <cstdint>
+#include <memory>
+
 #include <AVSCommon/Utils/LibcurlUtils/HTTPContentFetcherFactory.h>
 #include <AVSCommon/Utils/Threading/Executor.h>
 #include <AVSCommon/SDKInterfaces/Storage/MiscStorageInterface.h>
@@ -28,6 +31,40 @@ namespace sampleApp {
 
 class CachingDownloadManager : public alexaClientSDK::registrationManager::CustomerDataHandler {
 public:
+    class Observer {
+    public:
+        Observer() = default;
+        virtual ~Observer() = default;
+
+        /**
+         * Called at the start of a download, when a resource is not found in the cache.
+         */
+        virtual void onDownloadStarted() {};
+
+        /**
+         * Called when a resource was not found in the cache and has successfully been downloaded.
+         */
+        virtual void onDownloadComplete() {};
+
+        /**
+         * Called when a resource was not found in the cache and the attempt to download it has failed.
+         */
+        virtual void onDownloadFailed() {};
+
+        /**
+         * Called when a resource was found in the cache and downloading is not attempted.
+         */
+        virtual void onCacheHit() {};
+
+        /**
+         * Called during the download of a resource. Observers should expect multiple calls
+         * to this method for a single download.
+         *
+         * @param numberOfBytes The number of bytes that have been downloaded.
+         */
+        virtual void onBytesRead(uint64_t numberOfBytes) {};
+    };
+
     /**
      * Constructor.
      *
@@ -48,9 +85,10 @@ public:
      * Method that should be called when requesting content
      *
      * @param source URL
+     * @param observer An observer to notify of the download, or @c nullptr to disable notifications.
      * @return content - either from cache or from source
      */
-    std::string retrieveContent(const std::string& source);
+    std::string retrieveContent(const std::string& source, std::shared_ptr<Observer> observer = nullptr);
 
     /**
      * Class to define a cached content item
@@ -74,16 +112,17 @@ public:
          * @param importTime Time when the item was inserted into cache
          * @param content The content of the item
          */
-        CachedContent(std::chrono::system_clock::time_point importTime, std::string content);
+        CachedContent(std::chrono::system_clock::time_point importTime, const std::string &content);
     };
 
 private:
     /**
      * Downloads content requested by import from provided URL from source.
      * @param source URL
+     * @param observer An observer to notify of the download, or @c nullptr to disable notifications.
      * @return content from source
      */
-    std::string downloadFromSource(const std::string& source);
+    std::string downloadFromSource(const std::string& source, std::shared_ptr<Observer> observer);
     /**
      * Scans the cache to remove all expired entries, and evict the oldest entry if cache is full
      */

@@ -124,6 +124,7 @@ public:
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
     void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
         override;
+    void onPresentationSessionChanged() override;
     /// @}
 
     // @name VisualStateProviderInterface Functions
@@ -142,6 +143,7 @@ public:
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) override;
     void sendMessage(smartScreenSDKInterfaces::MessageInterface& message) override;
+    bool handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::NavigationEvent event) override;
     /// @}
 
     /// @name MessagingServerInterface Functions
@@ -501,7 +503,7 @@ private:
     /// Server observer
     std::shared_ptr<smartScreenSDKInterfaces::MessagingServerObserverInterface> m_observer;
 
-    // The APL renderer
+    // The APL Client Bridge
     std::shared_ptr<AplClientBridge> m_aplClientBridge;
 
     /// Flag to indicate that a fatal failure occurred. In this case, customer can either reset the device or kill

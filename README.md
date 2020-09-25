@@ -1,5 +1,16 @@
 # Alexa Smart Screen SDK
 
+<p>
+    <a href="https://github.com/alexa/alexa-smart-screen-sdk/tree/v2.3" alt="version">
+        <img src="https://img.shields.io/badge/stable%20version-2.3-brightgreen" /></a>
+    <a href="https://github.com/alexa/avs-device-sdk/tree/v1.20.1" alt="DeviceSDK">
+        <img src="https://img.shields.io/badge/avs%20device%20sdk-1.20.1-blueviolet" /></a>
+    <a href="https://github.com/alexa/apl-core-library/tree/v1.4.1" alt="APLCore">
+        <img src="https://img.shields.io/badge/apl%20core%20library-1.4.1-navy" /></a>
+    <a href="https://github.com/alexa/alexa-smart-screen-sdk/issues" alt="issues">
+        <img src="https://img.shields.io/github/issues/alexa/alexa-smart-screen-sdk" /></a>
+</p>
+
 The [Alexa Smart Screen SDK](https://developer.amazon.com/alexa-voice-service/alexa-smart-screen-sdk) extends the [AVS Device SDK](https://developer.amazon.com/alexa-voice-service/sdk) to support development for screen-based Alexa Built-in products. This SDK enables device makers to build screen-based products that complement Alexa voice responses with rich visual experiences. 
 
 The Alexa Smart Screen SDK package in this GitHub repo includes:
@@ -14,8 +25,9 @@ The Alexa Smart Screen SDK depends on the following additional GitHub repos:
 ## Get Started
 
 You can set up the Alexa Smart Screen SDK by using the following Quick Start Guides:
-* [MacOS Quick Start Guide](https://github.com/alexa/alexa-smart-screen-sdk/wiki/MacOS-Quick-Start-Guide)
-* [Raspberry Pi Quick Start Guide](https://github.com/alexa/alexa-smart-screen-sdk/wiki/Raspberry-Pi-Quick-Start-Guide) (Raspbian Stretch)
+* [MacOS Quick Start Guide](https://developer.amazon.com/en-US/docs/alexa/alexa-smart-screen-sdk/mac-os.html)
+* [Raspberry Pi Quick Start Guide](https://developer.amazon.com/en-US/docs/alexa/alexa-smart-screen-sdk/raspberry-pi.html)
+* [Ubuntu Quick Start Guide](https://developer.amazon.com/en-US/docs/alexa/alexa-smart-screen-sdk/ubuntu.html)
 
 You can also create your device prototype by using an [Amazon-qualified development kit](https://developer.amazon.com/en-US/alexa/alexa-voice-service/dev-kits) that supports the Smart Screen SDK, such as:
 * [Amazon Alexa Smart Screen Dev Kit](https://developer.amazon.com/alexa/alexa-voice-service/dev-kits/amazon-smart-screen)

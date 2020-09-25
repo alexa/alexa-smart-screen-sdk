@@ -14,7 +14,6 @@ else()
 endif()
 
 add_custom_target(GUIClient ALL
-        COMMAND "cp" "${CMAKE_CURRENT_SOURCE_DIR}/config/StartSample.sh" "${AlexaSmartScreenSDK_BINARY_DIR}"
         COMMAND "npm" "install"
         COMMAND "npm" "run" "build" "--"
             "--output-path" "${CMAKE_CURRENT_BINARY_DIR}"

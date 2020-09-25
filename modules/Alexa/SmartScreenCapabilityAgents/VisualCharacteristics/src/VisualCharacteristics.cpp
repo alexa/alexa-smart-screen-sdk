@@ -58,7 +58,7 @@ static const std::string CAPABILITY_INTERFACE_TYPE = "AlexaInterface";
 /// Alexa.InteractionMode interface name
 static const std::string ALEXAINTERACTIONMODE_CAPABILITY_INTERFACE_NAME = "Alexa.InteractionMode";
 /// Alexa.InteractionMode interface version
-static const std::string ALEXAINTERACTIONMODE_CAPABILITY_INTERFACE_VERSION = "1.0";
+static const std::string ALEXAINTERACTIONMODE_CAPABILITY_INTERFACE_VERSION = "1.1";
 
 /// Alexa.Presentation.APL.Video interface name
 static const std::string ALEXAPRESENTATIONAPLVIDEO_CAPABILITY_INTERFACE_NAME = "Alexa.Presentation.APL.Video";

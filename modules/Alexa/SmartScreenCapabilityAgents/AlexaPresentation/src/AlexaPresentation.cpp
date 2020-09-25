@@ -14,6 +14,7 @@
  */
 
 #include <ostream>
+#include <regex>
 
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
@@ -293,6 +294,9 @@ void AlexaPresentation::preHandleDirective(std::shared_ptr<DirectiveInfo> info) 
 }
 
 void AlexaPresentation::handleDirective(std::shared_ptr<DirectiveInfo> info) {
+    // Must remain on the very fist line for accurate telemetry
+    std::chrono::steady_clock::time_point renderStartTime = std::chrono::steady_clock::now();
+
     ACSDK_DEBUG5(LX(__func__));
     if (!info || !info->directive) {
         ACSDK_ERROR(LX("handleDirectiveFailed").d("reason", "nullDirectiveInfo"));
@@ -301,7 +305,7 @@ void AlexaPresentation::handleDirective(std::shared_ptr<DirectiveInfo> info) {
 
     if (info->directive->getNamespace() == DOCUMENT.nameSpace && info->directive->getName() == DOCUMENT.name) {
         setDocumentIdleTimeout(m_sdkConfiguredDocumentInteractionTimeout);
-        handleRenderDocumentDirective(info);
+        handleRenderDocumentDirective(info, renderStartTime);
     } else if (info->directive->getNamespace() == COMMAND.nameSpace && info->directive->getName() == COMMAND.name) {
         handleExecuteCommandDirective(info);
     } else if (
@@ -397,7 +401,9 @@ void AlexaPresentation::addObserver(
     }
     m_executor->submit([this, observer]() {
         ACSDK_DEBUG5(LX("addObserverInExecutor"));
-        if (!m_observers.insert(observer).second) {
+        if (m_observers.insert(observer).second) {
+            observer->onMetricRecorderAvailable(m_metricRecorder);
+        } else {
             ACSDK_ERROR(LX("addObserverFailedInExecutor").d("reason", "Duplicate observer."));
         }
     });
@@ -439,7 +445,9 @@ AlexaPresentation::AlexaPresentation(
         m_metricRecorder{metricRecorder},
         m_lastReportTime{std::chrono::steady_clock::now()},
         m_minStateReportInterval{DEFAULT_MIN_STATE_REPORT_INTERVAL_MS},
-        m_stateReportPending{false} {
+        m_stateReportPending{false},
+        m_documentRendered{false},
+        m_presentationSession{} {
     m_executor = std::make_shared<alexaClientSDK::avsCommon::utils::threading::Executor>();
     m_capabilityConfigurations.insert(getAlexaPresentationCapabilityConfiguration());
 }
@@ -564,13 +572,19 @@ bool AlexaPresentation::parseDirectivePayload(std::shared_ptr<DirectiveInfo> inf
     }
 }
 
-void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveInfo> info) {
+void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveInfo> info,
+                                                      const std::chrono::steady_clock::time_point &startTime) {
     ACSDK_DEBUG5(LX(__func__));
 
-    m_executor->submit([this, info]() {
+    m_executor->submit([this, info, startTime]() {
+        for (auto& observer : m_observers) {
+            observer->onRenderDirectiveReceived(startTime);
+        }
+
         ACSDK_DEBUG9(LX("handleRenderDocumentDirectiveInExecutor").sensitive("payload", info->directive->getPayload()));
         rapidjson::Document payload;
         if (!parseDirectivePayload(info, &payload)) {
+            notifyAbort();
             return;
         }
 
@@ -578,6 +592,7 @@ void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveI
         if (!jsonUtils::retrieveValue(payload, PRESENTATION_TOKEN, &presentationToken)) {
             ACSDK_ERROR(LX("handleRenderDocumentDirectiveFailedInExecutor").d("reason", "NoPresentationToken"));
             sendExceptionEncounteredAndReportFailed(info, "missing presentationToken");
+            notifyAbort();
             return;
         }
 
@@ -585,7 +600,39 @@ void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveI
         if (!jsonUtils::retrieveValue(payload, DOCUMENT_FIELD, &APLdocument)) {
             ACSDK_ERROR(LX("handleRenderDocumentDirectiveFailedInExecutor").d("reason", "NoDocument"));
             sendExceptionEncounteredAndReportFailed(info, "missing APLdocument");
+            notifyAbort();
             return;
+        }
+
+        PresentationSession presentationSession = {};
+        rapidjson::Value::ConstMemberIterator iterator;
+        std::string presentationSessionPayload;
+        if (jsonUtils::findNode(payload, PRESENTATION_SESSION_FIELD, &iterator) &&
+            jsonUtils::convertToValue(iterator->value, &presentationSessionPayload)) {
+
+            std::string skillId;
+            if (!jsonUtils::retrieveValue(presentationSessionPayload, SKILL_ID, &skillId)) {
+                ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor")
+                               .m("Failed to find presentationSession skillId"));
+            }
+
+            std::string id;
+            if (!jsonUtils::retrieveValue(presentationSessionPayload, PRESENTATION_SESSION_ID, &id)) {
+                ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor")
+                               .m("Failed to find presentationSession id"));
+            }
+
+            presentationSession = PresentationSession(skillId, id);
+        }
+
+        if (presentationSession != m_presentationSession) {
+            ACSDK_DEBUG0(LX("handleRenderDocumentDirectiveInExecutor").m("PresentationSessionChanged")
+                             .d("previousSkillId",m_presentationSession.skillId)
+                             .d("newSkillId", presentationSession.skillId));
+            for (auto& observer : m_observers) {
+                observer->onPresentationSessionChanged();
+            }
+            m_presentationSession = presentationSession;
         }
 
         executeDisplayCardEvent(info);
@@ -786,10 +833,12 @@ void AlexaPresentation::executeRenderDocumentCallbacks(bool isClearCard) {
                      .d("isClear", isClearCard)
                      .d("windowId", windowId));
 
+    m_documentRendered = false;
     startMetricsEvent(MetricEvent::RENDER_DOCUMENT);
 
     for (auto& observer : m_observers) {
         if (isClearCard) {
+            m_presentationSession = {};
             observer->clearDocument();
         } else {
             observer->renderDocument(m_lastDisplayedDirective->directive->getPayload(), newToken, windowId);
@@ -1217,29 +1266,47 @@ void AlexaPresentation::executeProvideState(unsigned int stateRequestToken) {
     }
 }
 
-void AlexaPresentation::onVisualContextAvailable(const unsigned int requestToken, const std::string& payload) {
-    ACSDK_DEBUG3(LX(__func__).d("requestToken", requestToken));
-    m_executor->submit([this, requestToken, payload]() {
+void AlexaPresentation::onVisualContextAvailable(const unsigned int requestToken, const std::string& visualContext) {
+    ACSDK_DEBUG3(LX(__func__).d("requestToken", requestToken).sensitive("visualContext", visualContext));
+    m_executor->submit([this, requestToken, visualContext]() {
         ACSDK_DEBUG3(LX("onVisualContextAvailableExecutor"));
-        CapabilityState state;
-        state.valuePayload = payload;
+
+        rapidjson::Document doc;
+        std::string payload;
+
+        // If valid visualContext, add presentationSession to payload
+        if (!doc.Parse(visualContext).HasParseError()) {
+            rapidjson::StringBuffer buffer;
+            rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+            m_presentationSession.addPresentationSessionPayload(&doc);
+            doc.Accept(writer);
+            payload = buffer.GetString();
+        } else {
+            // Otherwise make presentationSession the payload.
+            payload = m_presentationSession.getPresentationSessionPayload();
+        }
+
+        CapabilityState state(payload);
         m_lastReportTime = std::chrono::steady_clock::now();
         m_stateReportPending = false;
         if (0 == requestToken) {
-            // Proactive state report
-            if (m_lastReportedState != payload) {
+            // Proactive visualContext report
+            if (m_lastReportedState != visualContext) {
                 m_contextManager->reportStateChange(
                     RENDERED_DOCUMENT_STATE, state, AlexaStateChangeCauseType::ALEXA_INTERACTION);
-                m_lastReportedState = payload;
+                m_lastReportedState = visualContext;
             }
         } else {
             if (m_lastDisplayedDirective && !m_lastRenderedAPLToken.empty() &&
                 ALEXA_PRESENTATION_APL_NAMESPACE == m_lastDisplayedDirective->directive->getNamespace()) {
                 m_contextManager->provideStateResponse(RENDERED_DOCUMENT_STATE, state, requestToken);
-                m_lastReportedState = payload;
+                m_lastReportedState = visualContext;
             } else {
-                // Since requesting the state, APL is no longer being displayed
-                m_contextManager->setState(RENDERED_DOCUMENT_STATE, "", StateRefreshPolicy::SOMETIMES, requestToken);
+                // Since requesting the visualContext, APL is no longer being displayed
+                // Set presentationSession as the state.
+                m_contextManager->setState(RENDERED_DOCUMENT_STATE,
+                                           m_presentationSession.getPresentationSessionPayload(),
+                                           StateRefreshPolicy::SOMETIMES, requestToken);
                 m_lastReportedState.clear();
             }
         }
@@ -1293,6 +1360,7 @@ void AlexaPresentation::processRenderDocumentResult(
             sendExceptionEncounteredAndReportFailed(m_lastDisplayedDirective, "Renderer failed: " + error);
             resetMetricsEvent(MetricEvent::RENDER_DOCUMENT);
             endMetricsEvent(MetricEvent::RENDER_DOCUMENT, ACTIVITY_RENDER_DOCUMENT_FAIL);
+            notifyAbort();
         }
 
         if (DialogUXState::IDLE == m_dialogUxState && InteractionState::INACTIVE == m_documentInteractionState) {
@@ -1328,7 +1396,7 @@ void AlexaPresentation::processExecuteCommandsResult(
             setHandlingCompleted(m_lastExecuteCommandTokenAndDirective.second);
         } else {
             sendExceptionEncounteredAndReportFailed(
-                m_lastExecuteCommandTokenAndDirective.second, "Commands execution failed: " + error);
+            m_lastExecuteCommandTokenAndDirective.second, "Commands execution failed: " + error);
         }
 
         m_lastExecuteCommandTokenAndDirective.first.clear();
@@ -1483,6 +1551,19 @@ void AlexaPresentation::resetMetricsEvent(MetricEvent metricEvent) {
             break;
     }
 }
+
+std::string AlexaPresentation::getSkillIdFromAPLToken(const std::string& aplToken) {
+    std::string skillId;
+    std::regex rgx(".*#TID#([a-zA-Z0-9-_\\.]+[a-zA-Z0-9]):.*");
+    std::smatch match;
+
+    if (std::regex_search(aplToken.begin(), aplToken.end(), match, rgx) &&
+        match.size() > 1)  // Magic # we discard the first literal and goto the value
+        skillId = match[1].str();
+
+    return skillId;
+}
+
 void AlexaPresentation::endMetricsEvent(MetricEvent metricEvent, const std::string& activityName) {
     std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricEvent> event;
     switch (metricEvent) {
@@ -1504,6 +1585,10 @@ void AlexaPresentation::endMetricsEvent(MetricEvent metricEvent, const std::stri
                                           .setName("APL_TOKEN")
                                           .setValue(m_lastRenderedAPLToken.c_str())
                                           .build())
+                        .addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointStringBuilder{}
+                                          .setName("SKILL_ID")
+                                          .setValue(getSkillIdFromAPLToken(m_lastRenderedAPLToken).c_str())
+                                          .build())
                         .build();
             m_currentActiveTimePoints.erase(metricEvent);
             break;  // Timer Metric events
@@ -1520,6 +1605,10 @@ void AlexaPresentation::endMetricsEvent(MetricEvent metricEvent, const std::stri
                         .addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointStringBuilder{}
                                           .setName("APL_TOKEN")
                                           .setValue(m_lastRenderedAPLToken.c_str())
+                                          .build())
+                        .addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointStringBuilder{}
+                                          .setName("SKILL_ID")
+                                          .setValue(getSkillIdFromAPLToken(m_lastRenderedAPLToken).c_str())
                                           .build())
                         .build();
 
@@ -1538,6 +1627,8 @@ void AlexaPresentation::endMetricsEvent(MetricEvent metricEvent, const std::stri
 
 void AlexaPresentation::recordRenderComplete() {
     ACSDK_DEBUG5(LX(__func__));
+    m_documentRendered = true;
+
     /* The view layout was drawn */
     endMetricsEvent(MetricEvent::LAYOUT, ACTIVITY_VIEW_LAYOUT);
 
@@ -1581,7 +1672,8 @@ void AlexaPresentation::recordAPLEvent(APLClient::AplRenderingEvent event) {
 
 void AlexaPresentation::executeProactiveStateReport() {
     if (m_stateReportCheckInterval.count() == 0 || !m_lastDisplayedDirective || m_lastRenderedAPLToken.empty() ||
-        ALEXA_PRESENTATION_APL_NAMESPACE != m_lastDisplayedDirective->directive->getNamespace()) {
+        ALEXA_PRESENTATION_APL_NAMESPACE != m_lastDisplayedDirective->directive->getNamespace() ||
+        !m_documentRendered) {
         // Not rendering APL or reporting disabled, do not request a state report
         return;
     }
@@ -1597,6 +1689,12 @@ void AlexaPresentation::executeProactiveStateReport() {
 
 void AlexaPresentation::proactiveStateReport() {
     m_executor->submit([this] { executeProactiveStateReport(); });
+}
+
+void AlexaPresentation::notifyAbort() {
+    for (auto observer : m_observers) {
+        observer->onRenderingAborted();
+    }
 }
 
 }  // namespace alexaPresentation

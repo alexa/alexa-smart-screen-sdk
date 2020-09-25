@@ -17,8 +17,13 @@
 #include <rapidjson/error/en.h>
 
 #include <AVSCommon/AVS/PlaybackButtons.h>
+#include <AVSCommon/SDKInterfaces/FocusManagerInterface.h>
 
 #include "SampleApp/GUI/GUIManager.h"
+
+#ifdef ENABLE_APL_TELEMETRY
+    #include "SampleApp/TelemetrySink.h"
+#endif
 
 #ifdef UWP_BUILD
 #include <UWPSampleApp/Utils.h>
@@ -31,6 +36,7 @@ namespace gui {
 
 using namespace alexaClientSDK;
 using namespace alexaClientSDK::avsCommon::utils::json;
+using namespace alexaClientSDK::avsCommon::avs;
 
 using namespace smartScreenSDKInterfaces;
 
@@ -47,42 +53,6 @@ static const std::string TAG("GUIManager");
 /// Interface name to use for focus requests.
 static const std::string APL_INTERFACE("Alexa.Presentation.APL");
 
-/// String to identify the ARGUMENTS tag
-static const std::string ARGUMENTS_TAG("arguments");
-
-/// The command type index in the arguments array.
-static const int COMMAND_TYPE_INDEX = 0;
-
-/// The command id index in the arguments array.
-static const int COMMAND_ID_INDEX = 1;
-
-/// The action index in the arguments array.
-static const int COMMAND_ACTION_INDEX = 2;
-
-/// String to identify the Button command argument.
-static const std::string BUTTON_COMMAND_TYPE("ButtonCommandIssued");
-
-/// String to identify the Toggle command argument.
-static const std::string TOGGLE_COMMAND_TYPE("ToggleCommandIssued");
-
-/// String to identify the Button command argument.
-static const std::string PLAYPAUSE_COMMAND_TYPE("PlayCommandIssued");
-
-/// String to identify the Toggle command argument.
-static const std::string NEXT_COMMAND_TYPE("NextCommandIssued");
-
-/// String to identify the Button command argument.
-static const std::string PREVIOUS_COMMAND_TYPE("PreviousCommandIssued");
-
-/// String to identify the Previous Button of PlaybackController.
-static const std::string PREV_BUTTON_ID("PREVIOUS");
-
-/// String to identify the Next Button of PlaybackController.
-static const std::string NEXT_BUTTON_ID("NEXT");
-
-/// String to identify the Play/Pause Button of PlaybackController.
-static const std::string PLAYPAUSE_BUTTON_ID("PLAY_PAUSE");
-
 /// String to identify the Shuffle Toggle of PlaybackController.
 static const std::string SHUFFLE_TOGGLE_ID("SHUFFLE");
 
@@ -91,12 +61,6 @@ static const std::string LOOP_TOGGLE_ID("LOOP");
 
 /// String to identify the Repeat Toggle of PlaybackController.
 static const std::string REPEAT_TOGGLE_ID("REPEAT");
-
-/// String to identify the Skip Forward Button of PlaybackController.
-static const std::string SKIP_FORWARD_BUTTON_ID("SKIPFORWARD");
-
-/// String to identify the Skip Backward Button of PlaybackController.
-static const std::string SKIP_BACKWARD_BUTTON_ID("SKIPBACKWARD");
 
 /// String to identify the Repeat Toggle of PlaybackController.
 static const std::string THUMBSUP_TOGGLE_ID("THUMBSUP");
@@ -159,12 +123,17 @@ GUIManager::GUIManager(
         m_tapToTalkAudioProvider{tapToTalkAudioProvider},
         m_wakeWordAudioProvider{wakeWordAudioProvider},
         m_activeNonPlayerInfoDisplayType{NonPlayerInfoDisplayType::NONE},
-        m_playerActivityState{alexaClientSDK::avsCommon::avs::PlayerActivity::FINISHED} {
+        m_playerActivityState{PlayerActivity::FINISHED} {
     m_guiClient = guiClient;
     m_isMicOn = true;
     m_isHoldOccurring = false;
     m_isTapOccurring = false;
     m_isSpeakingOrListening = false;
+    m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME] = FocusState::NONE;
+    m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME] = FocusState::NONE;
+    m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::CONTENT_CHANNEL_NAME] = FocusState::NONE;
+    m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::COMMUNICATIONS_CHANNEL_NAME] = FocusState::NONE;
+    m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME] = FocusState::NONE;
 
 #ifdef UWP_BUILD
     m_micWrapper = std::dynamic_pointer_cast<alexaSmartScreenSDK::sssdkCommon::NullMicrophone>(micWrapper);
@@ -177,7 +146,7 @@ GUIManager::GUIManager(
 
 void GUIManager::renderTemplateCard(
     const std::string& jsonPayload,
-    alexaClientSDK::avsCommon::avs::FocusState focusState) {
+    FocusState focusState) {
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::RENDER_TEMPLATE;
     m_guiClient->renderTemplateCard(jsonPayload, focusState);
 }
@@ -190,7 +159,7 @@ void GUIManager::clearTemplateCard() {
 void GUIManager::renderPlayerInfoCard(
     const std::string& jsonPayload,
     smartScreenSDKInterfaces::AudioPlayerInfo info,
-    alexaClientSDK::avsCommon::avs::FocusState focusState) {
+    FocusState focusState) {
     m_guiClient->renderPlayerInfoCard(jsonPayload, info, focusState);
 }
 
@@ -202,7 +171,14 @@ void GUIManager::interruptCommandSequence() {
     m_guiClient->interruptCommandSequence();
 }
 
-void GUIManager::renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) {
+void GUIManager::onPresentationSessionChanged() {
+    m_guiClient->onPresentationSessionChanged();
+}
+
+void GUIManager::renderDocument(
+        const std::string& jsonPayload,
+        const std::string& token,
+        const std::string& windowId) {
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::ALEXA_PRESENTATION;
     m_guiClient->renderDocument(jsonPayload, token, windowId);
 }
@@ -279,77 +255,7 @@ void GUIManager::handleMicrophoneToggle() {
 }
 
 void GUIManager::handleUserEvent(std::string userEventPayload) {
-    m_executor.submit([this, userEventPayload]() {
-        rapidjson::Document document;
-        rapidjson::ParseResult result = document.Parse(userEventPayload);
-
-        ACSDK_DEBUG5(LX(__func__).d("payload", userEventPayload));
-
-        if (!result) {
-            ACSDK_ERROR(LX(__func__).d("reason", "Payload parse error."));
-            return;
-        }
-
-        do {
-            if (!document.HasMember(ARGUMENTS_TAG)) {
-                sendUserEvent(userEventPayload);
-                break;
-            }
-
-            auto argumentsValue = document.FindMember(ARGUMENTS_TAG);
-
-            if (!argumentsValue->value.IsArray()) {
-                sendUserEvent(userEventPayload);
-                break;
-            }
-
-            auto argumentsArray = argumentsValue->value.GetArray();
-            if (argumentsArray.Size() < 2) {
-                sendUserEvent(userEventPayload);
-                break;
-            }
-
-            if (!(argumentsArray[COMMAND_TYPE_INDEX].IsString()) || !(argumentsArray[COMMAND_ID_INDEX].IsString())) {
-                sendUserEvent(userEventPayload);
-                break;
-            }
-
-            std::string commandType = argumentsArray[COMMAND_TYPE_INDEX].GetString();
-            std::string commandId = argumentsArray[COMMAND_ID_INDEX].GetString();
-
-            if (commandType == PLAYPAUSE_COMMAND_TYPE && commandId == PLAYPAUSE_BUTTON_ID) {
-                playbackPlay();
-            } else if (commandType == NEXT_COMMAND_TYPE && commandId == NEXT_BUTTON_ID) {
-                playbackNext();
-            } else if (commandType == PREVIOUS_COMMAND_TYPE && commandId == PREV_BUTTON_ID) {
-                playbackPrevious();
-            } else if (commandType == BUTTON_COMMAND_TYPE) {
-                if (commandId == SKIP_FORWARD_BUTTON_ID) {
-                    playbackSkipForward();
-                } else if (commandId == SKIP_BACKWARD_BUTTON_ID) {
-                    playbackSkipBackward();
-                }
-            } else if (commandType == TOGGLE_COMMAND_TYPE) {
-                if (argumentsArray.Size() < 3 || !argumentsArray[COMMAND_ACTION_INDEX].IsString()) {
-                    ACSDK_INFO(LX(__func__)
-                                   .d("Possible error", "Command type is toggle with mismatch arguments")
-                                   .d("Payload:", userEventPayload));
-                    break;
-                }
-                std::string actionString = argumentsArray[COMMAND_ACTION_INDEX].GetString();
-                bool action = actionString == "SELECT";
-
-                auto it = TOGGLE_COMMAND_ID_TO_TOGGLE.find(commandId);
-                if (it == TOGGLE_COMMAND_ID_TO_TOGGLE.end()) {
-                    ACSDK_ERROR(LX(__func__).d("Key", commandId));
-                    return;
-                }
-                sendGuiToggleEvent(it->second, action);
-            } else {
-                sendUserEvent(userEventPayload);
-            }
-        } while (0);
-    });
+    m_executor.submit([this, userEventPayload]() { m_ssClient->sendUserEvent(userEventPayload); });
 }
 
 void GUIManager::handleDataSourceFetchRequestEvent(std::string type, std::string payload) {
@@ -360,63 +266,45 @@ void GUIManager::handleRuntimeErrorEvent(std::string payload) {
     m_executor.submit([this, payload] { m_ssClient->sendRuntimeErrorEvent(payload); });
 }
 
-void GUIManager::sendUserEvent(const std::string& payload) {
-    m_executor.submit([this, payload]() { m_ssClient->sendUserEvent(payload); });
-}
-
-void GUIManager::playbackPlay() {
+void GUIManager::handlePlaybackPlay() {
     m_executor.submit(
         [this]() { m_ssClient->getPlaybackRouter()->buttonPressed(avsCommon::avs::PlaybackButton::PLAY); });
 }
 
-void GUIManager::playbackPause() {
+void GUIManager::handlePlaybackPause() {
     m_executor.submit(
         [this]() { m_ssClient->getPlaybackRouter()->buttonPressed(avsCommon::avs::PlaybackButton::PAUSE); });
 }
 
-void GUIManager::playbackNext() {
+void GUIManager::handlePlaybackNext() {
     m_executor.submit(
         [this]() { m_ssClient->getPlaybackRouter()->buttonPressed(avsCommon::avs::PlaybackButton::NEXT); });
 }
 
-void GUIManager::playbackPrevious() {
+void GUIManager::handlePlaybackPrevious() {
     m_executor.submit(
         [this]() { m_ssClient->getPlaybackRouter()->buttonPressed(avsCommon::avs::PlaybackButton::PREVIOUS); });
 }
 
-void GUIManager::playbackSkipForward() {
+void GUIManager::handlePlaybackSkipForward() {
     m_executor.submit(
         [this]() { m_ssClient->getPlaybackRouter()->buttonPressed(avsCommon::avs::PlaybackButton::SKIP_FORWARD); });
 }
 
-void GUIManager::playbackSkipBackward() {
+void GUIManager::handlePlaybackSkipBackward() {
     m_executor.submit(
         [this]() { m_ssClient->getPlaybackRouter()->buttonPressed(avsCommon::avs::PlaybackButton::SKIP_BACKWARD); });
 }
 
-void GUIManager::playbackShuffle() {
-    sendGuiToggleEvent(avsCommon::avs::PlaybackToggle::SHUFFLE, false);
-}
-
-void GUIManager::playbackLoop() {
-    sendGuiToggleEvent(avsCommon::avs::PlaybackToggle::LOOP, false);
-}
-
-void GUIManager::playbackRepeat() {
-    sendGuiToggleEvent(avsCommon::avs::PlaybackToggle::REPEAT, false);
-}
-
-void GUIManager::playbackThumbsUp() {
-    sendGuiToggleEvent(avsCommon::avs::PlaybackToggle::THUMBS_UP, false);
-}
-
-void GUIManager::playbackThumbsDown() {
-    sendGuiToggleEvent(avsCommon::avs::PlaybackToggle::THUMBS_DOWN, false);
-}
-
-void GUIManager::sendGuiToggleEvent(avsCommon::avs::PlaybackToggle toggleType, const bool action) {
-    m_executor.submit(
-        [this, toggleType, action]() { m_ssClient->getPlaybackRouter()->togglePressed(toggleType, action); });
+void GUIManager::handlePlaybackToggle(const std::string& name, bool checked) {
+    m_executor.submit([this, name, checked]() {
+        auto it = TOGGLE_COMMAND_ID_TO_TOGGLE.find(name);
+        if (it == TOGGLE_COMMAND_ID_TO_TOGGLE.end()) {
+            ACSDK_ERROR(LX(__func__).d("Invalid Toggle Name", name));
+            return;
+        }
+        m_ssClient->getPlaybackRouter()->togglePressed(it->second, checked);
+    });
 }
 
 void GUIManager::setFirmwareVersion(avsCommon::sdkInterfaces::softwareInfo::FirmwareVersion firmwareVersion) {
@@ -585,7 +473,12 @@ bool GUIManager::handleFocusReleaseRequest(
 }
 
 void GUIManager::handleRenderDocumentResult(std::string token, bool result, std::string error) {
-    m_executor.submit([this, token, result, error]() { m_ssClient->handleRenderDocumentResult(token, result, error); });
+    m_executor.submit([this, token, result, error]() {
+        m_ssClient->handleRenderDocumentResult(token, result, error);
+        if (!result && m_aplRenderingEventObserver) {
+            m_aplRenderingEventObserver->onRenderingEvent(APLClient::AplRenderingEvent::RENDER_ABORTED);
+        }
+    });
 }
 
 void GUIManager::handleExecuteCommandsResult(std::string token, bool result, std::string error) {
@@ -606,7 +499,8 @@ void GUIManager::handleActivityEvent(smartScreenSDKInterfaces::ActivityEvent eve
             ACSDK_DEBUG3(LX(__func__).d(
                 "Interrupted activity while speaking or listening",
                 smartScreenSDKInterfaces::activityEventToString(event)));
-            executeStopForegroundActivity();
+            m_ssClient->stopForegroundActivity();
+            m_ssClient->clearAllExecuteCommands();
         }
         m_ssClient->handleActivityEvent(
             TAG, event, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
@@ -615,28 +509,16 @@ void GUIManager::handleActivityEvent(smartScreenSDKInterfaces::ActivityEvent eve
 
 void GUIManager::handleNavigationEvent(smartScreenSDKInterfaces::NavigationEvent event) {
     m_executor.submit([this, event]() {
-        /**
-         * If we've resumed playing audio and are still presenting GUI over PlayerInfo, only clear the remaining card,
-         * Don't Stop ForegroundActivity, as that will kill music
-         */
-        bool clearCardOnly = alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING == m_playerActivityState &&
-                             NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType;
-
-        if (!clearCardOnly) {
-            executeStopForegroundActivity();
-        }
-
         ACSDK_DEBUG3(LX(__func__).d(
             "processNavigationEvent in executor", smartScreenSDKInterfaces::navigationEventToString(event)));
+
+        // TODO : Implement more robust visual presentation and granular channel orchestration for local navigation
         switch (event) {
-            /// Phase 1 - BACK and EXIT will have the same result - EXIT the screen and clear any resources.
             case smartScreenSDKInterfaces::NavigationEvent::BACK:
+                executeBackNavigation();
+                break;
             case smartScreenSDKInterfaces::NavigationEvent::EXIT:
-                if (clearCardOnly) {
-                    m_ssClient->clearCard();
-                } else {
-                    m_ssClient->forceExit();
-                }
+                executeExitNavigation();
                 break;
             default:
                 // Not possible as returned above.
@@ -645,8 +527,79 @@ void GUIManager::handleNavigationEvent(smartScreenSDKInterfaces::NavigationEvent
     });
 }
 
+void GUIManager::executeBackNavigation() {
+    /**
+     * Back Navigation supports the following use cases:
+     * 1. GUIClient managed back, for traversal of a UI client implemented backstack.
+     * 2. Back from ALL other active audio channel(s) and /or visual card to audio content/PlayerInfo card.
+     * 3. Back from audio content content/PlayerInfo card to 'home' state.
+     */
+
+    bool dialogChannelActive = FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME];
+    bool alertChannelActive = FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME];
+
+    /**
+     * Always stop the foreground activity unless we're playing audio content, AND dialog and alerts aren't active,
+     * AND we are still presenting GUI over PlayerInfo.  In that case we should only clear the card.
+     */
+    bool stopForegroundActivity = !(PlayerActivity::PLAYING == m_playerActivityState &&
+                         NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType &&
+                         !dialogChannelActive &&
+                         !alertChannelActive);
+
+    /**
+     * Always clear the displayed card unless audio content is playing AND dialog or alerts are active without UI.
+     * In that case we should stop the foreground activity, but not clear the PlayerInfo card.
+     */
+    bool clearCard = !(PlayerActivity::PLAYING == m_playerActivityState &&
+            NonPlayerInfoDisplayType::NONE == m_activeNonPlayerInfoDisplayType &&
+            (dialogChannelActive || alertChannelActive));
+
+    /**
+     * Stopping foreground audio activity happens before we allow GUIClient to handle 'visual' back navigation.
+     */
+    if (stopForegroundActivity) {
+        /**
+         * If both dialog and alerts are active,
+         * stop dialog first (which has priority), and then stop alerts when it becomes foregrounded.
+         */
+        if (dialogChannelActive && alertChannelActive) {
+            m_clearAlertChannelOnForegrounded = true;
+        }
+        m_ssClient->stopForegroundActivity();
+    }
+
+    /**
+     * BACK will attempt to let the GUIClient handle visual navigation before clearing.
+     * This allows for things like backstack traversal if implemented by the client.
+     */
+    if (!m_guiClient->handleNavigationEvent(NavigationEvent::BACK)) {
+        /// Clear clout context unless waiting to clear Alert channel first
+        if (!m_clearAlertChannelOnForegrounded){
+            m_ssClient->forceClearDialogChannelFocus();
+        }
+        if (clearCard) {
+            /// Always stop active APL commands when clearing the card.
+            m_ssClient->clearAllExecuteCommands();
+            m_ssClient->clearCard();
+        }
+    }
+}
+
+void GUIManager::executeExitNavigation() {
+    /// EXIT will immediately clear everything.
+    if (PlayerActivity::PLAYING == m_playerActivityState &&
+        NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType) {
+        /// If we're presenting something over PlayerInfo, we need to separately clear PlayerInfo
+        m_clearPlayerInfoCardOnContentFocusLost = true;
+    }
+    m_ssClient->forceExit();
+}
+
 void GUIManager::forceExit() {
-    m_executor.submit([this]() { m_ssClient->forceExit(); });
+    m_executor.submit([this]() {
+        executeExitNavigation();
+    });
 }
 
 void GUIManager::setDocumentIdleTimeout(std::chrono::milliseconds timeout) {
@@ -659,8 +612,12 @@ void GUIManager::handleDeviceWindowState(std::string payload) {
 
 void GUIManager::handleRenderComplete() {
     m_executor.submit([this]() {
-        m_ssClient->handleRenderComplete(
-            NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
+        bool isAlexaPresentationPresenting =
+            NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType;
+        m_ssClient->handleRenderComplete(isAlexaPresentationPresenting);
+        if (isAlexaPresentationPresenting && m_aplRenderingEventObserver) {
+            m_aplRenderingEventObserver->onRenderingEvent(APLClient::AplRenderingEvent::DOCUMENT_RENDERED);
+        }
     });
 }
 
@@ -671,14 +628,20 @@ void GUIManager::handleDisplayMetrics(uint64_t dropFrameCount) {
     });
 }
 
-void GUIManager::handleAPLEvent(APLClient::AplRenderingEvent event) {
-    m_ssClient->handleAPLEvent(event, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
+void GUIManager::handleDisplayMetrics(const std::vector<APLClient::DisplayMetric> &metrics) {
+    m_executor.submit([this, metrics]() {
+        m_aplRenderingEventObserver->onMetricsReported(metrics);
+        for (const auto &metric : metrics) {
+            // for backwards compatibility, to remove when the viewhost changes are merged
+            if (metric.name == "APL-Web.RootContext.dropFrame") {
+                handleDisplayMetrics(metric.value);
+            }
+        }
+    });
 }
 
-void GUIManager::executeStopForegroundActivity() {
-    m_ssClient->stopForegroundActivity();
-    // TODO: ARC-570 consider cleaning the commands on CommandsSequencer
-    m_ssClient->clearAllExecuteCommands();
+void GUIManager::handleAPLEvent(APLClient::AplRenderingEvent event) {
+    m_ssClient->handleAPLEvent(event, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
 }
 
 void GUIManager::onAuthStateChange(AuthObserverInterface::State newState, AuthObserverInterface::Error newError) {
@@ -717,8 +680,45 @@ void GUIManager::onDialogUXStateChanged(DialogUXState state) {
     });
 }
 
+void GUIManager::onUserEvent() {
+    m_ssClient->onUserEvent(m_audioInputProcessorState);
+}
+
+void GUIManager::onStateChanged(AudioInputProcessorObserverInterface::State state) {
+    m_audioInputProcessorState = state;
+}
+
 void GUIManager::onPlayerActivityChanged(avsCommon::avs::PlayerActivity state, const Context& context) {
     m_executor.submit([this, state]() { m_playerActivityState = state; });
+}
+
+void GUIManager::onFocusChanged(const std::string &channelName, FocusState newFocus) {
+    m_executor.submit([this, channelName, newFocus]() {
+        ACSDK_DEBUG(LX("ChannelFocusChanged")
+             .d("channelName", channelName)
+             .d("newFocus",focusStateToString(newFocus)));
+
+        m_channelFocusStates[channelName] = newFocus;
+
+        /// Handle use case to clear Alerts channel when foregrounded.
+        if (channelName == avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME &&
+            FocusState::FOREGROUND == newFocus &&
+            m_clearAlertChannelOnForegrounded) {
+            m_ssClient->stopForegroundActivity();
+            m_ssClient->forceClearDialogChannelFocus();
+            m_clearAlertChannelOnForegrounded = false;
+        }
+
+        /// Handle use case to clear PlayerInfo when Content channel loses focus.
+        if (channelName == avsCommon::sdkInterfaces::FocusManagerInterface::CONTENT_CHANNEL_NAME &&
+            FocusState::NONE == newFocus &&
+            m_clearPlayerInfoCardOnContentFocusLost) {
+            if (FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME]){
+                m_ssClient->clearCard();
+            }
+            m_clearPlayerInfoCardOnContentFocusLost = false;
+        }
+    });
 }
 
 void GUIManager::setClient(std::shared_ptr<smartScreenClient::SmartScreenClient> client) {
@@ -728,6 +728,14 @@ void GUIManager::setClient(std::shared_ptr<smartScreenClient::SmartScreenClient>
         }
         m_ssClient = client;
     });
+}
+
+void GUIManager::setAplRenderingEventObserver(APLClient::AplRenderingEventObserverPtr observer) {
+    m_aplRenderingEventObserver = std::move(observer);
+}
+
+std::chrono::milliseconds GUIManager::getAudioItemOffset() {
+    return m_ssClient->getAudioItemOffset();
 }
 
 std::chrono::milliseconds GUIManager::getDeviceTimezoneOffset() {
@@ -745,6 +753,24 @@ void GUIManager::doShutdown() {
         m_callManager.reset();
     }
     m_micWrapper.reset();
+}
+
+void GUIManager::onRenderDirectiveReceived(const std::chrono::steady_clock::time_point& receiveTime) {
+    m_aplRenderingEventObserver->onRenderDirectiveReceived(receiveTime);
+}
+
+void GUIManager::onRenderingAborted() {
+    m_aplRenderingEventObserver->onRenderingEvent(APLClient::AplRenderingEvent::RENDER_ABORTED);
+}
+
+void GUIManager::onMetricRecorderAvailable(
+        std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) {
+#ifdef ENABLE_APL_TELEMETRY
+    if (metricRecorder) {
+        auto sink = std::make_shared<TelemetrySink>(metricRecorder);
+        m_aplRenderingEventObserver->onTelemetrySinkUpdated(sink);
+    }
+#endif
 }
 
 #ifdef UWP_BUILD

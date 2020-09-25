@@ -20,7 +20,8 @@ import {AVSVideoFactory} from '../lib/media/AVSVideo';
 import {ActivityTracker} from '../lib/activity/ActivityTracker';
 import { Timer } from '../lib/utils/timer';
 import { IAPLRendererWindowConfig } from '../lib/config/IDeviceAppConfig';
-import { VisibilityProperty } from 'csstype';
+
+type VisibilityProperty = import('csstype').Property.Visibility;
 
 const OVERLAY_WINDOW_ACTIVE_IN_MS : number = 750;
 const OVERLAY_WINDOW_INACTIVE_IN_MS : number = 250;
@@ -45,27 +46,28 @@ export interface IAPLRendererWindowProps {
 
 export class WebsocketConnectionWrapper extends APLClient {
   protected client : IClient;
+  private supportedExtensions : any;
 
   constructor(client : IClient) {
     super();
     this.client = client;
   }
 
-  public sendMessage(message : object) {
-    switch (Object(message).type) {
+  public sendMessage(message : any) {
+    switch (message.type) {
       case 'executeCommands' :
       case 'renderComplete':
       case 'displayMetrics':
       case 'renderStaticDocument' : {
-        this.client.sendMessage(Object(message));
+        this.client.sendMessage(message);
         break;
       }
       default : {
-        const wrapped : IAPLEventMessage = {
+        const aplEvent : IAPLEventMessage = {
           type: 'aplEvent',
           payload: message
         };
-        this.client.sendMessage(wrapped);
+        this.client.sendMessage(aplEvent);
       }
     }
   }
@@ -205,7 +207,7 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
 
     const environment : IEnvironment = {
       agentName: 'SmartScreenSDK',
-      agentVersion: '1.0',
+      agentVersion: '2.3',
       disallowVideo: this.windowConfig.disallowVideo,
       allowOpenUrl: this.windowConfig.allowOpenUrl,
       animationQuality: this.windowConfig.animationQuality
@@ -219,7 +221,8 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
       environment,
       audioPlayerFactory: this.createAudioPlayer.bind(this),
       client: this.client,
-      videoFactory: new AVSVideoFactory(this.props.focusManager, this.props.activityTracker)
+      videoFactory: new AVSVideoFactory(this.props.focusManager, this.props.activityTracker),
+      supportedExtensions: this.windowConfig.supportedExtensions
     } as any;
 
     APLRendererWindow.releaseActiveRendererContext();

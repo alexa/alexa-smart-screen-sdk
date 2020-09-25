@@ -3,7 +3,10 @@ project(ApplicationUtilities LANGUAGES CXX)
 
 include(../build/BuildDefaults.cmake)
 
-add_subdirectory("APLClient")
+if (METRICS_EXTENSION)
+    add_subdirectory("Metrics")
+endif ()
+
 if (NOT MSVC)
     add_subdirectory("Communication")
 endif ()

@@ -260,6 +260,8 @@ void TemplateRuntime::dataSourceUpdate(
 void TemplateRuntime::interruptCommandSequence() {
 }
 
+void TemplateRuntime::onPresentationSessionChanged() {}
+
 void TemplateRuntime::addObserver(
     std::shared_ptr<smartScreenSDKInterfaces::TemplateRuntimeObserverInterface> observer) {
     ACSDK_DEBUG5(LX("addObserver"));
@@ -299,7 +301,6 @@ TemplateRuntime::TemplateRuntime(
         CapabilityAgent{NAMESPACE, exceptionSender},
         RequiresShutdown{"TemplateRuntime"},
         m_activeNonPlayerInfoType{NonPlayerInfoDisplayType::NONE},
-        m_isPlayerInfoCardUpdated{false},
         m_focus{FocusState::NONE},
         m_state{smartScreenSDKInterfaces::State::IDLE},
         m_playerActivityState{alexaClientSDK::avsCommon::avs::PlayerActivity::FINISHED},
@@ -361,13 +362,10 @@ void TemplateRuntime::executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType c
     }
     m_activeNonPlayerInfoType = NonPlayerInfoDisplayType::NONE;
     executeStopTimer();
-    if (m_isPlayerInfoCardUpdated && m_activeRenderPlayerInfoCardsProvider) {
-        /**
-         * Only update player info card if we have an updated card,
-         * and an active render player info provider,
-         */
-        m_isPlayerInfoCardUpdated = false;
-
+    /**
+     * Only update player info card if we still have an active render player info provider
+     */
+    if (m_activeRenderPlayerInfoCardsProvider) {
         if (alexaClientSDK::avsCommon::avs::PlayerActivity::STOPPED == m_playerActivityState) {
             /**
              * Clear the remaining player info card if audio player is STOPPED.
@@ -376,7 +374,7 @@ void TemplateRuntime::executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType c
         } else {
             /**
              * Update the audioPlayerInfo to the most recent state and offset
-             * */
+             */
             m_audioPlayerInfo[m_activeRenderPlayerInfoCardsProvider].audioPlayerState = m_playerActivityState;
             m_audioPlayerInfo[m_activeRenderPlayerInfoCardsProvider].offset =
                 m_activeRenderPlayerInfoCardsProvider->getAudioItemOffset();
@@ -546,7 +544,6 @@ void TemplateRuntime::executeAudioPlayerInfoUpdates(
     auto isStateUpdated = (m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].audioPlayerState != state);
     m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].audioPlayerState = state;
     m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].offset = context.offset;
-    m_isPlayerInfoCardUpdated = true;
     if (m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].audioItemId != context.audioItemId) {
         m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].audioItemId = context.audioItemId;
         m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].directive.reset();
@@ -585,7 +582,6 @@ void TemplateRuntime::executeAudioPlayerInfoUpdates(
             return;
         }
 
-        m_isPlayerInfoCardUpdated = false;
         // Don't render the card if it's not displayed and state changed to STOPPED.
         if (state != alexaClientSDK::avsCommon::avs::PlayerActivity::STOPPED ||
             m_state == smartScreenSDKInterfaces::State::DISPLAYING) {

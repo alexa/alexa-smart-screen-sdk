@@ -1,0 +1,18 @@
+{
+  "name": "aplclientsandbox",
+  "version": "1.0.0",
+  "description": "The APL Client Sandbox GUI code which interacts with the APLClient Sandbox C++ application over websockets.",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Amazon.com, Inc",
+  "license": "SEE LICENSE IN README.md",
+  "engines": {
+    "node": ">=12.0"
+  },
+  "dependencies": {
+    "apl-client": "file:../../apl-client-js",
+    "express": "^4.16.4"
+  }
+}

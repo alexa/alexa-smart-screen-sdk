@@ -16,6 +16,11 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_CAPABILITYAGENTS_ALEXAPRESENTATION_INCLUDE_ALEXAPRESENTATION_ALEXAPRESENTATIONOBSERVERINTERFACE_H_
 #define ALEXA_SMART_SCREEN_SDK_CAPABILITYAGENTS_ALEXAPRESENTATION_INCLUDE_ALEXAPRESENTATION_ALEXAPRESENTATIONOBSERVERINTERFACE_H_
 
+#include <chrono>
+#include <string>
+
+#include <AVSCommon/Utils/Metrics/MetricRecorderInterface.h>
+
 namespace alexaSmartScreenSDK {
 namespace smartScreenSDKInterfaces {
 
@@ -31,7 +36,19 @@ public:
     virtual ~AlexaPresentationObserverInterface() = default;
 
     /**
-     * Used to notify the observer when a Alexa.Presentation.APL.RenderDocument directive is received. Once called, the
+     * Used to notify the observer that Alexa.Presentation.APL.RenderDocument has been received. This is
+     * typically intended for telemetry, and is invoked at the earliest possible time after receiving the
+     * directive (i.e. before any processing or error checking has taken place).
+     *
+     * @param receiveTime The time at which the directive was received, for more accurate telemetry.
+     */
+    virtual void onRenderDirectiveReceived(const std::chrono::steady_clock::time_point &receiveTime) {
+        // no-op by default
+    }
+
+    /**
+     * Used to notify the observer when an APL document is ready to be rendered, typically in response
+     * to a Alexa.Presentation.APL.RenderDocument directive being received. Once called, the
      * client should render the document based on the APL specification in the payload in structured JSON format.
      *
      * @note The payload may contain customer sensitive information and should be used with utmost care.
@@ -52,6 +69,14 @@ public:
      * the client should call clearDocument().
      */
     virtual void clearDocument() = 0;
+
+    /**
+     * Used to notify the observer that rendering has been aborted, e.g. because a check failed or an error
+     * was encountered.
+     */
+    virtual void onRenderingAborted() {
+        // no-op by default
+    }
 
     /**
      * Used to notify observer when @c Alexa.Presentation.APL.ExecuteCommands directive has been received.
@@ -77,6 +102,21 @@ public:
      * Used to notify the observer when a command execution sequence should be interrupted
      */
     virtual void interruptCommandSequence() = 0;
+
+    /**
+     * Used to notify observer that the active @c PresentationSession has changed.
+     */
+    virtual void onPresentationSessionChanged() = 0;
+
+    /**
+     * Called when a metricRecorder is available for use.
+     *
+     * @param metricRecorder the metric recorder to use for telemetry.
+     */
+    virtual void onMetricRecorderAvailable(
+            std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) {
+        // no-op by default
+    }
 };
 
 }  // namespace smartScreenSDKInterfaces

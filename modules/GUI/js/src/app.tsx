@@ -57,10 +57,10 @@ const HOST = 'localhost';
 const PORT = 8933;
 
 /// Maximum APL version supported by the runtime.
-const APL_MAX_VERSION = '1.3';
+const APL_MAX_VERSION = '1.4';
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.2';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.3';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;

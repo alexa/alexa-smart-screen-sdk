@@ -1,0 +1,8 @@
+{
+  "name": "apl-client",
+  "version": "1.4.28.0",
+  "description": "this version supports APL 1.4 - R2.18.1 patch release",
+  "repository": "hash:4de09e27",
+  "main": "index.js",
+  "types": "./index.d.ts"
+}

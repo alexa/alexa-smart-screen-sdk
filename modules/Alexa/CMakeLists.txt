@@ -4,7 +4,8 @@ project(AlexaModule LANGUAGES CXX)
 
 if (NOT MSVC)
 	find_package(PkgConfig)
-	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.20.0)
+	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.20.1)
+	set(ASDK_LIBRARY_DIRS "${CMAKE_PREFIX_PATH}/lib")
 else()
 	# No package manager support in MSVC yet. Emulating the same results
 	set(ASDK_INCLUDE_DIRS "${ASDK_INSTALL_PATH}/include")
@@ -62,6 +63,7 @@ add_subdirectory("ThirdParty")
 add_subdirectory("SmartScreenCapabilityAgents")
 add_subdirectory("SmartScreenSDKInterfaces")
 add_subdirectory("ApplicationUtilities")
+add_subdirectory("APLClientLibrary")
 if (NOT MSVC)
 	# For UWP SampleApp files are built as part of UWPSampleApp
 	add_subdirectory("SampleApp")

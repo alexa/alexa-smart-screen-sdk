@@ -342,6 +342,8 @@ public:
      */
     void disconnect();
 
+    void onUserEvent(alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface::State state);
+
     /**
      * Get the gateway URL for the AVS connection.
      *
@@ -350,8 +352,13 @@ public:
     std::string getAVSGateway();
 
     /**
-     * This acts as an "exit" button that can be used to exit any application including render music card.
-     * This will forcefully change focus, triggering an onFocusChange that will stopForegroundActivity and clearCard.
+     * This will force clear the DIALOG channel and reset it, allowing for proper cloud-side context when locally
+     * stopping DIALOG channel.
+     */
+    void forceClearDialogChannelFocus();
+
+    /**
+     * An exit event that can be used to stop all active audio channels, clear all active UI, and reset DIALOG focus.
      */
     void forceExit();
 
@@ -361,10 +368,16 @@ public:
     void clearCard();
 
     /**
-     * Stops the foreground activity if there is one. This acts as a "stop" button that can be used to stop an
+     * Stops the foreground audio activity if there is one. This acts as a "stop" button that can be used to stop an
      * ongoing activity. This call will block until the foreground activity has stopped all user-observable activities.
      */
     void stopForegroundActivity();
+
+    /**
+     *  This method will request to stop all active audio channels. This will be performed asynchronously, and so, if at the
+     *  time performing the stop, the channel is owned by another interface, this channel won't get stopped.
+     */
+    void stopAllActivities();
 
     /**
      * This function provides a way for application code to request this object stop any active alert as the result
@@ -391,6 +404,23 @@ public:
      */
     void removeAlexaDialogStateObserver(
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface> observer);
+
+
+    /**
+     * Adds an observer to be notified of Alexa Audio input related state.
+     *
+     * @param observer The observer to add.
+     */
+    void addAlexaAudioInputStateObserver(
+            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface> observer);
+
+    /**
+     * Removes an observer to be notified of Alexa Audio Input related state.
+     *
+     * @param observer The observer to remove.
+     */
+    void removeAlexaAudioInputStateObserver(
+            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface> observer);
 
     /**
      * Adds an observer to be notified when a message arrives from AVS.
@@ -606,6 +636,22 @@ public:
      * @return shared_ptr to the FocusManager
      */
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface> getVisualFocusManager() const;
+
+    /**
+     * Adds the provided FocusManagerObserver to be notified of all focus manager changes.
+     *
+     * @param observer The observer to be notified of focus manager changes.
+     */
+    void addFocusManagersObserver(
+            const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface>& observer);
+
+    /**
+     * Removes the provided FocusManagerObserver from being notified of focus manager changes.
+     *
+     * @param observer The observer to be removed from being notified of focus manager changes.
+     */
+    void removeFocusManagersObserver(
+            const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface>& observer);
 
     /**
      * Adds a SpeakerManagerObserver to be alerted when the volume and mute changes.
@@ -854,6 +900,11 @@ public:
      * Gets Device Time Zone Offset.
      */
     std::chrono::milliseconds getDeviceTimezoneOffset();
+
+    /**
+     * Get Offset for active Audio Item.
+     */
+    std::chrono::milliseconds getAudioItemOffset();
 
     /**
      * handle the renderComplete notification for APL Document
@@ -1120,7 +1171,6 @@ private:
     std::shared_ptr<alexaClientSDK::capabilityAgents::meetingClientController::MeetingClientController>
         m_meetingClientControllerCapabilityAgent;
 #endif
-
     /// The call manager capability agent.
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface> m_callManager;
 

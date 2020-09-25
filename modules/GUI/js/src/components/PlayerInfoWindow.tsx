@@ -7,7 +7,6 @@ import { IAPLRendererWindowConfig } from '../lib/config/IDeviceAppConfig';
 import {FocusManager} from '../lib/focus/FocusManager';
 import {ActivityTracker} from '../lib/activity/ActivityTracker';
 import {
-    IExecuteCommandsMessage,
     IRenderPlayerInfoMessage,
     IRenderStaticDocumentMessage
 } from '../lib/messages/messages';
@@ -17,8 +16,7 @@ import {
     APLRendererWindowState
 } from './APLRendererWindow';
 import {
-    resolveRenderPlayerInfo,
-    resolveRenderPlayerInfoCommand
+    resolveRenderPlayerInfo
 } from '../lib/displayCards/AVSDisplayCardHelpers';
 
 export const RENDER_PLAYER_INFO_WINDOW_ID = 'renderPlayerInfo';
@@ -35,8 +33,6 @@ interface IPlayerInfoWindowProps {
 
 interface IPlayerInfoWindowState {
     windowState : APLRendererWindowState;
-    onRendererInit() : void;
-    onRendererDestroyed() : void;
 }
 
 export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IPlayerInfoWindowState> {
@@ -46,10 +42,7 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
     protected focusManager : FocusManager;
     protected activityTracker : ActivityTracker;
     protected isTargetWindow : boolean;
-
-    protected renderTimerIntervalId : number;
-    protected renderTimerOffset : number;
-    protected renderTimeinMs : number;
+    protected isRendering : boolean;
 
     constructor(props : IPlayerInfoWindowProps) {
         super(props);
@@ -59,75 +52,66 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
         this.activityTracker = this.props.activityTracker;
 
         this.state = {
-            windowState : APLRendererWindowState.INACTIVE,
-            onRendererInit : undefined,
-            onRendererDestroyed : undefined
+            windowState : APLRendererWindowState.INACTIVE
         };
     }
 
-    protected startRenderTimer() {
-        if (!this.renderTimerIntervalId) {
-            this.renderTimerOffset = Date.now();
-            this.renderTimerIntervalId = window.setInterval(() => {
-                this.renderTimeinMs = Date.now() - this.renderTimerOffset;
-            }, 1);
+    private getToggleControls(controls : any) : Map<any, any> {
+        if (!controls) {
+            return new Map();
         }
+
+        return controls.filter((c : any) => c.type === 'TOGGLE').reduce((m : Map<any, any>, c : any) => {
+            m.set(c.name, c);
+            return m;
+        }, new Map() );
     }
 
-    protected stopRenderTimer() {
-        if (this.renderTimerIntervalId) {
-            clearInterval(this.renderTimerIntervalId);
-            this.renderTimerIntervalId = null;
-            this.renderTimeinMs = 0;
+    private toggleControlsChanged(controls : any) : boolean {
+        const newToggleControls = this.getToggleControls(controls);
+        const oldToggleControls = this.getToggleControls(this.props.playerInfoMessage.payload.controls);
+        if (newToggleControls.size !== oldToggleControls.size) {
+            // Number of controls has changed
+            return true;
         }
+
+        for (const [name, control] of newToggleControls) {
+            if (!oldToggleControls.has(name)) {
+                return true;
+            }
+
+            const oldControl = oldToggleControls.get(name);
+            if (control.selected !== oldControl.selected ||
+                control.enabled !== oldControl.enabled) {
+                return true;
+            }
+        }
+        return false;
     }
 
     protected handleRenderPlayerInfoMessage(renderPlayerInfoMessage : IRenderPlayerInfoMessage) {
-
-        const executeCommandsMessage : IExecuteCommandsMessage =
-                resolveRenderPlayerInfoCommand(renderPlayerInfoMessage);
-
-        // If not waiting to render AND
-        // this is not the current target window,
-        // or we have a new playerInfo audioItemId - send a new playerInfo renderDocument request
-        if (!this.renderTimerIntervalId && (!this.isTargetWindow ||
-                !this.props.playerInfoMessage ||
-                (renderPlayerInfoMessage.payload.audioItemId !==
-                this.props.playerInfoMessage.payload.audioItemId))) {
+        // If not rendering AND
+        // not the current target window,
+        // or we have a new playerInfo message or audioItemId,
+        // or toggle controls changed - send a new playerInfo renderDocument request
+        if (!this.isRendering && (!this.isTargetWindow ||
+            !this.props.playerInfoMessage ||
+            (renderPlayerInfoMessage.payload.audioItemId !==
+                this.props.playerInfoMessage.payload.audioItemId) ||
+            this.toggleControlsChanged(renderPlayerInfoMessage.payload.controls))) {
             const renderStaticDocumentMessage : IRenderStaticDocumentMessage =
                 resolveRenderPlayerInfo(renderPlayerInfoMessage, RENDER_PLAYER_INFO_WINDOW_ID);
-
+            this.isRendering = true;
             this.client.sendMessage(renderStaticDocumentMessage);
-            // Start render timer
-            this.startRenderTimer();
 
             this.setState({
-                windowState : APLRendererWindowState.ACTIVE,
-                onRendererInit: () => {
-                    // Add render time to audioOffset for accurate progress bar
-                    renderPlayerInfoMessage.audioOffset = renderPlayerInfoMessage.audioOffset + this.renderTimeinMs;
-                    this.stopRenderTimer();
-                    const offsetExecuteCommandsMessage : IExecuteCommandsMessage =
-                        resolveRenderPlayerInfoCommand(renderPlayerInfoMessage);
-                    if (offsetExecuteCommandsMessage) {
-                        this.client.sendMessage(offsetExecuteCommandsMessage);
-                    }
-                },
-                onRendererDestroyed: () => {
-                    this.stopRenderTimer();
-                }
+                windowState : APLRendererWindowState.ACTIVE
             });
-
-        } else if (executeCommandsMessage) {
-            // Update active render player info card via command
-            this.client.sendMessage(executeCommandsMessage);
-            // Make sure the window is active
-            if (this.state.windowState === APLRendererWindowState.INACTIVE) {
-                this.setState({
-                    windowState : APLRendererWindowState.ACTIVE
-                });
-            }
         }
+    }
+
+    protected onRendererInit() {
+        this.isRendering = false;
     }
 
     public render() {
@@ -137,12 +121,11 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
             key={RENDER_PLAYER_INFO_WINDOW_ID}
             windowConfig={this.windowConfig}
             windowState={this.state.windowState}
-            onRendererInit={this.state.onRendererInit}
-            onRendererDestroyed={this.state.onRendererDestroyed}
             refreshRenderer={this.props.refreshRenderer}
             client={this.client}
             focusManager={this.focusManager}
             activityTracker={this.activityTracker}
+            onRendererInit={this.onRendererInit.bind(this)}
           />;
 
         return(playerInfo);
@@ -154,12 +137,8 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
             if (nextProps.playerInfoMessage !== undefined) {
                 this.handleRenderPlayerInfoMessage(nextProps.playerInfoMessage);
             } else {
-                // Clear the window on an empty message
-                this.stopRenderTimer();
                 this.setState({
-                    windowState : APLRendererWindowState.INACTIVE,
-                    onRendererInit : undefined,
-                    onRendererDestroyed : undefined
+                    windowState : APLRendererWindowState.INACTIVE
                 });
             }
         } else if (nextProps.targetWindowId === undefined &&
@@ -171,9 +150,5 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
             && this.props.playerInfoMessage.audioPlayerState === 'STOPPED') {
             this.handleRenderPlayerInfoMessage(this.props.playerInfoMessage);
         }
-    }
-
-    public componentWillUnmount() {
-        this.stopRenderTimer();
     }
 }

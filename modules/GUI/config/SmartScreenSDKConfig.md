@@ -1,11 +1,10 @@
 # Alexa Smart Screen SDK Config Specification
 
-The SmartScreenSDKConfig is used to configure addtional functionality of the SmartScreenSDK SampleApp and GUI App apart from the AlexaClientSDKConfig.  The config manages declaration of the device's visual characteristics capabilities and windows for rendering APL responses, as well as configuration of the reference websocket server used for communication between the SDK and GUI app.
+The SmartScreenSDKConfig is used to configure additional functionality of the SmartScreenSDK SampleApp and GUI App apart from the AlexaClientSDKConfig.  The config manages declaration of the device's visual characteristics capabilities and windows for rendering APL responses, as well as configuration of the reference websocket server used for communication between the SDK and GUI app.
 
 The [default config](SmartScreenSDKConfig.json) file is a reference implementation of the SmartScreenSDK and GUI App for a TV type device that displays both fullscreen and lower third visual responses.
 
 There are additional sample device configurations for the GUI in the /guiConfigSamples:
-* [TV Fullscreen + Side Panel](guiConfigSamples/GuiConfigSample_TvOverlayPortrait.json)
 * [TV Fullscreen Only](guiConfigSamples/GuiConfigSample_TvFullscreen.json)
 * [Smart Screen Landscape](guiConfigSamples/GuiConfigSample_SmartScreenLargeLandscape.json)
 * [Smart Screen Round](guiConfigSamples/GuiConfigSample_SmartScreenRound.json)
@@ -55,7 +54,7 @@ There are additional sample device configurations for the GUI in the /guiConfigS
 
 # SampleApp Parameters
 
-Config parameters for the SmartScreenSDK SampleApp.  Handles configuration of  [websocket server](../../../README.md#websocket-encryption) used for [message communication between SDK SampleApp and GUI App](../SDK-GUI-API.md) and caching of imported packages.
+Config parameters for the SmartScreenSDK SampleApp.  Handles configuration of  [websocket server](https://developer.amazon.com/en-US/docs/alexa/alexa-smart-screen-sdk/security-requirements.html#html-rendering-client-with-websocket-ipc-sample-app) used for [message communication between SDK SampleApp and GUI App](../SDK-GUI-API.md) and caching of imported packages.
 
 ```
 "sampleApp": {
@@ -123,12 +122,12 @@ Parameters for GUI App and APL window functionality.
 | emulateDisplayDimensions      | boolean                                   | No        | `false`       | If true, the GUI app's root container will be explicitly sized to the device's display dimensions defined in visualCharacteristics `Alexa.Display`. 
 | scaleToFill                   | boolean                                   | No        | `false`       | If true the GUI's app root container will be uniformly scaled to fit within the supplied window.
 | audioInputInitiator           | string                                    | No        | `TAP`         | The [AudioInputInitiator](https://developer.amazon.com/docs/alexa-voice-service/speechrecognizer.html#initiator) type that will be messaged from the GUI app to the SampleApp for voice input.<br/>Valid values: `'PRESS_AND_HOLD', 'TAP', 'WAKEWORD'`
-| defaultWindowId               | string                                    | Yes       | None          | The ID of the [APL Window](#apl-window-parameters) to use as the default for visual responses.
+| defaultWindowId               | string                                    | Yes       | None          | The ID of the [APL Window](#apl-window-parameters) to use as the default for visual responses. *Note* the config for this window ID will also be used to create the PlayerInfo window for audio playback presentation.
 | windows                       | [[APL Windows](#apl-window-parameters)]   | Yes       | None          | A z-ordered array of [APL Window](#apl-window-parameters) configurations to create in the GUI App and report in `Alexa.Display.Window.WindowState` for targeting and presentation of APL responses.  These windows can be targeted by ID.<br/>`0 index = z-order: 0, 1 index = z-order: 1, ...`
 | deviceKeys                    | [Device Keys](#device-keys-parameters)    | Yes       | None          | The [Device Keys](#device-keys-parameters) config for defining core function keys in the GUI app relative to `talk, back, and exit` key input. 
 
 ### APL Window Parameters
-Parameters for targetable APL windows in the GUI App.  The device's windows are defined and reported via [visualCharacteristics](#visual-characteristics-parameters) `Alexa.Display.Window`, and this confing is used to reference those window definitions and configure additional runtime features of the APL viewhost running within the window.  
+Parameters for targetable APL windows in the GUI App.  The device's windows are defined and reported via [visualCharacteristics](#visual-characteristics-parameters) `Alexa.Display.Window`, and this config is used to reference those window definitions and configure additional runtime features of the APL viewhost running within the window.  
 
 | Parameter             | Type      | Required      | Default   | Description
 | -------------         |-------    |:-----:        | -----     |----- |
@@ -137,10 +136,11 @@ Parameters for targetable APL windows in the GUI App.  The device's windows are 
 | sizeConfigurationId   | string    | Yes           | None      | Indicates the active size configuration of the window as defined in `Alexa.Display.Window`. 
 | interactionMode       | string    | Yes           | None      | An "id" value representing the current `Alexa.InteractionMode` of the window. 
 | theme                 | string    | No            | `dark`    | Represents the preferred basic color scheme of the window.  Content developers may optionally use this value for [styling their visual response](https://developer.amazon.com/docs/alexa-presentation-language/apl-viewport-property.html#theme).<br/>Valid values: `'light'` and `'dark'`. 
-| allowOpenUrl          | boolean   | No            | `false`   | Inidicates if the window supports the APL [OpenUrlCommand](https://developer.amazon.com/docs/alexa-presentation-language/apl-standard-commands.html#open_url_command).
+| allowOpenUrl          | boolean   | No            | `false`   | Indicates if the window supports the APL [OpenUrlCommand](https://developer.amazon.com/docs/alexa-presentation-language/apl-standard-commands.html#open_url_command).
 | animationQuality      | string    | No            | `normal`  | Indicates the level of [AnimationQuality](https://developer.amazon.com/docs/alexa-presentation-language/apl-data-binding-evaluation.html#animation) support in the window.<br/>Valid Values: `none = 0, slow = 1, normal = 2`.
 | windowPosition        | string    | No            | `center`  | The screen position of the window.<br/>Valid values are `'center', 'right', 'left', 'top', 'bottom'`.  
 | token                 | string    | No            | `null`    | The token identifying the content currently occupying the window.  This is set by the window targeting response.
+| supportedExtensions   | [strings] | No            | `null`    | An optional array of [APL extension uri's](https://github.com/alexa/apl-core-library/blob/master/aplcore/include/apl/content/rootconfig.h#L360) supported in the window instance.  Note that any extensions declared here must have been built with the APLClient extensions framework to be available to the APL runtime for the window.
 
 ### Device Keys Parameters
 Config for device input keys.
@@ -150,14 +150,14 @@ Config for device input keys.
 | talkKey           | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send either a [tapToTalk](../SDK-GUI-API.md#taptotalk) or [holdToTalk](../SDK-GUI-API.md#holdtotalk) message to the SDK based on `AudioInputInitiator` parameter defined in the [AppConfig](#appconfig-parameters).
 | backKey           | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [navigationEvent](../SDK-GUI-API.md#navigationevent) to the SDK with event type `BACK`.
 | exitKey           | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [navigationEvent](../SDK-GUI-API.md#navigationevent) to the SDK with event type `EXIT`.
-| toggleCaptionsKey | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [toggleCaptionsEvent](../SDK-GUI-API.md#toggleCaptionsEvent) to the SDK.
+| toggleCaptionsKey | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [toggleCaptionsEvent](../SDK-GUI-API.md#togglecaptionsevent) to the SDK.
 
 #### Device Key Parameters
 Config for individual device key.
 
 | Parameter             | Type      | Required  | Description
 | -------------         |-------    |:-----:    | ----- |
-| code                  | string    | Yes       | Property represeting a physical key on the keyboard, following the [KeyboardEvent.code](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code) web standard.
+| code                  | string    | Yes       | Property representing a physical key on the keyboard, following the [KeyboardEvent.code](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/code) web standard.
 | keyCode               | number    | Yes       | Property representing a system and implementation dependent numerical code identifying the unmodified value of the pressed key, following the [KeyboardEvent.keyCode](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/keyCode) web standard.
 | key                   | string    | Yes       | Property representing the value of the key pressed by the user, following the [KeyboardEvent.key](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key) web standard.
 

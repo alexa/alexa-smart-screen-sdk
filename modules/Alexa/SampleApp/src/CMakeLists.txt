@@ -5,6 +5,7 @@ list(APPEND SampleApp_SOURCES
     ConnectionObserver.cpp
     CachingDownloadManager.cpp
     ConsolePrinter.cpp
+    DownloadMonitor.cpp
     GUILogBridge.cpp
     GUI/GUIClient.cpp
     GUI/GUIManager.cpp
@@ -15,6 +16,7 @@ list(APPEND SampleApp_SOURCES
     SampleEqualizerModeController.cpp
     SmartScreenCaptionPresenter.cpp
     SmartScreenCaptionStateManager.cpp
+    TelemetrySink.cpp
     main.cpp)
 
 if (PORTAUDIO)
@@ -37,6 +39,7 @@ IF (HAS_EXTERNAL_MEDIA_PLAYER_ADAPTERS)
 ENDIF()
 
 add_executable(SampleApp ${SampleApp_SOURCES})
+
 target_include_directories(SampleApp PUBLIC
     "${SampleApp_SOURCE_DIR}/include"
     "${ASDK_INCLUDE_DIRS}"
@@ -45,8 +48,8 @@ target_include_directories(SampleApp PUBLIC
     "${ESP_SOURCE_DIR}/include"
     "${PORTAUDIO_INCLUDE_DIR}"
     "${Utils_SOURCE_DIR}/include"
-    "${Communication_SOURCE_DIR/include}"
-    "${APLClient_SOURCE_DIR/include}")
+    "${Communication_SOURCE_DIR}/include"
+    "${APLClient_SOURCE_DIR}/include")
 
 target_link_libraries(SampleApp
     "${ASDK_LDFLAGS}"
@@ -149,6 +152,7 @@ list(APPEND SampleAppTest_SOURCES
         ConnectionObserver.cpp
         CachingDownloadManager.cpp
         ConsolePrinter.cpp
+        DownloadMonitor.cpp
         GUILogBridge.cpp
         GUI/GUIClient.cpp
         GUI/GUIManager.cpp
@@ -158,6 +162,7 @@ list(APPEND SampleAppTest_SOURCES
         SampleEqualizerModeController.cpp
         SmartScreenCaptionPresenter.cpp
         SmartScreenCaptionStateManager.cpp
+        TelemetrySink.cpp
         )
 
 add_library(SampleAppTest SHARED ${SampleAppTest_SOURCES})
@@ -165,7 +170,6 @@ add_library(SampleAppTest SHARED ${SampleAppTest_SOURCES})
 target_include_directories(SampleAppTest PUBLIC
         "${SampleApp_INCLUDE_DIR}"
         "${SampleApp_SOURCE_DIR}/include"
-        "${APLClient_INCLUDE_DIR}"
         "${ASDK_INCLUDE_DIRS}"
         "${AudioResources_SOURCE_DIR}/include"
         "${RegistrationManager_SOURCE_DIR}/include"

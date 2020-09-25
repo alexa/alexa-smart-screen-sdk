@@ -11,7 +11,10 @@
                     "id": "smartScreenRound",
                     "templateId": "smartScreenRound",
                     "sizeConfigurationId": "fullscreen",
-                    "interactionMode": "smart_screen"
+                    "interactionMode": "smart_screen",
+                    "supportedExtensions": [
+                        "aplext:backstack:10"
+                    ]
                 }
             ],
             "defaultWindowId": "smartScreenRound",
@@ -42,7 +45,7 @@
             {
                 "type": "AlexaInterface",
                 "interface": "Alexa.InteractionMode",
-                "version": "1.0",
+                "version": "1.1",
                 "configurations": {
                     "interactionModes": [
                         {
@@ -54,7 +57,8 @@
                             },
                             "touch": "SUPPORTED",
                             "keyboard": "UNSUPPORTED",
-                            "video": "SUPPORTED"
+                            "video": "SUPPORTED",
+                            "dialog": "SUPPORTED"
                         }
                     ]
                 }

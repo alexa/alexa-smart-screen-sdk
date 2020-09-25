@@ -22,6 +22,10 @@
 #include <queue>
 #include <string>
 #include <unordered_set>
+#include <utility>
+
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 #include <AVSCommon/AVS/CapabilityAgent.h>
 #include <AVSCommon/AVS/CapabilityConfiguration.h>
@@ -47,6 +51,15 @@
 namespace alexaSmartScreenSDK {
 namespace smartScreenCapabilityAgents {
 namespace alexaPresentation {
+
+/// Identifier for the presentationSession sent in a RenderDocument directive
+static const char PRESENTATION_SESSION_FIELD[] = "presentationSession";
+
+/// Identifier for the skilld in presentationSession
+static const char SKILL_ID[] = "skillId";
+
+/// Identifier for the id in presentationSession
+static const char PRESENTATION_SESSION_ID[] = "id";
 
 /**
  * This class implements a @c CapabilityAgent that handles the SS SDK @c AlexaPresentation API.  The
@@ -184,9 +197,9 @@ public:
     /**
      * This function is called by the @c VisualContextProviderInterface with the visual context to be passed to AVS.
      * @param requestToken The token of the request for which this function is called.
-     * @param payload The visual context payload to be passed to AVS.
+     * @param visualContext The visual context visualContext to be passed to AVS.
      */
-    void onVisualContextAvailable(const unsigned int requestToken, const std::string& payload);
+    void onVisualContextAvailable(const unsigned int requestToken, const std::string& visualContext);
 
     /**
      * Set The APL version supported by the runtime component
@@ -305,6 +318,69 @@ private:
     };
 
     /**
+     * Contains the values for the presentationSession object that is found in the
+     * @c Alexa.Presentation.APL @c RenderDocument directive.
+     */
+    struct PresentationSession {
+
+        /**
+         * Default Constructor.
+         */
+        PresentationSession() = default;
+
+        /**
+         * Constructor.
+         *
+         * @param skillId the identifier of the skill/speechlet.
+         * @param id The identifier of the presentation session.
+         */
+        PresentationSession(
+            std::string skillId,
+            std::string id) :
+            skillId{std::move(skillId)},
+            id{std::move(id)} {};
+
+        /// The identifier of the Skill/ Speechlet who sends this directive.
+        std::string skillId;
+
+        /// The identifier of the presentation session.
+        std::string id;
+
+        bool operator==(const PresentationSession& other) const {
+            return skillId == other.skillId && id == other.id;
+        }
+
+        bool operator!=(const PresentationSession& other) const {
+            return skillId != other.skillId || id != other.id;
+        }
+
+        /**
+         * Adds presentationSession payload to provided document.
+         * @param document the document to add the payload to.
+         */
+        void addPresentationSessionPayload(rapidjson::Document* document) {
+            rapidjson::Document::AllocatorType& allocator = document->GetAllocator();
+            rapidjson::Document presentationSession(rapidjson::kObjectType, &allocator);
+            presentationSession.AddMember(SKILL_ID, skillId, allocator);
+            presentationSession.AddMember(PRESENTATION_SESSION_ID, id, allocator);
+            document->AddMember(PRESENTATION_SESSION_FIELD, presentationSession, allocator);
+        }
+
+        /**
+         * Returns string payload of presentationSession object.
+         * @return the presentationSession object payload.
+         */
+        std::string getPresentationSessionPayload() {
+            rapidjson::Document doc(rapidjson::kObjectType);
+            addPresentationSessionPayload(&doc);
+            rapidjson::StringBuffer buffer;
+            rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+            doc.Accept(writer);
+            return buffer.GetString();
+        }
+    };
+
+    /**
      * Constructor.
      *
      * @param focusManager The object to use to fetch focus for the TemplateRuntime capabilityAgent.
@@ -365,7 +441,8 @@ private:
      *
      * @param info The @c DirectiveInfo containing the @c AVSDirective and the @c DirectiveHandlerResultInterface.
      */
-    void handleRenderDocumentDirective(std::shared_ptr<DirectiveInfo> info);
+    void handleRenderDocumentDirective(std::shared_ptr<DirectiveInfo> info,
+                                       const std::chrono::steady_clock::time_point &startTime);
 
     /**
      * This function handles a @c ExecuteCommand directive.
@@ -524,6 +601,16 @@ private:
      */
     void proactiveStateReport();
 
+    /**
+     * Extract skill id from APL token
+     */
+    std::string getSkillIdFromAPLToken(const std::string& aplToken);
+
+    /**
+     * Notify all observers that rendering has been aborted.
+     */
+     void notifyAbort();
+
     /// Timer that is responsible for clearing the display on IDLE.
     alexaClientSDK::avsCommon::utils::timing::Timer m_idleTimer;
 
@@ -566,8 +653,6 @@ private:
     /// Set of sources which are currently reporting activity
     std::unordered_set<std::string> m_activeSources;
     /// @}
-
-    /// The @c ContextManager used to fetch context of the system to be sent with events.
 
     /// The @c FocusManager used to manage usage of the visual channel.
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface> m_focusManager;
@@ -703,6 +788,12 @@ private:
 
     /// An internal timer used to check for context changes
     alexaClientSDK::avsCommon::utils::timing::Timer m_proactiveStateTimer;
+
+    /// Whether the current document is fully rendered
+    bool m_documentRendered;
+
+    /// The current @c PresentationSession as set by the latest @c RenderDocument directive.
+    PresentationSession m_presentationSession;
 
     /// This is the worker thread for the @c AlexaPresentation CA.
     std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor> m_executor;

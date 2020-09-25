@@ -11,14 +11,20 @@
                     "id": "tvFullscreen",
                     "templateId": "tvFullscreen",
                     "sizeConfigurationId": "fullscreen",
-                    "interactionMode": "tv"
+                    "interactionMode": "tv",
+                    "supportedExtensions": [
+                        "aplext:backstack:10"
+                    ]
                 },
                 {
                     "id": "tvOverlayLandscape",
                     "templateId": "tvOverlayLandscape",
-                    "windowPosition" : "bottom",
+                    "windowPosition": "bottom",
                     "sizeConfigurationId": "landscapePanel",
-                    "interactionMode": "tv_overlay"
+                    "interactionMode": "tv_overlay",
+                    "supportedExtensions": [
+                        "aplext:backstack:10"
+                    ]
                 }
             ],
             "defaultWindowId": "tvFullscreen",
@@ -49,7 +55,7 @@
             {
                 "type": "AlexaInterface",
                 "interface": "Alexa.InteractionMode",
-                "version": "1.0",
+                "version": "1.1",
                 "configurations": {
                     "interactionModes": [
                         {
@@ -61,7 +67,8 @@
                             },
                             "touch": "UNSUPPORTED",
                             "keyboard": "SUPPORTED",
-                            "video": "SUPPORTED"
+                            "video": "SUPPORTED",
+                            "dialog": "SUPPORTED"
                         },
                         {
                             "id": "tv_overlay",
@@ -72,7 +79,8 @@
                             },
                             "touch": "UNSUPPORTED",
                             "keyboard": "SUPPORTED",
-                            "video": "UNSUPPORTED"
+                            "video": "UNSUPPORTED",
+                            "dialog": "UNSUPPORTED"
                         }
                     ]
                 }

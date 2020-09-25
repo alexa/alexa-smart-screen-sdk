@@ -17,8 +17,7 @@
   "dependencies": {
     "@types/node": "^10.9.4",
     "@types/react-dom": "^16.0.6",
-    "apl-client": "file:../apl-client",
-    "csstype": "2.6.11",
+    "apl-client": "file:../../Alexa/APLClientLibrary/apl-client-js",
     "file-loader": "^1.1.11",
     "source-map-loader": "^0.2.4",
     "loglevel": "^1.6.3",

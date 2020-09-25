@@ -4,8 +4,9 @@
 import * as React from 'react';
 import './voiceChrome.css';
 import { AlexaState } from '../lib/messages/messages';
-import { VisibilityProperty } from 'csstype';
 import { IDeviceAppConfig, AudioInputInitiator } from '../lib/config/IDeviceAppConfig';
+
+type VisibilityProperty = import('csstype').Property.Visibility;
 
 interface IVoiceChromeProps {
     alexaState : AlexaState;

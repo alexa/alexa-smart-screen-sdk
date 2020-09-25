@@ -213,12 +213,16 @@ public:
     MOCK_METHOD2(executeCommands, void(const std::string& jsonPayload, const std::string& token));
     MOCK_METHOD3(
         renderDocument,
-        void(const std::string& jsonPayload, const std::string& token, const std::string& windowId));
+        void(
+                const std::string& jsonPayload,
+                const std::string& token,
+                const std::string& windowId));
     MOCK_METHOD3(
         dataSourceUpdate,
         void(const std::string& sourceType, const std::string& jsonPayload, const std::string& token));
     MOCK_METHOD0(clearDocument, void());
     MOCK_METHOD0(interruptCommandSequence, void());
+    MOCK_METHOD0(onPresentationSessionChanged, void());
 };
 
 /// Mock of VisualStateProviderInterface for testing.
@@ -680,7 +684,10 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
     std::shared_ptr<AVSDirective> directive =
         AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD, attachmentManager, "");
 
-    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1))
+    .WillRepeatedly(InvokeWithoutArgs([this] {
+        m_AlexaPresentation->recordRenderComplete();
+    }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
     EXPECT_CALL(*m_mockGui, clearDocument()).Times(Exactly(1));
     EXPECT_CALL(*m_mockVisualStateProvider, provideState(_));
@@ -734,7 +741,8 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
     m_mockDirectiveHandlerResult =
         make_unique<StrictMock<smartScreenSDKInterfaces::test::MockDirectiveHandlerResult>>();
 
-    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD_2, "APL_TOKEN_2", WINDOW_ID)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD_2, "APL_TOKEN_2", WINDOW_ID))
+            .Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
     EXPECT_CALL(*m_mockGui, clearDocument()).Times(Exactly(1));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
@@ -813,7 +821,10 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsGUIInactive) {
     std::shared_ptr<AVSDirective> directive =
         AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD, attachmentManager, "");
 
-    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1))
+    .WillRepeatedly(InvokeWithoutArgs([this] {
+        m_AlexaPresentation->recordRenderComplete();
+    }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
     EXPECT_CALL(*m_mockGui, clearDocument()).Times(1);
     EXPECT_CALL(*m_mockVisualStateProvider, provideState(_));
@@ -904,7 +915,10 @@ TEST_F(AlexaPresentationTest, testAPLFollowedByAPL) {
     std::shared_ptr<AVSDirective> directive =
         AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD, attachmentManager, "");
 
-    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(1);
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(1)
+    .WillRepeatedly(InvokeWithoutArgs([this] {
+        m_AlexaPresentation->recordRenderComplete();
+    }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(AtLeast(1));
     EXPECT_CALL(*m_mockVisualStateProvider, provideState(_));
 
@@ -925,7 +939,10 @@ TEST_F(AlexaPresentationTest, testAPLFollowedByAPL) {
     m_mockDirectiveHandlerResult =
         make_unique<StrictMock<smartScreenSDKInterfaces::test::MockDirectiveHandlerResult>>();
 
-    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD_2, "APL_TOKEN_2", WINDOW_ID)).Times(1);
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD_2, "APL_TOKEN_2", WINDOW_ID)).Times(1)
+    .WillRepeatedly(InvokeWithoutArgs([this] {
+        m_AlexaPresentation->recordRenderComplete();
+    }));
 
     // Expect a call to getContext.
     EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
@@ -1081,7 +1098,10 @@ TEST_F(AlexaPresentationTest, testAPLProactiveStateReportSentIfRendering) {
     std::shared_ptr<AVSDirective> directive =
         AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD, attachmentManager, "");
 
-    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1))
+    .WillRepeatedly(InvokeWithoutArgs([this] {
+        m_AlexaPresentation->recordRenderComplete();
+    }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
@@ -1122,7 +1142,10 @@ TEST_F(AlexaPresentationTest, testAPLProactiveStateReportNotSentIfStateUnchanged
     std::shared_ptr<AVSDirective> directive =
         AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD, attachmentManager, "");
 
-    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1))
+    .WillRepeatedly(InvokeWithoutArgs([this] {
+        m_AlexaPresentation->recordRenderComplete();
+    }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
@@ -1150,6 +1173,38 @@ TEST_F(AlexaPresentationTest, testAPLProactiveStateReportNotSentIfStateUnchanged
     m_contextTrigger.wait_for(exitLock, std::chrono::milliseconds(400));
 
     m_AlexaPresentation->onVisualContextAvailable(PROACTIVE_STATE_REQUEST_TOKEN, "{ 1 }");
+    m_executor->waitForSubmittedTasks();
+}
+
+TEST_F(AlexaPresentationTest, testAPLProactiveStateReportNotSentIfRenderingNotComplete) {
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->processRenderDocumentResult("APL_TOKEN", true, "");
+    m_executor->waitForSubmittedTasks();
+
+    // At least one state request will come as a result of rendering, depending on timing a second one may be made
+    // by the state reporter
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(STATE_REQUEST_TOKEN)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockVisualStateProvider, provideState(PROACTIVE_STATE_REQUEST_TOKEN)).Times(Exactly(0));
+    m_AlexaPresentation->provideState(DOCUMENT, STATE_REQUEST_TOKEN);
+    m_executor->waitForSubmittedTasks();
+
+    // Expect a state reponse for the original provideState request
+    EXPECT_CALL(*m_mockContextManager, provideStateResponse(_, _, STATE_REQUEST_TOKEN)).Times(Exactly(1));
+    m_AlexaPresentation->onVisualContextAvailable(STATE_REQUEST_TOKEN, "{ 1 }");
     m_executor->waitForSubmittedTasks();
 }
 
