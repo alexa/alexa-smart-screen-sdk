@@ -20,7 +20,7 @@
 #include <memory>
 #include <mutex>
 
-#include <AVSCommon/SDKInterfaces/Audio/EqualizerModeControllerInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerModeControllerInterface.h>
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -29,7 +29,7 @@ namespace sampleApp {
  * Sample implementation of @c EqualizerModeControllerInterface that prints the mode requested to console.
  */
 class SampleEqualizerModeController
-        : public alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerModeControllerInterface {
+        : public alexaClientSDK::acsdkEqualizerInterfaces::EqualizerModeControllerInterface {
 public:
     /**
      * Factory method.
@@ -41,7 +41,7 @@ public:
     /// @name EqualizerModeControllerInterface methods
     /// @{
 
-    bool setEqualizerMode(alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerMode mode) override;
+    bool setEqualizerMode(alexaClientSDK::acsdkEqualizerInterfaces::EqualizerMode mode) override;
 
     ///@}
 

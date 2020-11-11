@@ -40,6 +40,8 @@
 #include <SmartScreenSDKInterfaces/GUIServerInterface.h>
 #include <SmartScreenSDKInterfaces/NavigationEvent.h>
 #include <SmartScreenSDKInterfaces/TemplateRuntimeObserverInterface.h>
+#include <Settings/SettingCallbacks.h>
+#include <SampleApp/DoNotDisturbSettingObserver.h>
 
 #ifdef ENABLE_PCC
 #include "PhoneCaller.h"
@@ -103,7 +105,8 @@ public:
     void renderPlayerInfoCard(
         const std::string& jsonPayload,
         smartScreenSDKInterfaces::AudioPlayerInfo info,
-        alexaClientSDK::avsCommon::avs::FocusState focusState) override;
+        alexaClientSDK::avsCommon::avs::FocusState focusState,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) override;
 
     void clearPlayerInfoCard() override;
     /// @}
@@ -219,9 +222,13 @@ public:
 
     void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric> &metrics) override;
 
+    void handleToggleDoNotDisturbEvent() override;
+
     std::chrono::milliseconds getDeviceTimezoneOffset() override;
 
     std::chrono::milliseconds getAudioItemOffset() override;
+
+    void handleOnMessagingServerConnectionOpened() override;
     /// }
 
     /// @name FocusManagerObserverInterface methods
@@ -258,6 +265,20 @@ public:
     void setAplRenderingEventObserver(APLClient::AplRenderingEventObserverPtr observer);
     void onMetricRecorderAvailable(
         std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) override;
+
+    /**
+     * Configure settings notifications.
+     *
+     * @return @true if it succeeds to configure the settings notifications; @c false otherwise.
+     */
+    bool configureSettingsNotifications();
+
+    /**
+     * Set the DoNotDisturbSettingObserver
+     *
+     * @param Pointer to the observer
+     */
+    void setDoNotDisturbSettingObserver(std::shared_ptr<sampleApp::DoNotDisturbSettingObserver> doNotDisturbObserver);
 
 #ifdef UWP_BUILD
     void inputAudioFile(const std::string& audioFile);
@@ -422,7 +443,9 @@ private:
 
     /// The @c PlayerActivity of the @c AudioPlayer
     alexaClientSDK::avsCommon::avs::PlayerActivity m_playerActivityState;
-    /// @}
+
+    /// The @c MediaPropertiesInterface for the current @c AudioPlayer
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> m_mediaProperties;
 
     /// The last state reported by AudioInputProcessor.
     alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface::State m_audioInputProcessorState;
@@ -435,6 +458,16 @@ private:
 
     /// Utility flag used for clearing PlayerInfo card on Content Channel focus lost.
     bool m_clearPlayerInfoCardOnContentFocusLost;
+
+    /// Object that manages settings callbacks.
+    std::shared_ptr<alexaClientSDK::settings::SettingCallbacks<alexaClientSDK::settings::DeviceSettingsManager>>
+        m_callbacks;
+
+    /// Object that manages settings.
+    std::shared_ptr<alexaClientSDK::settings::DeviceSettingsManager> m_settingsManager;
+
+    /// Observer for DoNotDisturb Setting.
+    std::shared_ptr<sampleApp::DoNotDisturbSettingObserver> m_doNotDisturbObserver;
 };
 
 }  // namespace gui

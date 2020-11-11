@@ -145,12 +145,13 @@ Parameters for targetable APL windows in the GUI App.  The device's windows are 
 ### Device Keys Parameters
 Config for device input keys.
 
-| Parameter         | Type                                  | Required  | Description
-| -------------     |-------                                |:-----:    | ----- |
-| talkKey           | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send either a [tapToTalk](../SDK-GUI-API.md#taptotalk) or [holdToTalk](../SDK-GUI-API.md#holdtotalk) message to the SDK based on `AudioInputInitiator` parameter defined in the [AppConfig](#appconfig-parameters).
-| backKey           | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [navigationEvent](../SDK-GUI-API.md#navigationevent) to the SDK with event type `BACK`.
-| exitKey           | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [navigationEvent](../SDK-GUI-API.md#navigationevent) to the SDK with event type `EXIT`.
-| toggleCaptionsKey | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [toggleCaptionsEvent](../SDK-GUI-API.md#togglecaptionsevent) to the SDK.
+| Parameter             | Type                                  | Required  | Description
+| -------------         |-------                                |:-----:    | ----- |
+| talkKey               | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send either a [tapToTalk](../SDK-GUI-API.md#taptotalk) or [holdToTalk](../SDK-GUI-API.md#holdtotalk) message to the SDK based on `AudioInputInitiator` parameter defined in the [AppConfig](#appconfig-parameters).
+| backKey               | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [navigationEvent](../SDK-GUI-API.md#navigationevent) to the SDK with event type `BACK`.
+| exitKey               | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [navigationEvent](../SDK-GUI-API.md#navigationevent) to the SDK with event type `EXIT`.
+| toggleCaptionsKey     | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [toggleCaptionsEvent](../SDK-GUI-API.md#togglecaptionsevent) to the SDK.
+| toggleDoNotDisturbKey | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [toggleDoNotDisturbEvent](../SDK-GUI-API.md#toggledonotdisturbevent) to the SDK.
 
 #### Device Key Parameters
 Config for individual device key.

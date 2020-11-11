@@ -9,8 +9,7 @@ add_library(SSSDKCommon SHARED
 
 target_include_directories(SSSDKCommon
     PUBLIC "${SSSDKCommon_SOURCE_DIR}/include"
-    "${ASDK_INCLUDE_DIRS}"
-    "${RAPIDJSON_INCLUDE_DIR}")
+    "${ASDK_INCLUDE_DIRS}")
 
 target_link_libraries(SSSDKCommon "${ASDK_LDFLAGS}")
 

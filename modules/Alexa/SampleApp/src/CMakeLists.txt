@@ -6,6 +6,7 @@ list(APPEND SampleApp_SOURCES
     CachingDownloadManager.cpp
     ConsolePrinter.cpp
     DownloadMonitor.cpp
+    ExternalCapabilitiesBuilder.cpp
     GUILogBridge.cpp
     GUI/GUIClient.cpp
     GUI/GUIManager.cpp
@@ -13,6 +14,7 @@ list(APPEND SampleApp_SOURCES
     KeywordObserver.cpp
     LocaleAssetsManager.cpp
     SampleApplication.cpp
+    SampleApplicationComponent.cpp
     SampleEqualizerModeController.cpp
     SmartScreenCaptionPresenter.cpp
     SmartScreenCaptionStateManager.cpp
@@ -62,7 +64,7 @@ target_link_libraries(SampleApp
     DeviceSettings
     SQLiteStorage
     SSSDKCommon
-    EqualizerImplementations
+    acsdkEqualizerImplementations
     TemplateRuntime
     Utils
     "${PORTAUDIO_LIB_PATH}")
@@ -180,7 +182,6 @@ target_include_directories(SampleAppTest PUBLIC
         "${APLClient_SOURCE_DIR/include}"
         "${SmartScreenSDKInterfaces_SOURCE_DIR}/test"
         "${TemplateRuntime_SOURCE_DIR}/include"
-        "${RAPIDJSON_INCLUDE_DIR}"
         "${SmartScreenSDKInterfaces_SOURCE_DIR}/include"
         )
 
@@ -195,7 +196,7 @@ target_link_libraries(SampleAppTest
         DeviceSettings
         SQLiteStorage
         SSSDKCommon
-        EqualizerImplementations
+        acsdkEqualizerImplementations
         TemplateRuntime
         Utils
         "${PORTAUDIO_LIB_PATH}")

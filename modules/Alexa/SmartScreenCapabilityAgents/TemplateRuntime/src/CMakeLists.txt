@@ -6,8 +6,7 @@ add_library(SmartScreenTemplateRunTime SHARED
 target_include_directories(SmartScreenTemplateRunTime
     PUBLIC "${SmartScreenTemplateRunTime_SOURCE_DIR}/include"
         "${SmartScreenSDKInterfaces_SOURCE_DIR}/include"
-        "${ASDK_INCLUDE_DIRS}"
-        "${RAPIDJSON_INCLUDE_DIR}")
+        "${ASDK_INCLUDE_DIRS}")
 
 target_link_libraries(SmartScreenTemplateRunTime "${ASDK_LDFLAGS}" SmartScreenSDKInterfaces)
 

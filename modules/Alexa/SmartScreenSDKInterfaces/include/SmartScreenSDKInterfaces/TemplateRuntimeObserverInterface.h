@@ -20,6 +20,7 @@
 #include <string>
 
 #include <AVSCommon/AVS/FocusState.h>
+#include <AVSCommon/SDKInterfaces/MediaPropertiesInterface.h>
 
 #include "AudioPlayerInfo.h"
 
@@ -66,11 +67,13 @@ public:
      * @param jsonPayload The payload of the RenderPlayerInfo directive in structured JSON format.
      * @param audioPlayerInfo Information on the @c AudioPlayer.
      * @param focusState The @c FocusState of the channel used by TemplateRuntime interface.
+     * @param mediaProperties The @c MediaPropertiesInterface for the current @c AudioPlayer
      */
     virtual void renderPlayerInfoCard(
         const std::string& jsonPayload,
         smartScreenSDKInterfaces::AudioPlayerInfo audioPlayerInfo,
-        alexaClientSDK::avsCommon::avs::FocusState focusState) = 0;
+        alexaClientSDK::avsCommon::avs::FocusState focusState,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) = 0;
 
     /**
      * Used to notify the observer when the client should clear the PlayerInfo display card.  Once the card is cleared,

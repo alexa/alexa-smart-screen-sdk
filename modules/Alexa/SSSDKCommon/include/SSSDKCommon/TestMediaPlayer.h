@@ -30,7 +30,7 @@
 #include <AVSCommon/Utils/MediaPlayer/SourceConfig.h>
 #include "AVSCommon/Utils/Timing/Timer.h"
 #include <AVSCommon/Utils/RequiresShutdown.h>
-#include <AVSCommon/SDKInterfaces/Audio/EqualizerInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerInterface.h>
 
 namespace alexaSmartScreenSDK {
 namespace sssdkCommon {
@@ -43,7 +43,7 @@ namespace sssdkCommon {
 class TestMediaPlayer
         : public alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface
         , public alexaClientSDK::avsCommon::utils::RequiresShutdown
-        , public alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerInterface {
+        , public alexaClientSDK::acsdkEqualizerInterfaces::EqualizerInterface {
 public:
     TestMediaPlayer();
     // Destructor.
@@ -51,8 +51,7 @@ public:
 
     /// @name EqualizerInterface methods.
     ///@{
-    void setEqualizerBandLevels(
-        alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerBandLevelMap bandLevelMap) override;
+    void setEqualizerBandLevels(alexaClientSDK::acsdkEqualizerInterfaces::EqualizerBandLevelMap bandLevelMap) override;
 
     int getMinimumBandLevel() override;
 

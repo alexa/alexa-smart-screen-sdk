@@ -71,6 +71,12 @@ const std::string GUI_MSG_TYPE_CLEAR_DOCUMENT("clearDocument");
 /// The message type for renderCaptions.
 const std::string GUI_MSG_TYPE_RENDER_CAPTIONS("renderCaptions");
 
+/// The message type for DoNotDisturbStateChanged.
+const std::string GUI_MSG_TYPE_DND_SETTING_CHANGE("doNotDisturbSettingChanged");
+
+/// The doNotDisturbEnabled json key in the message.
+const std::string GUI_MSG_TYPE_DND_SETTING_TAG("doNotDisturbSettingEnabled");
+
 /// The SSSDK version key in the message.
 const std::string GUI_MSG_SMART_SCREEN_SDK_VERSION_TAG("smartScreenSDKVersion");
 
@@ -365,6 +371,17 @@ public:
         setParsedPayload(payload);
     };
 };
+
+/**
+ *  The @c DoNotDisturbSettingChange instructs the GUI Client to render DoNotDisturb VoiceChrome
+ */
+class DoNotDisturbSettingChangedMessage : public GUIClientMessage {
+public:
+    explicit DoNotDisturbSettingChangedMessage(const bool payload) : GUIClientMessage(GUI_MSG_TYPE_DND_SETTING_CHANGE) {
+        addMember(GUI_MSG_TYPE_DND_SETTING_TAG, payload);
+    };
+};
+
 }  // namespace messages
 }  // namespace sampleApp
 }  // namespace alexaSmartScreenSDK

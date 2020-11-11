@@ -1,3 +1,13 @@
+### v2.4.0 released 11/09/2020:
+ 
+#### Enhancements
+* Upgraded dependency to Device SDK 1.21.0 [https://github.com/alexa/avs-device-sdk/tree/v1.21.0]
+* Added DND Support
+ 
+#### Bug fixes
+* Fixed a back navigation issue causing a RenderPlayerInfo card to be cleared
+* Fixed an issue where the sample app automatically goes into the listening mode when prompted by a skill
+
 ### v2.3.0 released 09/24/2020:
  
 #### Enhancements

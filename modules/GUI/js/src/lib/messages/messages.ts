@@ -65,7 +65,8 @@ export type InboundMessageType =
     | 'clearDocument'
     | 'aplRender'
     | 'aplCore'
-    | 'renderCaptions';
+    | 'renderCaptions'
+    | 'doNotDisturbSettingChanged';
 
 export interface IBaseInboundMessage {
     type : InboundMessageType;
@@ -126,6 +127,10 @@ export interface IRenderCaptionsMessage extends IBaseInboundMessage {
     payload : any;
 }
 
+export interface IDoNotDisturbSettingChangedMessage extends IBaseInboundMessage {
+    doNotDisturbSettingEnabled : boolean;
+}
+
 export type OutboundMessageType =
     'initResponse'
     | 'deviceWindowState'
@@ -140,7 +145,8 @@ export type OutboundMessageType =
     | 'activityEvent'
     | 'navigationEvent'
     | 'logEvent'
-    | 'toggleCaptions';
+    | 'toggleCaptions'
+    | 'toggleDoNotDisturb';
 
 export interface IBaseOutboundMessage {
     type : OutboundMessageType;

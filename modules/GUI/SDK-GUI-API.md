@@ -197,6 +197,17 @@ This message instructs the client to clear visual content from the screen.
 }
 ```
 
+## doNotDisturbSettingChanged
+
+This message informs the client of any changes to the DoNotDisturb setting 
+
+```javascript
+{
+  type: 'doNotDisturbSettingChanged',
+  doNotDisturbSettingEnabled: boolean
+}
+```
+
 # Client -> Server (Outbound)
 
 ## initResponse
@@ -338,6 +349,8 @@ type ActivityEvent =
     event: ActivityEvent
 }
 ```
+```INTERRUPT``` events only need to be reported once in a set time period, regardless of how often it is actually 
+invoked. The guidance for reporting interval is 500 ms. 
 
 ## navigationEvent
 
@@ -361,6 +374,15 @@ This message is sent to the SDK to toggle the on/off for displaying captions
 ```javascript
 {
     type: 'toggleCaptions'
+}
+```
+
+## toggleDoNotDisturbEvent
+
+This message is sent to the SDK to toggle the on/off for the DoNotDisturb Setting
+```javascript
+{
+    type: 'toggleDoNotDisturbEvent'
 }
 ```
 

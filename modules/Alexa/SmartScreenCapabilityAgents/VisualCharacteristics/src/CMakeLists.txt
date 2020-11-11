@@ -6,8 +6,7 @@ add_library(VisualCharacteristics SHARED
 target_include_directories(VisualCharacteristics
     PUBLIC "${VisualCharacteristics_SOURCE_DIR}/include"
         "${SmartScreenSDKInterfaces_SOURCE_DIR}/include"
-        "${ASDK_INCLUDE_DIRS}"
-        "${RAPIDJSON_INCLUDE_DIR}")
+        "${ASDK_INCLUDE_DIRS}")
 
 target_link_libraries(VisualCharacteristics "${ASDK_LDFLAGS}" SmartScreenSDKInterfaces)
 

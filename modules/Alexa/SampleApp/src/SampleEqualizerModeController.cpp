@@ -25,7 +25,7 @@ namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
 using namespace alexaClientSDK;
-using namespace alexaClientSDK::avsCommon::sdkInterfaces::audio;
+using namespace alexaClientSDK::acsdkEqualizerInterfaces;
 
 std::shared_ptr<SampleEqualizerModeController> SampleEqualizerModeController::create() {
     return std::shared_ptr<SampleEqualizerModeController>(new SampleEqualizerModeController());

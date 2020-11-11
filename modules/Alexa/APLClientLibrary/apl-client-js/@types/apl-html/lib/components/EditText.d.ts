@@ -38,6 +38,7 @@ export declare class EditText extends ActionableComponent<IEditTextProperties> {
     inputElement: HTMLInputElement;
     private localFocused;
     private enterPressedDown;
+    private isEdge;
     constructor(renderer: APLRenderer, component: APL.Component, factory: FactoryFunction, parent?: Component);
     private initEditTextHtmlComponent();
     private setBorderColor;

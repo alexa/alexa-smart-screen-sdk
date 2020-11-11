@@ -103,6 +103,23 @@ static const std::chrono::milliseconds DEFAULT_TEMPLATE_CARD_INTERACTION_TIMEOUT
  */
 #define LX(event) alexaClientSDK::avsCommon::utils::logger::LogEntry(TAG, event)
 
+std::shared_ptr<TemplateRuntime> TemplateRuntime::createTemplateRuntime(
+    const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::RenderPlayerInfoCardsProviderRegistrarInterface>&
+        renderPlayerInfoCardsProviderRegistrar,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface> focusManager,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ExceptionEncounteredSenderInterface> exceptionSender) {
+    if (!renderPlayerInfoCardsProviderRegistrar || !focusManager || !exceptionSender) {
+        ACSDK_ERROR(LX("createFailed")
+                        .d("isRenderPlayerInfoCardsProviderRegistrarNull", !renderPlayerInfoCardsProviderRegistrar)
+                        .d("isFocusManagerNull", !focusManager)
+                        .d("isExceptionSenderNull", !exceptionSender));
+        return nullptr;
+    }
+
+    auto providers = renderPlayerInfoCardsProviderRegistrar->getProviders();
+    return TemplateRuntime::create(providers, focusManager, exceptionSender);
+}
+
 std::shared_ptr<TemplateRuntime> TemplateRuntime::create(
     const std::unordered_set<
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::RenderPlayerInfoCardsProviderInterface>>&
@@ -622,7 +639,11 @@ void TemplateRuntime::executeRenderPlayerInfoCallbacks(bool isClearCard) {
         auto payload =
             m_audioItemsInExecution[m_activeRenderPlayerInfoCardsProvider].directive->directive->getPayload();
         for (auto& observer : m_observers) {
-            observer->renderPlayerInfoCard(payload, m_audioPlayerInfo[m_activeRenderPlayerInfoCardsProvider], m_focus);
+            observer->renderPlayerInfoCard(
+                payload,
+                m_audioPlayerInfo[m_activeRenderPlayerInfoCardsProvider],
+                m_focus,
+                m_activeRenderPlayerInfoCardsProvider);
         }
     }
 }

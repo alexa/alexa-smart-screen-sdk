@@ -41,7 +41,7 @@ TestMediaPlayer::TestMediaPlayer() : RequiresShutdown("NullMediaPlayer") {
 TestMediaPlayer::~TestMediaPlayer() {
 }
 
-void TestMediaPlayer::setEqualizerBandLevels(avsCommon::sdkInterfaces::audio::EqualizerBandLevelMap bandLevelMap) {
+void TestMediaPlayer::setEqualizerBandLevels(acsdkEqualizerInterfaces::EqualizerBandLevelMap bandLevelMap) {
 }
 
 int TestMediaPlayer::getMinimumBandLevel() {

@@ -4,7 +4,6 @@ set(INCLUDE_PATH
     "${TemplateRuntime_INCLUDE_DIR}"
     "${SmartScreenSDKInterfaces_SOURCE_DIR}/test"
     "${TemplateRuntime_SOURCE_DIR}/include"
-    "${RAPIDJSON_INCLUDE_DIR}"
     "${ASDK_INCLUDE_DIRS}"
         "${SmartScreenSDKInterfaces_SOURCE_DIR}/include"
         )

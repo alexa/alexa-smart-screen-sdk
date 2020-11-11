@@ -4,7 +4,7 @@ project(AlexaModule LANGUAGES CXX)
 
 if (NOT MSVC)
 	find_package(PkgConfig)
-	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.20.1)
+	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.21.0)
 	set(ASDK_LIBRARY_DIRS "${CMAKE_PREFIX_PATH}/lib")
 else()
 	# No package manager support in MSVC yet. Emulating the same results

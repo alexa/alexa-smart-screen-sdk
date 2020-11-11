@@ -12,6 +12,7 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
+
 #ifndef ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_SMARTSCREENCLIENT_INCLUDE_SMARTSCREENCLIENT_DEVICESETTINGSMANAGERBUILDER_H_
 #define ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_SMARTSCREENCLIENT_INCLUDE_SMARTSCREENCLIENT_DEVICESETTINGSMANAGERBUILDER_H_
 
@@ -20,7 +21,7 @@
 #include <memory>
 #include <tuple>
 
-#include <ACL/AVSConnectionManager.h>
+#include <AVSCommon/SDKInterfaces/AVSConnectionManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/LocaleAssetsManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/MessageSenderInterface.h>
 #include <AVSCommon/SDKInterfaces/SystemTimeZoneInterface.h>
@@ -56,7 +57,7 @@ public:
     DeviceSettingsManagerBuilder(
         std::shared_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface> settingStorage,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
-        std::shared_ptr<alexaClientSDK::acl::AVSConnectionManager> connectionManager,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AVSConnectionManagerInterface> connectionManager,
         std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> dataManager);
 
     /**
@@ -120,6 +121,13 @@ public:
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::LocaleAssetsManagerInterface> localeAssetsManager);
 
     /**
+     * Configures network info setting.
+     *
+     * @return This builder to allow nested calls.
+     */
+    DeviceSettingsManagerBuilder& withNetworkInfoSetting();
+
+    /**
      * Gets the setting for the given @c index.
      *
      * @tparam index The setting index.
@@ -146,22 +154,7 @@ public:
      */
     std::unique_ptr<alexaClientSDK::settings::DeviceSettingsManager> build() override;
 
-    /**
-     * Gets Device Time Zone Offset.
-     *
-     * @return Timezone offset in milliseconds.
-     */
-    std::chrono::milliseconds getDeviceTimezoneOffset();
-
 private:
-    /**
-     * Calculates Device Timezone Offset.
-     *
-     * @param timeZone Timezone string
-     * @return Timezone offset in milliseconds.
-     */
-    std::chrono::milliseconds calculateDeviceTimezoneOffset(const std::string& timeZone);
-
     /**
      * Builds a setting that follows the given synchronization protocol.
      *
@@ -185,16 +178,13 @@ private:
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> m_messageSender;
 
     /// The connection manager that manages the connection with AVS.
-    std::shared_ptr<alexaClientSDK::acl::AVSConnectionManager> m_connectionManager;
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AVSConnectionManagerInterface> m_connectionManager;
 
     /// The dataManager object that will track the CustomerDataHandler.
     std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> m_dataManager;
 
     /// Flag that indicates if there was any configuration error.
     bool m_foundError;
-
-    /// Device Timezone Offset in milliseconds.
-    std::chrono::milliseconds m_deviceTimeZoneOffset;
 };
 
 template <size_t index>

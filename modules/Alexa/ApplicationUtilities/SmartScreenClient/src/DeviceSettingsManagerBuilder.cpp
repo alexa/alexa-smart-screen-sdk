@@ -22,6 +22,7 @@
 #include <Settings/Types/LocaleWakeWordsSetting.h>
 #include <System/TimeZoneHandler.h>
 #include <System/LocaleHandler.h>
+
 #include "SmartScreenClient/DeviceSettingsManagerBuilder.h"
 
 /// String to identify log entries originating from this file.
@@ -37,6 +38,7 @@ static const std::string TAG("SettingsManagerBuilder");
 namespace alexaSmartScreenSDK {
 namespace smartScreenClient {
 
+using namespace alexaClientSDK;
 using namespace alexaClientSDK::settings;
 
 /// The default timezone setting.
@@ -47,6 +49,13 @@ static const std::string SETTINGS_CONFIGURATION_ROOT_KEY = "deviceSettings";
 
 /// The key to find the default timezone configuration.
 static const std::string DEFAULT_TIMEZONE_CONFIGURATION_KEY = "defaultTimezone";
+
+/// Network info setting events metadata.
+static const SettingEventMetadata NETWORK_INFO_METADATA = {
+    "System",
+    "NetworkInfoChanged",
+    "NetworkInfoReport",
+    "networkInfo"};
 
 template <typename PointerT>
 static inline bool checkPointer(const std::shared_ptr<PointerT>& pointer, const std::string& variableName) {
@@ -59,9 +68,9 @@ static inline bool checkPointer(const std::shared_ptr<PointerT>& pointer, const 
 
 DeviceSettingsManagerBuilder::DeviceSettingsManagerBuilder(
     std::shared_ptr<storage::DeviceSettingStorageInterface> settingStorage,
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
-    std::shared_ptr<alexaClientSDK::acl::AVSConnectionManager> connectionManager,
-    std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> dataManager) :
+    std::shared_ptr<avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
+    std::shared_ptr<avsCommon::sdkInterfaces::AVSConnectionManagerInterface> connectionManager,
+    std::shared_ptr<registrationManager::CustomerDataManager> dataManager) :
         m_settingStorage{settingStorage},
         m_messageSender{messageSender},
         m_connectionManager{connectionManager},
@@ -100,24 +109,22 @@ std::unique_ptr<DeviceSettingsManager> DeviceSettingsManagerBuilder::build() {
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withAlarmVolumeRampSetting() {
     return withSynchronizedSetting<DeviceSettingsIndex::ALARM_VOLUME_RAMP, SharedAVSSettingProtocol>(
-        alexaClientSDK::acsdkAlerts::AlertsCapabilityAgent::getAlarmVolumeRampMetadata(),
-        types::getAlarmVolumeRampDefault());
+        acsdkAlerts::AlertsCapabilityAgent::getAlarmVolumeRampMetadata(), types::getAlarmVolumeRampDefault());
 }
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withWakeWordConfirmationSetting() {
     return withSynchronizedSetting<DeviceSettingsIndex::WAKEWORD_CONFIRMATION, SharedAVSSettingProtocol>(
-        alexaClientSDK::capabilityAgents::aip::AudioInputProcessor::getWakeWordConfirmationMetadata(),
+        capabilityAgents::aip::AudioInputProcessor::getWakeWordConfirmationMetadata(),
         getWakeWordConfirmationDefault());
 }
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withSpeechConfirmationSetting() {
     return withSynchronizedSetting<DeviceSettingsIndex::SPEECH_CONFIRMATION, SharedAVSSettingProtocol>(
-        alexaClientSDK::capabilityAgents::aip::AudioInputProcessor::getSpeechConfirmationMetadata(),
-        getSpeechConfirmationDefault());
+        capabilityAgents::aip::AudioInputProcessor::getSpeechConfirmationMetadata(), getSpeechConfirmationDefault());
 }
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withTimeZoneSetting(
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SystemTimeZoneInterface> systemTimeZone) {
+    std::shared_ptr<avsCommon::sdkInterfaces::SystemTimeZoneInterface> systemTimeZone) {
     std::function<bool(const TimeZoneSetting::ValueType&)> applyFunction;
     if (systemTimeZone) {
         applyFunction = [systemTimeZone](const TimeZoneSetting::ValueType& value) {
@@ -127,49 +134,20 @@ DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withTimeZoneSetting(
 
     std::string defaultTimezone = DEFAULT_TIMEZONE;
     auto settingsConfig =
-        alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode::getRoot()[SETTINGS_CONFIGURATION_ROOT_KEY];
+        avsCommon::utils::configuration::ConfigurationNode::getRoot()[SETTINGS_CONFIGURATION_ROOT_KEY];
     if (settingsConfig) {
         settingsConfig.getString(DEFAULT_TIMEZONE_CONFIGURATION_KEY, &defaultTimezone, DEFAULT_TIMEZONE);
     }
 
-    m_deviceTimeZoneOffset = calculateDeviceTimezoneOffset(defaultTimezone);
-
     return withSynchronizedSetting<DeviceSettingsIndex::TIMEZONE, SharedAVSSettingProtocol>(
-        alexaClientSDK::capabilityAgents::system::TimeZoneHandler::getTimeZoneMetadata(),
-        defaultTimezone,
-        applyFunction);
-}
-
-std::chrono::milliseconds DeviceSettingsManagerBuilder::getDeviceTimezoneOffset() {
-    return m_deviceTimeZoneOffset;
-}
-
-std::chrono::milliseconds DeviceSettingsManagerBuilder::calculateDeviceTimezoneOffset(const std::string& timeZone) {
-#ifdef _MSC_VER
-    TIME_ZONE_INFORMATION TimeZoneInfo;
-    GetTimeZoneInformation(&TimeZoneInfo);
-    auto offsetInMinutes = -TimeZoneInfo.Bias - TimeZoneInfo.DaylightBias;
-    ACSDK_DEBUG9(LX(__func__).m(std::to_string(offsetInMinutes)));
-    return std::chrono::minutes(offsetInMinutes);
-#else
-    char* prevTZ = getenv("TZ");
-    setenv("TZ", timeZone.c_str(), 1);
-    time_t t = time(NULL);
-    struct tm* structtm = localtime(&t);
-    if (prevTZ) {
-        setenv("TZ", prevTZ, 1);
-    } else {
-        unsetenv("TZ");
-    }
-    return std::chrono::milliseconds(structtm->tm_gmtoff * 1000);
-#endif
+        capabilityAgents::system::TimeZoneHandler::getTimeZoneMetadata(), defaultTimezone, applyFunction);
 }
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withLocaleSetting(
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::LocaleAssetsManagerInterface> localeAssetsManager) {
+    std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface> localeAssetsManager) {
     // TODO: LocaleWakeWordsSetting should accept nullptr as wakeWordEventSender if wake words are disabled.
     auto dummySender = SettingEventSender::create(SettingEventMetadata(), m_messageSender);
-    auto localeMetadata = alexaClientSDK::capabilityAgents::system::LocaleHandler::getLocaleEventsMetadata();
+    auto localeMetadata = capabilityAgents::system::LocaleHandler::getLocaleEventsMetadata();
     auto localeEventSender = SettingEventSender::create(localeMetadata, m_messageSender);
     auto setting = types::LocaleWakeWordsSetting::create(
         std::move(localeEventSender), std::move(dummySender), m_settingStorage, localeAssetsManager);
@@ -188,9 +166,9 @@ DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withLocaleSetting(
 }
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withLocaleAndWakeWordsSettings(
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::LocaleAssetsManagerInterface> localeAssetsManager) {
-    auto localeMetadata = alexaClientSDK::capabilityAgents::system::LocaleHandler::getLocaleEventsMetadata();
-    auto wakeWordsMetadata = alexaClientSDK::capabilityAgents::aip::AudioInputProcessor::getWakeWordsEventsMetadata();
+    std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface> localeAssetsManager) {
+    auto localeMetadata = capabilityAgents::system::LocaleHandler::getLocaleEventsMetadata();
+    auto wakeWordsMetadata = capabilityAgents::aip::AudioInputProcessor::getWakeWordsEventsMetadata();
     auto localeEventSender = SettingEventSender::create(localeMetadata, m_messageSender);
     auto wakeWordsEventSender = SettingEventSender::create(wakeWordsMetadata, m_messageSender);
     auto setting = types::LocaleWakeWordsSetting::create(
@@ -211,8 +189,13 @@ DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withLocaleAndWakeWor
     return *this;
 }
 
+DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withNetworkInfoSetting() {
+    return withSynchronizedSetting<DeviceSettingsIndex::NETWORK_INFO, DeviceControlledSettingProtocol>(
+        NETWORK_INFO_METADATA, types::NetworkInfo());
+}
+
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withDoNotDisturbSetting(
-    const std::shared_ptr<alexaClientSDK::capabilityAgents::doNotDisturb::DoNotDisturbCapabilityAgent>& dndCA) {
+    const std::shared_ptr<capabilityAgents::doNotDisturb::DoNotDisturbCapabilityAgent>& dndCA) {
     if (!dndCA) {
         ACSDK_ERROR(LX("withDNDSettingFailed").d("reason", "nullCA"));
         m_foundError = true;

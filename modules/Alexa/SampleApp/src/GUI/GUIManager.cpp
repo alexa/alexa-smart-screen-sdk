@@ -18,6 +18,7 @@
 
 #include <AVSCommon/AVS/PlaybackButtons.h>
 #include <AVSCommon/SDKInterfaces/FocusManagerInterface.h>
+#include <Settings/SettingObserverInterface.h>
 
 #include "SampleApp/GUI/GUIManager.h"
 
@@ -67,6 +68,9 @@ static const std::string THUMBSUP_TOGGLE_ID("THUMBSUP");
 
 /// String to identify the Repeat Toggle of PlaybackController.
 static const std::string THUMBSDOWN_TOGGLE_ID("THUMBSDOWN");
+
+/// The name of the do not disturb confirmation setting.
+static const std::string DO_NOT_DISTURB_NAME = "DoNotDisturb";
 
 /// Map to match a toggle command id to the corresponding enum value.
 static const std::map<std::string, avsCommon::avs::PlaybackToggle> TOGGLE_COMMAND_ID_TO_TOGGLE = {
@@ -129,6 +133,8 @@ GUIManager::GUIManager(
     m_isHoldOccurring = false;
     m_isTapOccurring = false;
     m_isSpeakingOrListening = false;
+    m_clearAlertChannelOnForegrounded = false;
+    m_clearPlayerInfoCardOnContentFocusLost = false;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME] = FocusState::NONE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME] = FocusState::NONE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::CONTENT_CHANNEL_NAME] = FocusState::NONE;
@@ -159,8 +165,10 @@ void GUIManager::clearTemplateCard() {
 void GUIManager::renderPlayerInfoCard(
     const std::string& jsonPayload,
     smartScreenSDKInterfaces::AudioPlayerInfo info,
-    FocusState focusState) {
-    m_guiClient->renderPlayerInfoCard(jsonPayload, info, focusState);
+    FocusState focusState,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) {
+    m_mediaProperties = mediaProperties;
+    m_guiClient->renderPlayerInfoCard(jsonPayload, info, focusState, mediaProperties);
 }
 
 void GUIManager::clearPlayerInfoCard() {
@@ -499,7 +507,7 @@ void GUIManager::handleActivityEvent(smartScreenSDKInterfaces::ActivityEvent eve
             ACSDK_DEBUG3(LX(__func__).d(
                 "Interrupted activity while speaking or listening",
                 smartScreenSDKInterfaces::activityEventToString(event)));
-            m_ssClient->stopForegroundActivity();
+            m_ssClient->releaseAllObserversOnDialogChannel();
             m_ssClient->clearAllExecuteCommands();
         }
         m_ssClient->handleActivityEvent(
@@ -588,8 +596,7 @@ void GUIManager::executeBackNavigation() {
 
 void GUIManager::executeExitNavigation() {
     /// EXIT will immediately clear everything.
-    if (PlayerActivity::PLAYING == m_playerActivityState &&
-        NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType) {
+    if (NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType) {
         /// If we're presenting something over PlayerInfo, we need to separately clear PlayerInfo
         m_clearPlayerInfoCardOnContentFocusLost = true;
     }
@@ -642,6 +649,11 @@ void GUIManager::handleDisplayMetrics(const std::vector<APLClient::DisplayMetric
 
 void GUIManager::handleAPLEvent(APLClient::AplRenderingEvent event) {
     m_ssClient->handleAPLEvent(event, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
+}
+
+void GUIManager::handleToggleDoNotDisturbEvent() {
+    m_ssClient->getSettingsManager()->setValue<settings::DO_NOT_DISTURB>(
+        !m_ssClient->getSettingsManager()->getValue<settings::DO_NOT_DISTURB>().second);
 }
 
 void GUIManager::onAuthStateChange(AuthObserverInterface::State newState, AuthObserverInterface::Error newError) {
@@ -735,7 +747,11 @@ void GUIManager::setAplRenderingEventObserver(APLClient::AplRenderingEventObserv
 }
 
 std::chrono::milliseconds GUIManager::getAudioItemOffset() {
-    return m_ssClient->getAudioItemOffset();
+    if (!m_mediaProperties) {
+        ACSDK_ERROR(LX("getAudioItemOffset").d("reason", "Null MediaPropertiesInterface"));
+        return std::chrono::milliseconds::zero();
+    }
+    return m_mediaProperties->getAudioItemOffset();
 }
 
 std::chrono::milliseconds GUIManager::getDeviceTimezoneOffset() {
@@ -771,6 +787,39 @@ void GUIManager::onMetricRecorderAvailable(
         m_aplRenderingEventObserver->onTelemetrySinkUpdated(sink);
     }
 #endif
+}
+
+bool GUIManager::configureSettingsNotifications() {
+    m_settingsManager = m_ssClient->getSettingsManager();
+    m_callbacks = alexaClientSDK::settings::SettingCallbacks<alexaClientSDK::settings::DeviceSettingsManager>::create(
+        m_settingsManager);
+
+    if (!m_callbacks) {
+        ACSDK_ERROR(LX("configureSettingsNotificationsFailed").d("reason", "createCallbacksFailed"));
+        return false;
+    }
+
+    bool ok = m_callbacks->add<alexaClientSDK::settings::DeviceSettingsIndex::DO_NOT_DISTURB>(
+        [this](bool enable, alexaClientSDK::settings::SettingNotifications notifications) {
+            if (m_doNotDisturbObserver && m_settingsManager) {
+                m_doNotDisturbObserver->onDoNotDisturbSettingChanged(
+                    m_settingsManager->getValue<settings::DO_NOT_DISTURB>().second);
+            }
+        });
+
+    return ok;
+}
+
+void GUIManager::setDoNotDisturbSettingObserver(
+    std::shared_ptr<sampleApp::DoNotDisturbSettingObserver> doNotDisturbObserver) {
+    m_doNotDisturbObserver = std::move(doNotDisturbObserver);
+}
+
+void GUIManager::handleOnMessagingServerConnectionOpened() {
+    if (m_doNotDisturbObserver && m_settingsManager) {
+        m_doNotDisturbObserver->onDoNotDisturbSettingChanged(
+            m_settingsManager->getValue<settings::DO_NOT_DISTURB>().second);
+    }
 }
 
 #ifdef UWP_BUILD

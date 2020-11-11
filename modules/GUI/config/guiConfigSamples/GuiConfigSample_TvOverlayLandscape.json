@@ -48,6 +48,11 @@
                     "code": "KeyC",
                     "keyCode": 67,
                     "key": "c"
+                },
+                "toggleDoNotDisturbKey": {
+                    "code": "KeyD",
+                    "keyCode": 68,
+                    "key": "d"
                 }
             }
         },

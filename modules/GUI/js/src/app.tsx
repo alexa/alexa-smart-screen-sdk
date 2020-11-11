@@ -4,54 +4,51 @@
 
 import * as React from 'react';
 
-import {
-    APLRendererWindow,
-    WebsocketConnectionWrapper,
-    APLRendererWindowState
-} from './components/APLRendererWindow';
-import { SampleHome } from './components/SampleHome';
-import { NavigationEvent } from './lib/messages/NavigationEvent';
-import { IClientConfig, Client, IClient } from './lib/messages/client';
+import {APLRendererWindow, APLRendererWindowState, WebsocketConnectionWrapper} from './components/APLRendererWindow';
+import {SampleHome} from './components/SampleHome';
+import {NavigationEvent} from './lib/messages/NavigationEvent';
+import {Client, IClient, IClientConfig} from './lib/messages/client';
 import {
     AlexaState,
-    IAPLCoreMessage,
-    IRenderStaticDocumentMessage,
-    IRenderPlayerInfoMessage,
-    IBaseOutboundMessage,
-    IRenderTemplateMessage,
+    IActivityReportMessage,
     IAlexaStateChangedMessage,
-    IInitRequest,
-    IInitResponse,
+    IAPLCoreMessage,
+    IAPLRenderMessage,
+    IAuthorizationChangeMessage,
+    IBaseInboundMessage,
+    IBaseOutboundMessage,
+    IDeviceWindowStateMessage,
+    IDoNotDisturbSettingChangedMessage,
     IFocusAcquireRequestMessage,
     IFocusReleaseRequestMessage,
     IFocusResponseMessage,
+    IGuiConfigurationMessage,
+    IInitRequest,
+    IInitResponse,
+    INavigationReportMessage,
     IOnFocusChangedMessage,
     IOnFocusChangedReceivedConfirmationMessage,
-    IActivityReportMessage,
-    INavigationReportMessage,
-    OutboundMessageType,
+    IRenderCaptionsMessage,
+    IRenderPlayerInfoMessage,
+    IRenderStaticDocumentMessage,
+    IRenderTemplateMessage,
     IRequestAuthorizationMessage,
-    IAuthorizationChangeMessage,
-    IAPLRenderMessage,
-    IGuiConfigurationMessage,
-    IDeviceWindowStateMessage,
-    IBaseInboundMessage,
-    IRenderCaptionsMessage
+    OutboundMessageType
 } from './lib/messages/messages';
-import { PlayerInfoWindow, RENDER_PLAYER_INFO_WINDOW_ID } from './components/PlayerInfoWindow';
-import { resolveRenderTemplate } from './lib/displayCards/AVSDisplayCardHelpers';
-import { SDKLogTransport } from './lib/messages/sdkLogTransport';
-import { ILogger, LoggerFactory } from 'apl-client';
-import { FocusManager } from './lib/focus/FocusManager';
-import { ActivityTracker } from './lib/activity/ActivityTracker';
-import { ActivityEvent } from './lib/activity/ActivityEvent';
-import { VoiceChrome } from './components/VoiceChrome';
-import { IDeviceAppConfig, AudioInputInitiator } from './lib/config/IDeviceAppConfig';
-import { IDisplayPixelDimensions } from './lib/config/visualCharacteristics/IDeviceDisplay';
-import { resolveDeviceAppConfig, resolveDeviceWindowState } from './lib/config/GuiConfigHelpers';
-import { IWindowState } from './lib/config/visualCharacteristics/IWindowState';
-import { UWPWebViewClient } from './lib/messages/UWPClient';
-import { CaptionsView } from './components/CaptionsView';
+import {PlayerInfoWindow, RENDER_PLAYER_INFO_WINDOW_ID} from './components/PlayerInfoWindow';
+import {resolveRenderTemplate} from './lib/displayCards/AVSDisplayCardHelpers';
+import {SDKLogTransport} from './lib/messages/sdkLogTransport';
+import {ILogger, LoggerFactory} from 'apl-client';
+import {FocusManager} from './lib/focus/FocusManager';
+import {ActivityTracker} from './lib/activity/ActivityTracker';
+import {ActivityEvent} from './lib/activity/ActivityEvent';
+import {VoiceChrome} from './components/VoiceChrome';
+import {AudioInputInitiator, IDeviceAppConfig} from './lib/config/IDeviceAppConfig';
+import {IDisplayPixelDimensions} from './lib/config/visualCharacteristics/IDeviceDisplay';
+import {resolveDeviceAppConfig, resolveDeviceWindowState} from './lib/config/GuiConfigHelpers';
+import {IWindowState} from './lib/config/visualCharacteristics/IWindowState';
+import {UWPWebViewClient} from './lib/messages/UWPClient';
+import {CaptionsView} from './components/CaptionsView';
 
 const HOST = 'localhost';
 const PORT = 8933;
@@ -60,7 +57,7 @@ const PORT = 8933;
 const APL_MAX_VERSION = '1.4';
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.3';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.4';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
@@ -74,6 +71,7 @@ export interface IAppState {
     playerInfoMessage : IRenderPlayerInfoMessage;
     updateActiveAPLRendererWindow : boolean;
     captionsMessage : IRenderCaptionsMessage;
+    doNotDisturbSettingEnabled : boolean;
 }
 
 export class App extends React.Component<any, IAppState> {
@@ -91,6 +89,7 @@ export class App extends React.Component<any, IAppState> {
     private captionFrame : any;
     private lastCaptionTimeOutId : number;
     private toggleCaptionsMessage : OutboundMessageType = 'toggleCaptions';
+    private toggleDoNotDisturbMessage : OutboundMessageType = 'toggleDoNotDisturb';
 
     /**
      * Compare two versions as strings.
@@ -141,7 +140,16 @@ export class App extends React.Component<any, IAppState> {
             captionsMessage : this.captionFrame
         });
 
-        this.lastCaptionTimeOutId = setTimeout(this.clearCaptions, this.captionFrame.duration);
+        this.lastCaptionTimeOutId = window.setTimeout(this.clearCaptions, this.captionFrame.duration);
+    }
+
+    protected handleDoNotDisturbSettingChanged(message : IBaseInboundMessage) {
+        const newDoNotDisturbSettingEnabled =
+            (message as IDoNotDisturbSettingChangedMessage).doNotDisturbSettingEnabled;
+
+        this.setState({
+            doNotDisturbSettingEnabled : newDoNotDisturbSettingEnabled
+        });
     }
 
     protected clearCaptions = () => {
@@ -256,8 +264,11 @@ export class App extends React.Component<any, IAppState> {
             this.eventListenersAdded = true;
             document.addEventListener('keydown', this.handleKeyDown.bind(this));
             document.addEventListener('keyup', this.handleKeyUp.bind(this));
-            document.addEventListener('touchstart', this.handleUserInteraction.bind(this));
-            document.addEventListener('mousedown', this.handleUserInteraction.bind(this));
+
+            let handleUserInteractionFunction = this.handleUserInteraction();
+            document.addEventListener('touchstart', handleUserInteractionFunction);
+            document.addEventListener('mousedown', handleUserInteractionFunction);
+            document.addEventListener('wheel', handleUserInteractionFunction, {capture: true, passive: true});
         }
 
         this.sendDeviceWindowState();
@@ -325,6 +336,10 @@ export class App extends React.Component<any, IAppState> {
                 this.handleRenderCaptions(message);
                 break;
             }
+            case 'doNotDisturbSettingChanged': {
+                this.handleDoNotDisturbSettingChanged(message);
+                break;
+            }
             default: {
                 this.logger.warn('received message with unsupported type. Type: ', message.type);
                 break;
@@ -363,7 +378,8 @@ export class App extends React.Component<any, IAppState> {
             playerInfoMessage : undefined,
             updateActiveAPLRendererWindow : false,
             targetWindowId : undefined,
-            captionsMessage : undefined
+            captionsMessage : undefined,
+            doNotDisturbSettingEnabled : undefined
         };
 
         this.eventListenersAdded = false;
@@ -416,6 +432,16 @@ export class App extends React.Component<any, IAppState> {
     }
 
     protected sendToggleCaptionsEvent(type : OutboundMessageType) {
+        if (type === undefined) {
+            return;
+        }
+        const message : IBaseOutboundMessage = {
+            type
+        };
+        this.client.sendMessage(message);
+    }
+
+    protected sendToggleDoNotDisturbEvent(type : OutboundMessageType) {
         if (type === undefined) {
             return;
         }
@@ -507,6 +533,7 @@ export class App extends React.Component<any, IAppState> {
                     deviceAppConfig={this.deviceAppConfig}
                     targetWindowId={this.state.targetWindowId}
                     alexaState={this.state.alexaState}
+                    doNotDisturbSettingEnabled={this.state.doNotDisturbSettingEnabled}
                 />
             </div>
         );
@@ -566,6 +593,10 @@ export class App extends React.Component<any, IAppState> {
             case this.deviceAppConfig.deviceKeys.toggleCaptionsKey.code:
                 this.sendToggleCaptionsEvent(this.toggleCaptionsMessage);
                 break;
+            // Similar to toggle Do Not Disturb setting on remote
+            case this.deviceAppConfig.deviceKeys.toggleDoNotDisturbKey.code:
+                this.sendToggleDoNotDisturbEvent(this.toggleDoNotDisturbMessage);
+                break;
             default : {
                 this.handleUserInteraction();
                 break;
@@ -589,14 +620,28 @@ export class App extends React.Component<any, IAppState> {
             }
         }
     }
-
+    /** The interrupted event is reported when an user interaction interrupts an activity. Examples include clicks,
+     *  touches, and scrolls. Some of these user interactions results in multiple events per user interaction, such
+     *  as scrolling. Even when multiple events are fired, the interrupted event only needs to be
+     *  reported once in a set time period. This implementation will report a maximum of one
+     *  interrupted activity every 500 ms.
+     */
     private handleUserInteraction() {
-        // Allow user interaction while presenting Player Info Window
-        // This enables UI navigation without killing progress bar.
-        if (this.state.targetWindowId
-            && this.state.targetWindowId !== RENDER_PLAYER_INFO_WINDOW_ID) {
-            this.activityTracker.reportInterrupted();
-        }
+        let lock = false;
+        return () => {
+            if (!lock) {
+                // Allow user interaction while presenting Player Info Window
+                // This enables UI navigation without killing progress bar.
+                if (this.state.targetWindowId && this.state.targetWindowId !== RENDER_PLAYER_INFO_WINDOW_ID) {
+                    lock = true;
+
+                    this.activityTracker.reportInterrupted();
+                    setTimeout(() => {
+                        lock = false;
+                    }, 500);
+                }
+            }
+        };
     }
 
     private setTokenForWindowId(token : string, windowId : string) {

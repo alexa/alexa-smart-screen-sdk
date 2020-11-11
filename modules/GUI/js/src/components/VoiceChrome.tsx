@@ -3,8 +3,8 @@
  */
 import * as React from 'react';
 import './voiceChrome.css';
-import { AlexaState } from '../lib/messages/messages';
-import { IDeviceAppConfig, AudioInputInitiator } from '../lib/config/IDeviceAppConfig';
+import {AlexaState} from '../lib/messages/messages';
+import {AudioInputInitiator, IDeviceAppConfig} from '../lib/config/IDeviceAppConfig';
 
 type VisibilityProperty = import('csstype').Property.Visibility;
 
@@ -12,18 +12,45 @@ interface IVoiceChromeProps {
     alexaState : AlexaState;
     targetWindowId : string;
     deviceAppConfig : IDeviceAppConfig;
+    doNotDisturbSettingEnabled : boolean;
 }
 
 interface IVoiceChromeState {
-    alexaState : AlexaState;
+    voiceChromeState : VoiceChromeState;
+}
+
+enum VoiceChromeState {
+    /// Guard for unknown state.
+    UNKNOWN = 'UNKNOWN',
+    /// Alexa is disconnected.
+    DISCONNECTED = 'DISCONNECTED',
+    /// Alexa is pending connection.
+    CONNECTING = 'CONNECTING',
+    /// Alexa connected.
+    CONNECTED = 'CONNECTED',
+    /// Alexa is idle and ready for an interaction.
+    IDLE = 'IDLE',
+    /// Alexa is currently listening.
+    LISTENING = 'LISTENING',
+    /// Alexa is currently expecting a response from the customer.
+    EXPECTING = 'EXPECTING',
+    /**
+     * A customer request has been completed and no more input is accepted. In this state, Alexa is waiting for a
+     * response from AVS.
+     */
+    THINKING = 'THINKING',
+    /// Alexa is responding to a request with speech.
+    SPEAKING = 'SPEAKING',
+    /// VoiceChrome should be in this state at the end of an Alexa Interaction if DoNotDisturb is enabled
+    DO_NOT_DISTURB_ENABLED = 'DO NOT DISTURB ENABLED'
 }
 
 export class VoiceChrome extends React.Component<IVoiceChromeProps, IVoiceChromeState> {
 
-    protected voiceChromeStateString : string;
     protected expectingPromptString : string;
     protected voiceChromeStateAlign : string = this.props.deviceAppConfig.display.shape === 'RECTANGLE'
         ? 'flex-end' : 'center';
+    protected lastDoNotDisturbVoiceChromeStateTimeout : number;
 
     constructor(props : IVoiceChromeProps) {
         super(props);
@@ -41,48 +68,78 @@ export class VoiceChrome extends React.Component<IVoiceChromeProps, IVoiceChrome
         }
 
         this.state = {
-            alexaState : this.props.alexaState
+            voiceChromeState : this.props.alexaState as string as VoiceChromeState
         };
     }
 
     public render() {
-        const chromeOpacity = this.state.alexaState !== undefined  ? 1 : 0;
+        const chromeOpacity = this.props.alexaState !== undefined  ? 1 : 0;
         const chromeVisibility : VisibilityProperty = chromeOpacity === 0 ? 'hidden' : 'visible';
-
-        if (this.state.alexaState !== undefined) {
-            this.voiceChromeStateString = this.state.alexaState === AlexaState.EXPECTING ? this.expectingPromptString :
-                this.state.alexaState;
-        }
-
         return (
             <div id='voiceChromeScrim' style={{
                 opacity: chromeOpacity,
                 visibility : chromeVisibility}}>
                 <div id='voiceChromeState' style={{
                     justifyContent : this.voiceChromeStateAlign
-                }}>{this.voiceChromeStateString}</div>
+                }}>{this.state.voiceChromeState}</div>
             </div>
         );
     }
 
     public componentWillReceiveProps(nextProps : IVoiceChromeProps) {
-        let alexaState : AlexaState = nextProps.alexaState;
-        // Don't show speaking or idle when we have an active visual window
-        if ((alexaState === AlexaState.SPEAKING
-            && (this.props.targetWindowId !== undefined || nextProps.targetWindowId !== undefined)) ||
-            (alexaState === AlexaState.IDLE && nextProps.targetWindowId !== undefined)) {
-            alexaState = undefined;
-        }
+        // Update State if any props have changed
+        if (this.props.alexaState !== nextProps.alexaState
+            || this.props.doNotDisturbSettingEnabled !== nextProps.doNotDisturbSettingEnabled
+            || this.props.targetWindowId !== nextProps.targetWindowId) {
 
-        if (alexaState !== this.state.alexaState) {
-            this.setState({
-                alexaState
-            });
+            this.setVoiceChromeStateWithDoNotDisturbIfRequired(nextProps.alexaState, nextProps.targetWindowId,
+                nextProps.doNotDisturbSettingEnabled);
         }
     }
 
     public shouldComponentUpdate(nextProps : IVoiceChromeProps, nextState : IVoiceChromeState) {
-        // Only update on alexaState change or targetWindow change
-        return this.state.alexaState !== nextState.alexaState || this.props.targetWindowId !== nextProps.targetWindowId;
+        // Update on alexaState change, targetWindow change or VoiceChrome state change
+        return this.props.alexaState !== nextProps.alexaState || this.props.targetWindowId !== nextProps.targetWindowId
+            || this.props.doNotDisturbSettingEnabled !== nextProps.doNotDisturbSettingEnabled
+            || this.state.voiceChromeState !== nextState.voiceChromeState;
+    }
+
+    private setVoiceChromeStateWithDoNotDisturbIfRequired(alexaState : AlexaState,
+                                                          targetWindowId : string,
+                                                          doNotDisturbState : boolean) {
+
+        // Don't show speaking or idle when we have an active visual window
+        if ((alexaState === AlexaState.SPEAKING && targetWindowId !== undefined) ||
+            (alexaState === AlexaState.IDLE && targetWindowId !== undefined)) {
+
+            alexaState = undefined;
+        } else {
+            if (alexaState === AlexaState.IDLE) {
+                if (doNotDisturbState) {
+                    this.setState({
+                        voiceChromeState: VoiceChromeState.DO_NOT_DISTURB_ENABLED
+                    });
+                    clearTimeout(this.lastDoNotDisturbVoiceChromeStateTimeout);
+                    this.lastDoNotDisturbVoiceChromeStateTimeout =
+                        setTimeout(this.setVoiceChromeStateStringWithCurrentAlexaState.bind(this), 5000);
+                    return;
+                }
+            }
+        }
+        this.setVoiceChromeStateWithAlexaState(alexaState);
+    }
+
+    private setVoiceChromeStateWithAlexaState(alexaState : AlexaState) {
+        this.setState({
+            voiceChromeState: this.getVoiceChromeStateStringWithAlexaState(alexaState) as VoiceChromeState
+        });
+    }
+
+    private setVoiceChromeStateStringWithCurrentAlexaState() {
+        this.setVoiceChromeStateWithAlexaState(this.props.alexaState);
+    }
+
+    private getVoiceChromeStateStringWithAlexaState(alexaState : AlexaState) {
+        return alexaState === AlexaState.EXPECTING ? this.expectingPromptString : alexaState;
     }
 }

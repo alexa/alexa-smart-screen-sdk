@@ -60,6 +60,7 @@
 #include <SmartScreenSDKInterfaces/RenderCaptionsInterface.h>
 #include <SampleApp/GUILogBridge.h>
 #include <SampleApp/SmartScreenCaptionStateManager.h>
+#include <SampleApp/DoNotDisturbSettingObserver.h>
 
 #include "SampleApp/AplClientBridge.h"
 #include "SampleApp/SampleApplicationReturnCodes.h"
@@ -85,7 +86,8 @@ class GUIClient
         , public alexaClientSDK::avsCommon::utils::RequiresShutdown
         , public alexaClientSDK::registrationManager::CustomerDataHandler
         , public std::enable_shared_from_this<GUIClient>
-        , public alexaSmartScreenSDK::smartScreenSDKInterfaces::RenderCaptionsInterface {
+        , public alexaSmartScreenSDK::smartScreenSDKInterfaces::RenderCaptionsInterface
+        , public sampleApp::DoNotDisturbSettingObserver {
 public:
     /// Alias for GUI provided token.
     using APLToken = uint64_t;
@@ -112,7 +114,8 @@ public:
     void renderPlayerInfoCard(
         const std::string& jsonPayload,
         smartScreenSDKInterfaces::AudioPlayerInfo info,
-        alexaClientSDK::avsCommon::avs::FocusState focusState) override;
+        alexaClientSDK::avsCommon::avs::FocusState focusState,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) override;
     void clearPlayerInfoCard() override;
     /// @}
 
@@ -215,6 +218,11 @@ public:
     /// @name RenderCaptionsInterface Function
     /// @{
     void renderCaptions(const std::string& payload) override;
+    /// @}
+
+    /// @name DoNotDisturbSettingObserverInterface Function
+    /// @{
+    void onDoNotDisturbSettingChanged(bool enable) override;
     /// @}
 
 private:

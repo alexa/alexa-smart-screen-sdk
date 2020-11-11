@@ -6,16 +6,15 @@ The APL Client Sandbox provides a basic implementation of APL Client with a Webs
 * WebsocketPP
 * RapidJSON
 
-## Building
-`cmake -DWEBSOCKETPP_INCLUDE_DIR=<...> && make`
+## Server Side
+Go to 'build/APLClientSandbox/src'
+For building refer to main README file
+Run './APLClientSandbox'
 
-From the GUI directory:
-`npm install`
+## Client Side
+Go to 'APLClientLibrary/APLClientSandbox/GUI'
+For building run `npm install`
+Run `npm start`
 
-## Running
-Run `APLClientSandbox`
-
-From the GUI directory:
-`npm start`
 
 Open a browser and point it to http://127.0.0.1:8000

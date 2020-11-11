@@ -114,6 +114,10 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
         this.isRendering = false;
     }
 
+    protected onRendererDestroyed() {
+        this.isRendering = false;
+    }
+
     public render() {
         // Create Player Info APL Window
         const playerInfo = <APLRendererWindow
@@ -126,6 +130,7 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
             focusManager={this.focusManager}
             activityTracker={this.activityTracker}
             onRendererInit={this.onRendererInit.bind(this)}
+            onRendererDestroyed={this.onRendererDestroyed.bind(this)}
           />;
 
         return(playerInfo);

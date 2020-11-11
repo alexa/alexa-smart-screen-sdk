@@ -16,11 +16,12 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_SMARTSCREENCLIENT_INCLUDE_SMARTSCREENCLIENT_EQUALIZERRUNTIMESETUP_H_
 #define ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_SMARTSCREENCLIENT_INCLUDE_SMARTSCREENCLIENT_EQUALIZERRUNTIMESETUP_H_
 
-#include <AVSCommon/SDKInterfaces/Audio/EqualizerConfigurationInterface.h>
-#include <AVSCommon/SDKInterfaces/Audio/EqualizerModeControllerInterface.h>
-#include <AVSCommon/SDKInterfaces/Audio/EqualizerStorageInterface.h>
-#include <AVSCommon/SDKInterfaces/Audio/EqualizerInterface.h>
-#include <AVSCommon/SDKInterfaces/Audio/EqualizerControllerListenerInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerConfigurationInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerModeControllerInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerStorageInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerControllerListenerInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerRuntimeSetupInterface.h>
 
 #include <list>
 #include <memory>
@@ -31,12 +32,55 @@ namespace smartScreenClient {
 /**
  * Class containing references to implementations for all equalizer related interfaces.
  */
-class EqualizerRuntimeSetup {
+class EqualizerRuntimeSetup : public alexaClientSDK::acsdkEqualizerInterfaces::EqualizerRuntimeSetupInterface {
 public:
     /**
-     * Constructor.
+     * Factory method to create an instance of @c EqualizerRuntimeSetupInterface.
+     *
+     * @param equalizerConfiguration Equalizer configuration instance.
+     * @param equalizerStorage Equalizer storage instance.
+     * @param equalizerModeController Equalizer mode controller instance.
+     * @return An enabled @c EqualizerRuntimeSetup if equalizer is enabled in the configuration instance; otherwise,
+     * a disabled @c EqualizerRuntimeSetupInterface.
      */
-    EqualizerRuntimeSetup();
+    static std::shared_ptr<EqualizerRuntimeSetupInterface> createEqualizerRuntimeSetupInterface(
+        const std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerConfigurationInterface>&
+            equalizerConfiguration,
+        const std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerStorageInterface>& equalizerStorage,
+        const std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerModeControllerInterface>&
+            equalizerModeController);
+
+    /**
+     * Constructor.
+     *
+     * @param isEnabled Whether equalizer is enabled; true by default.
+     */
+    EqualizerRuntimeSetup(bool isEnabled = true);
+
+    /// @name EqualizerRuntimeSetupInterface functions
+    /// @{
+    std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerConfigurationInterface> getConfiguration()
+        override;
+
+    std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerStorageInterface> getStorage() override;
+
+    std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerModeControllerInterface> getModeController()
+        override;
+
+    bool addEqualizer(std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerInterface> equalizer) override;
+
+    bool addEqualizerControllerListener(
+        std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerControllerListenerInterface> listener)
+        override;
+
+    std::list<std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerInterface>> getAllEqualizers()
+        override;
+
+    std::list<std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerControllerListenerInterface>>
+    getAllEqualizerControllerListeners() override;
+
+    bool isEnabled() override;
+    ///@}
 
     /**
      * Set equalizer configuration instance.
@@ -44,31 +88,14 @@ public:
      * @param configuration Equalizer configuration instance.
      */
     void setConfiguration(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerConfigurationInterface>
-            configuration);
-
-    /**
-     * Returns equalizer configuration instance.
-     *
-     * @return Equalizer configuration instance.
-     */
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerConfigurationInterface>
-    getConfiguration();
+        std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerConfigurationInterface> configuration);
 
     /**
      * Set equalizer state storage instance.
      *
      * @param storage Equalizer state storage instance.
      */
-    void setStorage(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerStorageInterface> storage);
-
-    /**
-     * Returns equalizer state storage instance.
-     *
-     * @return Equalizer state storage instance.
-     */
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerStorageInterface> getStorage();
+    void setStorage(std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerStorageInterface> storage);
 
     /**
      * Set equalizer mode controller instance.
@@ -76,64 +103,27 @@ public:
      * @param modeController Equalizer mode controller instance.
      */
     void setModeController(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerModeControllerInterface>
-            modeController);
-
-    /**
-     * Returns equalizer mode controller instance.
-     *
-     * @return Equalizer mode controller instance.
-     */
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerModeControllerInterface>
-    getModeController();
-
-    /**
-     * Adds @c EqualizerInterface instance to be used by the SDK.
-     *
-     * @param equalizer @c EqualizerInterface instance to be used by the SDK.
-     */
-    void addEqualizer(std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerInterface> equalizer);
-
-    /**
-     * Adds @c EqualizerControllerListenerInterface instance to be used by the SDK.
-     *
-     * @param listener @c EqualizerControllerListenerInterface instance to be used by the SDK.
-     */
-    void addEqualizerControllerListener(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerControllerListenerInterface>
-            listener);
-
-    /**
-     * Returns a list of all equalizers that are going to be used by the SDK.
-     *
-     * @return List of all equalizers that are going to be used by the SDK.
-     */
-    std::list<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerInterface>> getAllEqualizers();
-
-    /**
-     * Returns a list of all equalizer controller listeners that are going to be used by the SDK.
-     *
-     * @return List of all equalizer controller listeners that are going to be used by the SDK.
-     */
-    std::list<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerControllerListenerInterface>>
-    getAllEqualizerControllerListeners();
+        std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerModeControllerInterface> modeController);
 
 private:
     /// Equalizer configuration instance.
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerConfigurationInterface> m_configuration;
+    std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerConfigurationInterface> m_configuration;
 
     /// Equalizer mode controller instance.
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerModeControllerInterface> m_modeController;
+    std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerModeControllerInterface> m_modeController;
 
     /// Equalizer state storage instance.
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerStorageInterface> m_storage;
+    std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerStorageInterface> m_storage;
 
     /// List of equalizers to be used by the SDK.
-    std::list<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerInterface>> m_equalizers;
+    std::list<std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerInterface>> m_equalizers;
 
     /// List of listeners to be subscribed to @c EqualizerController.
-    std::list<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::EqualizerControllerListenerInterface>>
+    std::list<std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerControllerListenerInterface>>
         m_equalizerControllerListeners;
+
+    /// Whether the equalizer is enabled.
+    bool m_isEnabled;
 };
 
 }  // namespace smartScreenClient

@@ -78,6 +78,9 @@ static const std::string MESSAGE_TYPE_DISPLAY_METRICS("displayMetrics");
 /// The message type for toggling captions.
 static const std::string MESSAGE_TYPE_TOGGLE_CAPTIONS("toggleCaptions");
 
+/// The message type for toggling DoNotDisturb.
+static const std::string MESSAGE_TYPE_TOGGLE_DONOTDISTURB("toggleDoNotDisturb");
+
 /// Key for isSupported.
 static const std::string IS_SUPPORTED_TAG("isSupported");
 
@@ -301,6 +304,9 @@ GUIClient::GUIClient(
         MESSAGE_TYPE_DISPLAY_METRICS, [this](rapidjson::Document& payload) { executeHandleDisplayMetrics(payload); });
     m_messageHandlers.emplace(
         MESSAGE_TYPE_TOGGLE_CAPTIONS, [this](rapidjson::Document& payload) { m_captionManager.toggleCaptions(); });
+    m_messageHandlers.emplace(MESSAGE_TYPE_TOGGLE_DONOTDISTURB, [this](rapidjson::Document& payload) {
+        m_guiManager->handleToggleDoNotDisturbEvent();
+    });
 }
 
 void GUIClient::doShutdown() {
@@ -814,6 +820,7 @@ void GUIClient::onConnectionOpened() {
         if (m_observer) {
             m_observer->onConnectionOpened();
         }
+        m_guiManager->handleOnMessagingServerConnectionOpened();
     });
 }
 
@@ -880,7 +887,8 @@ void GUIClient::clearData() {
 void GUIClient::renderPlayerInfoCard(
     const std::string& jsonPayload,
     smartScreenSDKInterfaces::AudioPlayerInfo info,
-    alexaClientSDK::avsCommon::avs::FocusState focusState) {
+    alexaClientSDK::avsCommon::avs::FocusState focusState,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) {
     auto message = messages::RenderPlayerInfoMessage(jsonPayload, info);
     sendMessage(message);
 }
@@ -899,6 +907,12 @@ void GUIClient::renderCaptions(const std::string& payload) {
         auto message = messages::RenderCaptionsMessage(payload);
         sendMessage(message);
     }
+}
+
+void GUIClient::onDoNotDisturbSettingChanged(bool enable) {
+    ACSDK_DEBUG5(LX(__func__));
+    auto message = messages::DoNotDisturbSettingChangedMessage(enable);
+    sendMessage(message);
 }
 
 bool GUIClient::handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::NavigationEvent event) {

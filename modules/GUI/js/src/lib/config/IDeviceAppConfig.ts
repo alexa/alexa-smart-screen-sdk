@@ -51,6 +51,8 @@ export interface IDeviceKeys {
     backKey : IDeviceKey;
     /** Key to toggle captions */
     toggleCaptionsKey : IDeviceKey;
+    /** Key to toggle DoNotDisturb */
+    toggleDoNotDisturbKey : IDeviceKey;
 }
 
 /**

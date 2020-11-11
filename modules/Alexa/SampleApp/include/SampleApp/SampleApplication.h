@@ -16,10 +16,21 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_SAMPLEAPPLICATION_H_
 #define ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_SAMPLEAPPLICATION_H_
 
+#include <fstream>
+#include <map>
 #include <memory>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include <AVSCommon/AVS/Initialization/AlexaClientSDKInit.h>
+#include <AVSCommon/SDKInterfaces/ApplicationMediaInterfaces.h>
+#include <AVSCommon/SDKInterfaces/ChannelVolumeInterface.h>
+#include <AVSCommon/SDKInterfaces/Diagnostics/DiagnosticsInterface.h>
+#include <AVSCommon/Utils/MediaPlayer/PooledMediaPlayerFactory.h>
+#include <CapabilitiesDelegate/CapabilitiesDelegate.h>
+#include <acsdkExternalMediaPlayer/ExternalMediaPlayer.h>
 
 #include "ConsolePrinter.h"
 #include "SmartScreenClient/EqualizerRuntimeSetup.h"
@@ -45,20 +56,8 @@
 #include <BlueZ/PulseAudioBluetoothInitializer.h>
 #endif
 
-#include <CapabilitiesDelegate/CapabilitiesDelegate.h>
-#include <ExternalMediaPlayer/ExternalMediaPlayer.h>
-#include <AVSCommon/Utils/MediaPlayer/PooledMediaPlayerFactory.h>
-
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
-
-#ifdef GSTREAMER_MEDIA_PLAYER
-using ApplicationMediaPlayer = alexaClientSDK::mediaPlayer::MediaPlayer;
-#elif defined(ANDROID_MEDIA_PLAYER)
-using ApplicationMediaPlayer = mediaPlayer::android::AndroidSLESMediaPlayer;
-#elif defined(UWP_BUILD)
-using ApplicationMediaPlayer = alexaSmartScreenSDK::sssdkCommon::TestMediaPlayer;
-#endif
 
 /// Class to manage the top-level components of the AVS Client Application
 class SampleApplication {
@@ -90,8 +89,8 @@ public:
     /// Destructor which manages the @c SampleApplication shutdown sequence.
     ~SampleApplication();
 #ifdef UWP_BUILD
-    std::shared_ptr<smartScreenSDKInterfaces::MessageListenerInterface> getMessageSink() {
-        return m_guiMessaging;
+    std::shared_ptr<gui::GUIClient> getGUIClient() {
+        return m_guiClient;
     }
 
     std::shared_ptr<gui::GUIManager> getGUIManager() {
@@ -103,16 +102,12 @@ public:
      *
      * @param httpContentFetcherFactory The HTTPContentFetcherFactory to be used while creating the mediaPlayers.
      * @param equalizerRuntimeSetup Equalizer runtime setup to register equalizers
-     * @param additionalSpeakers The @c SpeakerInterface to add the created mediaPlayer.
      * @return @c true if the mediaPlayer of all the registered adapters could be created @c false otherwise.
      */
     bool createMediaPlayersForAdapters(
-        std::shared_ptr<alexaClientSDK::avsCommon::utils::libcurlUtils::HTTPContentFetcherFactory>
+        const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::HTTPContentFetcherInterfaceFactoryInterface>&
             httpContentFetcherFactory,
-        std::shared_ptr<smartScreenClient::EqualizerRuntimeSetup> equalizerRuntimeSetup,
-        std::multimap<
-            alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type,
-            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface>>& additionalSpeakers);
+        const std::shared_ptr<smartScreenClient::EqualizerRuntimeSetup> equalizerRuntimeSetup);
 
     /**
      * Instances of this class register ExternalMediaAdapters. Each adapter registers itself by instantiating
@@ -128,8 +123,7 @@ public:
          */
         AdapterRegistration(
             const std::string& playerId,
-            alexaClientSDK::capabilityAgents::externalMediaPlayer::ExternalMediaPlayer::AdapterCreateFunction
-                createFunction);
+            alexaClientSDK::acsdkExternalMediaPlayer::ExternalMediaPlayer::AdapterCreateFunction createFunction);
     };
 
     /**
@@ -174,18 +168,42 @@ private:
      * @param enableEqualizer Flag indicating if equalizer should be enabled for this media player.
      * @param name The media player instance name used for logging purpose.
      * @param enableLiveMode Flag, indicating if the player is in live mode.
-     * @return A pointer to the @c ApplicationMediaPlayer and to its speaker if it succeeds; otherwise, return @c
-     * nullptr.
+     * @return Application Media interface if it succeeds; otherwise, return @c nullptr.
      */
-    std::pair<
-        std::shared_ptr<ApplicationMediaPlayer>,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface>>
-    createApplicationMediaPlayer(
-        std::shared_ptr<alexaClientSDK::avsCommon::utils::libcurlUtils::HTTPContentFetcherFactory>
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ApplicationMediaInterfaces> createApplicationMediaPlayer(
+        const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::HTTPContentFetcherInterfaceFactoryInterface>&
             httpContentFetcherFactory,
         bool enableEqualizer,
         const std::string& name,
         bool enableLiveMode = false);
+
+#ifdef ENABLE_ENDPOINT_CONTROLLERS
+    /**
+     * Function to add Toggle, Range and Mode handlers to the Default endpoint.
+     *
+     * @param defaultEndpointBuilder The reference to default endpoint's @c EndpointBuilderInterface used for adding
+     * controllers.
+     * @return Returns @c true if successful in adding all the three controllers otherwise @c false.
+     */
+
+    bool addControllersToDefaultEndpoint(
+        std::shared_ptr<avsCommon::sdkInterfaces::endpoints::EndpointBuilderInterface> defaultEndpointBuilder);
+
+    /**
+     * Function to add Power, Toggle, Range and Mode handlers to the Peripheral endpoint.
+     *
+     * @param peripheralEndpointBuilder The reference to peripheral endpoint's @c EndpointBuilder used for adding
+     * controllers.
+     * @return Returns @c true if successful in adding all the four controllers otherwise @c false.
+     */
+    bool addControllersToPeripheralEndpoint(
+        std::shared_ptr<avsCommon::sdkInterfaces::endpoints::EndpointBuilderInterface> peripheralEndpointBuilder);
+#endif
+    /// Object with which to trigger shutdown operations.
+    std::shared_ptr<alexaClientSDK::acsdkShutdownManagerInterfaces::ShutdownManagerInterface> m_shutdownManager;
+
+    /// Object to manage lifecycle of Alexa Client SDK initialization.
+    std::shared_ptr<alexaClientSDK::avsCommon::avs::initialization::AlexaClientSDKInit> m_sdkInit;
 
     /// The @c GUIClient
     std::shared_ptr<gui::GUIClient> m_guiClient;
@@ -201,53 +219,50 @@ private:
     std::unordered_map<std::string, std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface>>
         m_externalMusicProviderSpeakersMap;
 
-    /// The vector of mediaPlayers for the adapters.
-    std::vector<std::shared_ptr<ApplicationMediaPlayer>> m_adapterMediaPlayers;
+    /// The vector of components requiring shutdown
+    std::vector<std::shared_ptr<alexaClientSDK::avsCommon::utils::RequiresShutdown>> m_shutdownRequiredList;
 
     /// The @c MediaPlayer used by @c SpeechSynthesizer.
-    std::shared_ptr<ApplicationMediaPlayer> m_speakMediaPlayer;
-
-    /// The @c MediaPlayerFactory used by @c AudioPlayer.
-    std::unique_ptr<alexaClientSDK::mediaPlayer::PooledMediaPlayerFactory> m_audioMediaPlayerFactory;
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface> m_speakMediaPlayer;
 
     /// The Pool of @c MediaPlayers used by @c AudioPlayer (via @c PooledMediaPlayerFactory)
-    std::vector<std::shared_ptr<ApplicationMediaPlayer>> m_audioMediaPlayerPool;
+    std::vector<std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface>>
+        m_audioMediaPlayerPool;
 
     /// The @c MediaPlayer used by @c Alerts.
-    std::shared_ptr<ApplicationMediaPlayer> m_alertsMediaPlayer;
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface> m_alertsMediaPlayer;
 
     /// The @c MediaPlayer used by @c NotificationsCapabilityAgent.
-    std::shared_ptr<ApplicationMediaPlayer> m_notificationsMediaPlayer;
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface> m_notificationsMediaPlayer;
 
     /// The @c MediaPlayer used by @c Bluetooth.
-    std::shared_ptr<ApplicationMediaPlayer> m_bluetoothMediaPlayer;
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface> m_bluetoothMediaPlayer;
 
     /// The @c MediaPlayer used by @c SystemSoundPlayer.
-    std::shared_ptr<ApplicationMediaPlayer> m_systemSoundMediaPlayer;
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface> m_systemSoundMediaPlayer;
 
 #ifdef ENABLE_COMMS_AUDIO_PROXY
     /// The @c MediaPlayer used by @c Comms.
-    std::shared_ptr<ApplicationMediaPlayer> m_commsMediaPlayer;
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface> m_commsMediaPlayer;
 #endif
 
 #ifdef ENABLE_PCC
     /// The @c MediaPlayer used by PhoneCallController.
-    std::shared_ptr<ApplicationMediaPlayer> m_phoneMediaPlayer;
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface> m_phoneMediaPlayer;
 #endif
 
     /// The @c CapabilitiesDelegate used by the client.
     std::shared_ptr<alexaClientSDK::capabilitiesDelegate::CapabilitiesDelegate> m_capabilitiesDelegate;
 
     /// The @c MediaPlayer used by @c NotificationsCapabilityAgent.
-    std::shared_ptr<ApplicationMediaPlayer> m_ringtoneMediaPlayer;
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface> m_ringtoneMediaPlayer;
 
-    /// The singleton map from @c playerId to @c SpeakerInterface::Type.
+    /// The singleton map from @c playerId to @c ChannelVolumeInterface::Type.
     static std::unordered_map<std::string, alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type>
         m_playerToSpeakerTypeMap;
 
     /// The singleton map from @c playerId to @c ExternalMediaAdapter creation functions.
-    static alexaClientSDK::capabilityAgents::externalMediaPlayer::ExternalMediaPlayer::AdapterCreationMap
-        m_adapterToCreateFuncMap;
+    static alexaClientSDK::acsdkExternalMediaPlayer::ExternalMediaPlayer::AdapterCreationMap m_adapterToCreateFuncMap;
 
 #ifdef KWD
     /// The Wakeword Detector which can wake up the client using audio input.
@@ -259,13 +274,29 @@ private:
     std::shared_ptr<applicationUtilities::androidUtilities::AndroidSLESEngine> m_openSlEngine;
 #endif
 
-#ifdef UWP_BUILD
-    std::shared_ptr<smartScreenSDKInterfaces::MessageListenerInterface> m_guiMessaging;
+#ifdef BLUETOOTH_BLUEZ_PULSEAUDIO_OVERRIDE_ENDPOINTS
+    /// Initializer object to reload PulseAudio Bluetooth modules.
+    std::shared_ptr<bluetoothImplementations::blueZ::PulseAudioBluetoothInitializer> m_pulseAudioInitializer;
 #endif
 
-#ifdef BLUETOOTH_BLUEZ_PULSEAUDIO_OVERRIDE_ENDPOINTS
-    /// Iniitalizer object to reload PulseAudio Bluetooth modules.
-    std::shared_ptr<bluetoothImplementations::blueZ::PulseAudioBluetoothInitializer> m_pulseAudioInitializer;
+#ifdef POWER_CONTROLLER
+    /// The @c PeripheralEndpointPowerControllerHandler used by @c InteractionManager
+    std::shared_ptr<PeripheralEndpointPowerControllerHandler> m_peripheralEndpointPowerHandler;
+#endif
+
+#ifdef TOGGLE_CONTROLLER
+    /// The @c PeripheralEndpointToggleControllerHandler used by @c InteractionManager
+    std::shared_ptr<PeripheralEndpointToggleControllerHandler> m_peripheralEndpointToggleHandler;
+#endif
+
+#ifdef RANGE_CONTROLLER
+    /// The @c PeripheralEndpointRangeControllerHandler used by @c InteractionManager
+    std::shared_ptr<PeripheralEndpointRangeControllerHandler> m_peripheralEndpointRangeHandler;
+#endif
+
+#ifdef MODE_CONTROLLER
+    /// The @c PeripheralEndpointModeControllerHandler used by @c InteractionManager
+    std::shared_ptr<PeripheralEndpointModeControllerHandler> m_peripheralEndpointModeHandler;
 #endif
 };
 

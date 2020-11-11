@@ -14,16 +14,13 @@
  */
 
 #include <AVSCommon/Utils/Logger/Logger.h>
-#include <SmartScreenClient/EqualizerRuntimeSetup.h>
 
 #include "SmartScreenClient/EqualizerRuntimeSetup.h"
 
 namespace alexaSmartScreenSDK {
 namespace smartScreenClient {
 
-using namespace alexaClientSDK;
-using namespace alexaClientSDK::avsCommon::sdkInterfaces;
-using namespace alexaClientSDK::avsCommon::sdkInterfaces::audio;
+using namespace alexaClientSDK::acsdkEqualizerInterfaces;
 
 /// String to identify log entries originating from this file.
 static const std::string TAG("EqualizerRuntimeSetup");
@@ -35,6 +32,22 @@ static const std::string TAG("EqualizerRuntimeSetup");
  */
 #define LX(event) alexaClientSDK::avsCommon::utils::logger::LogEntry(TAG, event)
 
+std::shared_ptr<EqualizerRuntimeSetupInterface> EqualizerRuntimeSetup::createEqualizerRuntimeSetupInterface(
+    const std::shared_ptr<EqualizerConfigurationInterface>& equalizerConfiguration,
+    const std::shared_ptr<EqualizerStorageInterface>& equalizerStorage,
+    const std::shared_ptr<EqualizerModeControllerInterface>& equalizerModeController) {
+    if (equalizerConfiguration && equalizerConfiguration->isEnabled()) {
+        auto equalizerRuntimeSetup = std::make_shared<EqualizerRuntimeSetup>();
+        equalizerRuntimeSetup->setStorage(equalizerStorage);
+        equalizerRuntimeSetup->setConfiguration(equalizerConfiguration);
+        equalizerRuntimeSetup->setModeController(equalizerModeController);
+
+        return equalizerRuntimeSetup;
+    }
+
+    return std::make_shared<EqualizerRuntimeSetup>(false);
+}
+
 void EqualizerRuntimeSetup::setConfiguration(std::shared_ptr<EqualizerConfigurationInterface> configuration) {
     m_configuration = configuration;
 }
@@ -43,7 +56,7 @@ std::shared_ptr<EqualizerConfigurationInterface> EqualizerRuntimeSetup::getConfi
     return m_configuration;
 }
 
-std::shared_ptr<avsCommon::sdkInterfaces::audio::EqualizerStorageInterface> EqualizerRuntimeSetup::getStorage() {
+std::shared_ptr<EqualizerStorageInterface> EqualizerRuntimeSetup::getStorage() {
     return m_storage;
 }
 
@@ -59,17 +72,27 @@ std::shared_ptr<EqualizerModeControllerInterface> EqualizerRuntimeSetup::getMode
     return m_modeController;
 }
 
-void EqualizerRuntimeSetup::addEqualizer(std::shared_ptr<EqualizerInterface> equalizer) {
+bool EqualizerRuntimeSetup::addEqualizer(std::shared_ptr<EqualizerInterface> equalizer) {
+    if (!isEnabled()) {
+        ACSDK_ERROR(LX("addEqualizerFailed").m("Equalizer not enabled"));
+        return false;
+    }
     m_equalizers.push_back(equalizer);
+    return true;
 }
 
 std::list<std::shared_ptr<EqualizerInterface>> EqualizerRuntimeSetup::getAllEqualizers() {
     return m_equalizers;
 }
 
-void EqualizerRuntimeSetup::addEqualizerControllerListener(
+bool EqualizerRuntimeSetup::addEqualizerControllerListener(
     std::shared_ptr<EqualizerControllerListenerInterface> listener) {
+    if (!isEnabled()) {
+        ACSDK_ERROR(LX("addEqualizerControllerListenerFailed").m("Equalizer not enabled"));
+        return false;
+    }
     m_equalizerControllerListeners.push_back(listener);
+    return true;
 }
 
 std::list<std::shared_ptr<EqualizerControllerListenerInterface>> EqualizerRuntimeSetup::
@@ -77,7 +100,12 @@ std::list<std::shared_ptr<EqualizerControllerListenerInterface>> EqualizerRuntim
     return m_equalizerControllerListeners;
 }
 
-EqualizerRuntimeSetup::EqualizerRuntimeSetup() {
+bool EqualizerRuntimeSetup::isEnabled() {
+    return m_isEnabled;
+}
+
+EqualizerRuntimeSetup::EqualizerRuntimeSetup(bool isEnabled) {
+    m_isEnabled = isEnabled;
 }
 
 }  // namespace smartScreenClient

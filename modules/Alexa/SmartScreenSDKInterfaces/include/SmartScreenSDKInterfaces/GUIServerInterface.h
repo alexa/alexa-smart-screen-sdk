@@ -201,7 +201,6 @@ public:
      */
     virtual std::chrono::milliseconds getAudioItemOffset() = 0;
 
-
     virtual void onUserEvent() = 0;
 
     /**
@@ -234,6 +233,16 @@ public:
      * @param event The event in context
      */
     virtual void handleAPLEvent(APLClient::AplRenderingEvent event) = 0;
+
+    /**
+     * Handle toggle Do Not Disturb event
+     */
+    virtual void handleToggleDoNotDisturbEvent() = 0;
+
+    /**
+     * Handle an onConnectionOpened event from the messaging server
+     */
+    virtual void handleOnMessagingServerConnectionOpened() = 0;
 };
 
 }  // namespace smartScreenSDKInterfaces
