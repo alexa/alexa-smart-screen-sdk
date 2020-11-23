@@ -15,7 +15,7 @@
 * Support for APL 1.4 [https://aplspec.aka.corp.amazon.com/release-1.4/html/index.html#apl-specification-1-4]
 * Added APL Telemetry Support
 * TV Overlay Portrait is no longer supported
-* Added support for APL Extensions [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html#apl-extensions-and-the-backstack]
+* Added support for APL Extensions [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-4.html#apl-extensions-and-the-backstack]
  
 #### Bug fixes
 * Correctly handle GUI state when presenting content over attenuated PlayerInfo card
