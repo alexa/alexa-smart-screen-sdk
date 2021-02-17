@@ -263,7 +263,7 @@ void TemplateRuntime::renderDocument(
     m_activeNonPlayerInfoType = NonPlayerInfoDisplayType::ALEXA_PRESENTATION;
 }
 
-void TemplateRuntime::clearDocument() {
+void TemplateRuntime::clearDocument(const std::string& token) {
     m_executor->submit([this]() { executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType::ALEXA_PRESENTATION); });
 }
 
@@ -274,10 +274,11 @@ void TemplateRuntime::dataSourceUpdate(
     const std::string& jsonPayload,
     const std::string& token) {
 }
-void TemplateRuntime::interruptCommandSequence() {
+void TemplateRuntime::interruptCommandSequence(const std::string& token) {
 }
 
-void TemplateRuntime::onPresentationSessionChanged() {}
+void TemplateRuntime::onPresentationSessionChanged(const std::string& id, const std::string& skillId) {
+}
 
 void TemplateRuntime::addObserver(
     std::shared_ptr<smartScreenSDKInterfaces::TemplateRuntimeObserverInterface> observer) {
@@ -349,7 +350,7 @@ void TemplateRuntime::doShutdown() {
     m_activeRenderPlayerInfoCardsProvider.reset();
     m_audioItemsInExecution.clear();
     m_audioPlayerInfo.clear();
-    for (const auto renderPlayerInfoCardsInterface : m_renderPlayerInfoCardsInterfaces) {
+    for (const auto& renderPlayerInfoCardsInterface : m_renderPlayerInfoCardsInterfaces) {
         renderPlayerInfoCardsInterface->setObserver(nullptr);
     }
     m_renderPlayerInfoCardsInterfaces.clear();
@@ -401,10 +402,12 @@ void TemplateRuntime::executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType c
 }
 
 void TemplateRuntime::setHandlingCompleted(std::shared_ptr<DirectiveInfo> info) {
-    if (info && info->result) {
-        info->result->setCompleted();
+    if (info) {
+        if (info->result) {
+            info->result->setCompleted();
+        }
+        removeDirective(info);
     }
-    removeDirective(info);
 }
 
 void TemplateRuntime::handleRenderTemplateDirective(std::shared_ptr<DirectiveInfo> info) {
@@ -624,8 +627,9 @@ void TemplateRuntime::executeRenderPlayerInfoCallbacks(bool isClearCard) {
     ACSDK_DEBUG3(LX("executeRenderPlayerInfoCallbacks").d("isClearCard", isClearCard ? "True" : "False"));
     if (isClearCard) {
         for (auto& observer : m_observers) {
-            observer->clearPlayerInfoCard();
+            observer->clearPlayerInfoCard(m_playerInfoCardToken);
         }
+        m_playerInfoCardToken = "";
     } else {
         if (!m_activeRenderPlayerInfoCardsProvider) {
             ACSDK_ERROR(
@@ -653,7 +657,11 @@ void TemplateRuntime::executeRenderTemplateCallbacks(bool isClearCard) {
     for (auto& observer : m_observers) {
         if (isClearCard) {
             executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType::RENDER_TEMPLATE);
-            observer->clearTemplateCard();
+            if (!m_nonPlayerInfoCardToken.empty()) {
+                observer->clearTemplateCard(m_nonPlayerInfoCardToken);
+            }
+
+            m_nonPlayerInfoCardToken = "";
         } else {
             m_activeNonPlayerInfoType = NonPlayerInfoDisplayType::RENDER_TEMPLATE;
             observer->renderTemplateCard(m_lastDisplayedDirective->directive->getPayload(), m_focus);
@@ -931,6 +939,17 @@ void TemplateRuntime::executeCardClearedEvent() {
 std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityConfiguration>> TemplateRuntime::
     getCapabilityConfigurations() {
     return m_capabilityConfigurations;
+}
+
+void TemplateRuntime::processPresentationResult(const std::string& token) {
+    if (!m_lastDisplayedDirective || m_activeNonPlayerInfoType == NonPlayerInfoDisplayType::ALEXA_PRESENTATION) return;
+
+    const std::string displayedDirectiveName = m_lastDisplayedDirective->directive->getName();
+    if (RENDER_TEMPLATE == displayedDirectiveName) {
+        m_nonPlayerInfoCardToken = token;
+    } else if (RENDER_PLAYER_INFO == displayedDirectiveName) {
+        m_playerInfoCardToken = token;
+    }
 }
 
 }  // namespace templateRuntime

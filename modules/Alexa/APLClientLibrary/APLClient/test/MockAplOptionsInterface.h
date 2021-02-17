@@ -44,9 +44,10 @@ public:
     MOCK_METHOD0(getMaxNumberOfConcurrentDownloads, int());
     MOCK_METHOD0(getMetricsRecorder, Telemetry::AplMetricsRecorderInterfacePtr());
     MOCK_METHOD1(setMetricsRecorder, void(Telemetry::AplMetricsRecorderInterfacePtr));
-    MOCK_METHOD6(
+    MOCK_METHOD7(
         onExtensionEvent,
         void(
+            const std::string& aplToken,
             const std::string& uri,
             const std::string& name,
             const std::string& source,

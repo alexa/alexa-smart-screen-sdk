@@ -26,6 +26,10 @@
 
 #include "Message.h"
 
+namespace alexaSmartScreenSDK {
+namespace sampleApp {
+namespace messages {
+
 /// The message type for initRequest.
 const std::string GUI_MSG_TYPE_INIT_REQUEST("initRequest");
 
@@ -110,10 +114,6 @@ const char GUI_MSG_AUDIO_PLAYER_STATE_TAG[] = "audioPlayerState";
 /// The audioOffset json key in the message.
 const char GUI_MSG_AUDIO_OFFSET_TAG[] = "audioOffset";
 
-namespace alexaSmartScreenSDK {
-namespace sampleApp {
-namespace messages {
-
 /**
  * The @c GUIClientMessage base class for @c Messages sent to GUI Client.
  */
@@ -136,6 +136,16 @@ public:
      */
     GUIClientMessage& setParsedPayload(const std::string& payload) {
         mDocument.AddMember(MSG_PAYLOAD_TAG, mParsedDocument.Parse(payload), mDocument.GetAllocator());
+        return *this;
+    }
+
+    /**
+     * Sets the windowId for this message
+     * @param windowId The target windowId of
+     * @return this
+     */
+    GUIClientMessage& setWindowId(const std::string& windowId) {
+        mDocument.AddMember(MSG_WINDOWID_TAG, windowId, mDocument.GetAllocator());
         return *this;
     }
 };
@@ -291,9 +301,11 @@ public:
     /**
      * Constructor.
      *
+     * @param windowId The target windowId for this message.
      * @param payload The APL Core message object to serialize.
      */
-    AplCoreMessage(std::string payload) : GUIClientMessage(GUI_MSG_TYPE_APL_CORE) {
+    AplCoreMessage(std::string windowId, std::string payload) : GUIClientMessage(GUI_MSG_TYPE_APL_CORE) {
+        setWindowId(windowId);
         setParsedPayload(payload);
     }
 };
@@ -340,7 +352,8 @@ public:
  */
 class ClearRenderTemplateCardMessage : public GUIClientMessage {
 public:
-    ClearRenderTemplateCardMessage() : GUIClientMessage(GUI_MSG_TYPE_CLEAR_TEMPLATE_CARD) {
+    ClearRenderTemplateCardMessage(std::string windowId) : GUIClientMessage(GUI_MSG_TYPE_CLEAR_TEMPLATE_CARD) {
+        setWindowId(windowId);
     }
 };
 
@@ -358,7 +371,8 @@ public:
  */
 class ClearDocumentMessage : public GUIClientMessage {
 public:
-    ClearDocumentMessage() : GUIClientMessage(GUI_MSG_TYPE_CLEAR_DOCUMENT) {
+    ClearDocumentMessage(std::string windowId) : GUIClientMessage(GUI_MSG_TYPE_CLEAR_DOCUMENT) {
+        setWindowId(windowId);
     }
 };
 

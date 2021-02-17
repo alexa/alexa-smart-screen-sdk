@@ -31,8 +31,10 @@ export declare abstract class MultiChildScrollable extends Scrollable<IMultiChil
     protected fullyLoaded: boolean;
     constructor(renderer: APLRenderer, component: APL.Component, factory: FactoryFunction, parent?: Component);
     init(): void;
-    private adjustIndices(target, insert);
     setProperties(props: IMultiChildScrollableProperties): Promise<void>;
+    destroy(): void;
+    protected allowFocus(requestedDistance: number, moveTo: HTMLDivElement): boolean;
+    private adjustIndices(target, insert);
     private updateUponChildrenChange;
     private setSnapAlign;
     private setSnapType;
@@ -40,6 +42,5 @@ export declare abstract class MultiChildScrollable extends Scrollable<IMultiChil
     private setScrollDirection;
     private onScroll(relativePosition);
     private createItem(index, insertAt?);
-    protected allowFocus(requestedDistance: number, moveTo: HTMLDivElement): boolean;
     private onUpdate;
 }

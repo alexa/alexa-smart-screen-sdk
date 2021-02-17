@@ -8,14 +8,22 @@ import {
     AudioTrack,
     Component,
     FactoryFunction,
+    IAPLOptions,
     IVideoFactory,
     PlaybackState,
-    Video
+    Video,
+    VideoHolder
 } from 'apl-client';
 import { FocusManager } from '../focus/FocusManager';
 import { ChannelName } from '../focus/ChannelName';
 import { FocusState } from '../focus/FocusState';
 import { ActivityTracker } from '../activity/ActivityTracker';
+
+/// Default volume value for the player.
+const DEFAULT_VOLUME = 1;
+
+/// Low volume value for the player.
+const LOW_VOLUME = 0.2;
 
 /**
  * Factory class which creates AVSVideo objects
@@ -33,7 +41,11 @@ export class AVSVideoFactory implements IVideoFactory {
                   component : APL.Component,
                   factory : FactoryFunction,
                   parent? : Component) : AbstractVideoComponent {
-        return new AVSVideo(this.focusManager, this.activityTracker, renderer, component, factory, parent);
+        if ((renderer.options as IAPLOptions).environment.disallowVideo) {
+            return new VideoHolder(renderer, component, factory, parent);
+        } else {
+            return new AVSVideo(this.focusManager, this.activityTracker, renderer, component, factory, parent);
+        }
     }
 }
 
@@ -151,15 +163,15 @@ export class AVSVideo extends Video {
                 this.focusToken = undefined;
                 break;
             case FocusState.FOREGROUND:
-                this.player.unmute();
+                this.player.setVolume(DEFAULT_VOLUME);
 
                 if (this.playbackFocusResolver) {
                     this.playbackFocusResolver.resolve();
                 }
                 break;
             case FocusState.BACKGROUND:
-                // Do not start playback with only background focus as it causes an undesirable user experience
-                this.player.mute();
+                // Lower the volume for ducking experience
+                this.player.setVolume(LOW_VOLUME);
                 break;
             default:
                 console.error('Unknown focus state');

@@ -90,7 +90,7 @@ public:
      *
      * @param userEventPayload the user event payload.
      */
-    virtual void handleUserEvent(std::string userEventPayload) = 0;
+    virtual void handleUserEvent(const std::string& token, std::string userEventPayload) = 0;
 
     /**
      * Handle DataSourceFetchRequestEvent.
@@ -98,14 +98,14 @@ public:
      * @param type type of DataSource asking for fetch.
      * @param payload event payload.
      */
-    virtual void handleDataSourceFetchRequestEvent(std::string type, std::string payload) = 0;
+    virtual void handleDataSourceFetchRequestEvent(const std::string& token, std::string type, std::string payload) = 0;
 
     /**
      * Handle RuntimeError event.
      *
      * @param payload event payload.
      */
-    virtual void handleRuntimeErrorEvent(std::string payload) = 0;
+    virtual void handleRuntimeErrorEvent(const std::string& token, std::string payload) = 0;
 
     /**
      * Handle visual context received in a message.
@@ -113,7 +113,7 @@ public:
      * @param token The token visual context token.
      * @param payload The visual context payload.
      */
-    virtual void handleVisualContext(uint64_t token, std::string payload) = 0;
+    virtual void handleVisualContext(const std::string& token, uint64_t stateRequestToken, std::string payload) = 0;
 
     /**
      * Handle focus acquire requests.
@@ -157,18 +157,11 @@ public:
      * Handle activityEvent message.
      *
      * @param event the activity event.
-     */
-    virtual void handleActivityEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::ActivityEvent event) = 0;
-
-    /**
-     * Handle activityEvent message.
-     *
-     * @param source The source of the activity event
-     * @param event the activity event.
+     * @param source The source of the activity event. Default empty string.
      */
     virtual void handleActivityEvent(
-        const std::string& source,
-        alexaSmartScreenSDK::smartScreenSDKInterfaces::ActivityEvent event) = 0;
+        alexaSmartScreenSDK::smartScreenSDKInterfaces::ActivityEvent event,
+        const std::string& source = "") = 0;
 
     /**
      * Handle event the navigation event.
@@ -182,7 +175,7 @@ public:
      *
      * @param timeout timeout in milliseconds.
      */
-    virtual void setDocumentIdleTimeout(std::chrono::milliseconds timeout) = 0;
+    virtual void setDocumentIdleTimeout(const std::string& token, std::chrono::milliseconds timeout) = 0;
 
     /**
      * Handle device window state received in a message.
@@ -225,7 +218,7 @@ public:
      *
      * @param metrics the recorded metrics
      */
-    virtual void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric> &metrics) = 0;
+    virtual void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric>& metrics) = 0;
 
     /**
      * Handle APL context inflate started event.

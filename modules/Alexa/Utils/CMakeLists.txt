@@ -10,4 +10,4 @@ target_include_directories(Utils INTERFACE
     "${Utils_SOURCE_DIR}/include")
 
 # install target
-asdk_install()
+asdk_install_interface()

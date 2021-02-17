@@ -110,29 +110,34 @@ public:
     /// @{
     void renderTemplateCard(const std::string& jsonPayload, alexaClientSDK::avsCommon::avs::FocusState focusState)
         override;
-    void clearTemplateCard() override;
+    void clearTemplateCard(const std::string& token) override;
     void renderPlayerInfoCard(
         const std::string& jsonPayload,
         smartScreenSDKInterfaces::AudioPlayerInfo info,
         alexaClientSDK::avsCommon::avs::FocusState focusState,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) override;
-    void clearPlayerInfoCard() override;
+    void clearPlayerInfoCard(const std::string& token) override;
     /// @}
 
     // @name AlexaPresentationObserverInterface Functions
     /// @{
-    void interruptCommandSequence() override;
+    void interruptCommandSequence(const std::string& token) override;
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
-    void clearDocument() override;
+    void clearDocument(const std::string& token) override;
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
     void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
         override;
-    void onPresentationSessionChanged() override;
+    void onPresentationSessionChanged(const std::string& id, const std::string& skillId) override;
+    void onRenderDirectiveReceived(const std::string& token, const std::chrono::steady_clock::time_point& receiveTime)
+        override;
+    void onRenderingAborted(const std::string& token) override;
+    void onMetricRecorderAvailable(
+        std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) override;
     /// @}
 
     // @name VisualStateProviderInterface Functions
     /// @{
-    void provideState(const unsigned int stateRequestToken) override;
+    void provideState(const std::string& aplToken, const unsigned int stateRequestToken) override;
     /// @}
 
     /// @name GUIClientInterface Functions
@@ -466,6 +471,38 @@ private:
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver);
 
+    /**
+     * Extracts the document section from an APL payload
+     * @param jsonPayload
+     * @return The extracted document
+     */
+    std::string extractDocument(const std::string& jsonPayload);
+
+    /**
+     * Extracts the datasource from an APL payload
+     * @param jsonPayload
+     * @return The extracted section
+     */
+    std::string extractDatasources(const std::string& jsonPayload);
+
+    /**
+     * Extracts the SupportedViewports section from a directive
+     * @param jsonPayload
+     * @return The extracted section
+     */
+    std::string extractSupportedViewports(const std::string& jsonPayload);
+
+    /**
+     * Initializes the @ConfigurationNodes for the GUI configs.
+     */
+    void initGuiConfigs();
+
+    /**
+     * Reads the window configuration and initialize @c APLClientRenderers for all window with supported APL extensions.
+     * This function also creates renderPlayerInfo with audioPlayer APL extension.     *
+     */
+    void initializeAllRenderers();
+
     // The GUI manager implementation.
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIServerInterface> m_guiManager;
 
@@ -511,8 +548,11 @@ private:
     /// Server observer
     std::shared_ptr<smartScreenSDKInterfaces::MessagingServerObserverInterface> m_observer;
 
-    // The APL Client Bridge
+    /// The APL Client Bridge
     std::shared_ptr<AplClientBridge> m_aplClientBridge;
+
+    /// Default window Id
+    std::string m_defaultWindowId;
 
     /// Flag to indicate that a fatal failure occurred. In this case, customer can either reset the device or kill
     /// the app.
@@ -536,6 +576,12 @@ private:
 
     /// CaptionManager to manage settings for captions
     SmartScreenCaptionStateManager m_captionManager;
+
+    /// @c ConfigurationNode for VisualCharacteristics
+    alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode m_visualCharacteristics;
+
+    /// @c ConfigurationNode for GUI AppConfig
+    alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode m_guiAppConfig;
 };
 
 }  // namespace gui

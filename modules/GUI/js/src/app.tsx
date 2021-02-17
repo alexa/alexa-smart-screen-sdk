@@ -17,6 +17,7 @@ import {
     IAuthorizationChangeMessage,
     IBaseInboundMessage,
     IBaseOutboundMessage,
+    IClearDocumentMessage,
     IDeviceWindowStateMessage,
     IDoNotDisturbSettingChangedMessage,
     IFocusAcquireRequestMessage,
@@ -54,10 +55,10 @@ const HOST = 'localhost';
 const PORT = 8933;
 
 /// Maximum APL version supported by the runtime.
-const APL_MAX_VERSION = '1.4';
+const APL_MAX_VERSION = '1.5';
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.4';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.5';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
@@ -72,6 +73,7 @@ export interface IAppState {
     updateActiveAPLRendererWindow : boolean;
     captionsMessage : IRenderCaptionsMessage;
     doNotDisturbSettingEnabled : boolean;
+    clearWindow : boolean;
 }
 
 export class App extends React.Component<any, IAppState> {
@@ -90,6 +92,8 @@ export class App extends React.Component<any, IAppState> {
     private lastCaptionTimeOutId : number;
     private toggleCaptionsMessage : OutboundMessageType = 'toggleCaptions';
     private toggleDoNotDisturbMessage : OutboundMessageType = 'toggleDoNotDisturb';
+    private lastRenderedWindowId : string;
+    private aplCoreMessageHandlers : Map<string, (message : IAPLCoreMessage) => void> = new Map();
 
     /**
      * Compare two versions as strings.
@@ -177,6 +181,8 @@ export class App extends React.Component<any, IAppState> {
         let targetWindowId : string = message.windowId ? message.windowId : this.deviceAppConfig.defaultWindowId;
         // Setting the token on the displaying window
         this.setTokenForWindowId(message.token, targetWindowId);
+        this.lastRenderedWindowId = targetWindowId;
+
         this.setState((prevState, props) => ({
                 targetWindowId,
                 updateActiveAPLRendererWindow: true
@@ -186,6 +192,15 @@ export class App extends React.Component<any, IAppState> {
         this.setState({
             updateActiveAPLRendererWindow: false
         });
+    }
+
+    protected handleAPLCore(message : IAPLCoreMessage) {
+        const windowId : string = message.windowId ? message.windowId : this.deviceAppConfig.defaultWindowId;
+
+        let aplCoreMessageHandler = this.aplCoreMessageHandlers.get(windowId);
+        if (aplCoreMessageHandler !== undefined) {
+            aplCoreMessageHandler(message);
+        }
     }
 
     protected handleAlexaStateChangedMessage(message : IBaseInboundMessage) {
@@ -223,10 +238,19 @@ export class App extends React.Component<any, IAppState> {
         });
     }
 
-    protected handleClearNonPlayerInfoWindow() {
+    protected handleClearNonPlayerInfoWindow(message : IClearDocumentMessage) {
         // Clearing the token on the displaying window
         this.setTokenForWindowId(null, this.state.targetWindowId);
-        this.setState({targetWindowId : undefined});
+        this.setState({
+            targetWindowId : message.windowId,
+            clearWindow: true
+        });
+
+        // Make sure clearWindow only updates once.
+        this.setState({
+            targetWindowId : undefined,
+            clearWindow: false
+        });
     }
 
     protected handleOnFocusChanged(message : IBaseInboundMessage) {
@@ -265,10 +289,9 @@ export class App extends React.Component<any, IAppState> {
             document.addEventListener('keydown', this.handleKeyDown.bind(this));
             document.addEventListener('keyup', this.handleKeyUp.bind(this));
 
-            let handleUserInteractionFunction = this.handleUserInteraction();
-            document.addEventListener('touchstart', handleUserInteractionFunction);
-            document.addEventListener('mousedown', handleUserInteractionFunction);
-            document.addEventListener('wheel', handleUserInteractionFunction, {capture: true, passive: true});
+            document.addEventListener('touchstart', this.handleUserInterruption.bind(this));
+            document.addEventListener('mousedown', this.handleUserInterruption.bind(this));
+            document.addEventListener('wheel', this.handleUserInterruption.bind(this), {capture: true, passive: true});
         }
 
         this.sendDeviceWindowState();
@@ -321,7 +344,7 @@ export class App extends React.Component<any, IAppState> {
             }
             case 'clearDocument':
             case 'clearTemplateCard': {
-                this.handleClearNonPlayerInfoWindow();
+                this.handleClearNonPlayerInfoWindow(message as IClearDocumentMessage);
                 break;
             }
             case 'aplRender': {
@@ -329,7 +352,7 @@ export class App extends React.Component<any, IAppState> {
               break;
             }
             case 'aplCore': {
-              this.aplConnection.handleMessage(message as IAPLCoreMessage);
+              this.handleAPLCore(message as IAPLCoreMessage);
               break;
             }
             case 'renderCaptions': {
@@ -379,7 +402,8 @@ export class App extends React.Component<any, IAppState> {
             updateActiveAPLRendererWindow : false,
             targetWindowId : undefined,
             captionsMessage : undefined,
-            doNotDisturbSettingEnabled : undefined
+            doNotDisturbSettingEnabled : undefined,
+            clearWindow: false
         };
 
         this.eventListenersAdded = false;
@@ -491,12 +515,13 @@ export class App extends React.Component<any, IAppState> {
             playerInfoMessage={this.state.playerInfoMessage}
             targetWindowId={this.state.targetWindowId}
             refreshRenderer={
-                this.state.targetWindowId === RENDER_PLAYER_INFO_WINDOW_ID
-                && this.state.updateActiveAPLRendererWindow}
+                this.state.targetWindowId === RENDER_PLAYER_INFO_WINDOW_ID &&
+                this.state.updateActiveAPLRendererWindow}
             windowConfig={this.deviceAppConfig.renderPlayerInfoWindowConfig}
             client={this.aplConnection}
             focusManager={this.focusManager}
             activityTracker={this.activityTracker}
+            aplCoreMessageHandlerCallback={this.setAPLCoreMessageHandler.bind(this)}
           />;
 
         // Create APL Renderer Windows from GUI App Config
@@ -506,14 +531,16 @@ export class App extends React.Component<any, IAppState> {
                     id={window.id}
                     key={window.id}
                     windowConfig={window}
-                    windowState={window.id === this.state.targetWindowId ?
-                        APLRendererWindowState.ACTIVE : APLRendererWindowState.INACTIVE}
+                    windowState={(window.id === this.state.targetWindowId && this.state.clearWindow) ||
+                        (window.id !== this.state.targetWindowId) ?
+                        APLRendererWindowState.INACTIVE : APLRendererWindowState.ACTIVE}
                     refreshRenderer={
                         window.id === this.state.targetWindowId
                         && this.state.updateActiveAPLRendererWindow}
                     client={this.aplConnection}
                     focusManager={this.focusManager}
                     activityTracker={this.activityTracker}
+                    aplCoreMessageHandlerCallback={this.setAPLCoreMessageHandler.bind(this)}
                 />
             );
         });
@@ -526,17 +553,21 @@ export class App extends React.Component<any, IAppState> {
                 />
                 {playerInfo}
                 {aplRendererWindows}
-                <CaptionsView
-                    captionsMessage={this.state.captionsMessage}
-                />
                 <VoiceChrome
                     deviceAppConfig={this.deviceAppConfig}
                     targetWindowId={this.state.targetWindowId}
                     alexaState={this.state.alexaState}
                     doNotDisturbSettingEnabled={this.state.doNotDisturbSettingEnabled}
                 />
+                <CaptionsView
+                    captionsMessage={this.state.captionsMessage}
+                />
             </div>
         );
+    }
+
+    public setAPLCoreMessageHandler(windowId : string, aplCoreMessageHandler : (message : IAPLCoreMessage) => void) {
+        this.aplCoreMessageHandlers.set(windowId, aplCoreMessageHandler);
     }
 
     protected getDisplayStyle() : any {
@@ -597,8 +628,9 @@ export class App extends React.Component<any, IAppState> {
             case this.deviceAppConfig.deviceKeys.toggleDoNotDisturbKey.code:
                 this.sendToggleDoNotDisturbEvent(this.toggleDoNotDisturbMessage);
                 break;
+            // All KeyDown events trigger user interruption
             default : {
-                this.handleUserInteraction();
+                this.handleUserInterruption();
                 break;
             }
         }
@@ -620,28 +652,27 @@ export class App extends React.Component<any, IAppState> {
             }
         }
     }
-    /** The interrupted event is reported when an user interaction interrupts an activity. Examples include clicks,
-     *  touches, and scrolls. Some of these user interactions results in multiple events per user interaction, such
+
+    /**
+     * Boolean tracking locked state of user interruption event handling.
+     */
+    private interruptionLock = false;
+
+    /** The interrupted event is reported when an user interaction interrupts an activity.
+     *  Examples include keyDown events, clicks, touches, and scrolls.
+     *  Some of these user interactions results in multiple events per user interaction, such
      *  as scrolling. Even when multiple events are fired, the interrupted event only needs to be
      *  reported once in a set time period. This implementation will report a maximum of one
      *  interrupted activity every 500 ms.
      */
-    private handleUserInteraction() {
-        let lock = false;
-        return () => {
-            if (!lock) {
-                // Allow user interaction while presenting Player Info Window
-                // This enables UI navigation without killing progress bar.
-                if (this.state.targetWindowId && this.state.targetWindowId !== RENDER_PLAYER_INFO_WINDOW_ID) {
-                    lock = true;
-
-                    this.activityTracker.reportInterrupted();
-                    setTimeout(() => {
-                        lock = false;
-                    }, 500);
-                }
-            }
-        };
+    private handleUserInterruption() {
+        if (!this.interruptionLock) {
+            this.interruptionLock = true;
+            this.activityTracker.reportInterrupted();
+            window.setTimeout(() => {
+                this.interruptionLock = false;
+            }, 500);
+        }
     }
 
     private setTokenForWindowId(token : string, windowId : string) {

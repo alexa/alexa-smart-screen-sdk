@@ -27,6 +27,9 @@
 /// The payload json key in the message.
 const char MSG_PAYLOAD_TAG[] = "payload";
 
+/// The windowId json key in the message.
+const char MSG_WINDOWID_TAG[] = "windowId";
+
 /// The token json key in the message.
 const char MSG_TOKEN_TAG[] = "token";
 

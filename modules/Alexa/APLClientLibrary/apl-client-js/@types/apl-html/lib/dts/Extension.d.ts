@@ -18,4 +18,11 @@ declare namespace APL {
         public getURI(): string;
         public getName(): string;
     }
+    export class ExtensionFilterDefinition {
+        public static create(uri: string, name: string, imageCount: number): ExtensionFilterDefinition;
+        public property(property: string, defValue: any): ExtensionFilterDefinition;
+        public getURI(): string;
+        public getName(): string;
+        public getImageCount(): number;
+    }
 }

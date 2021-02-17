@@ -57,6 +57,9 @@
 
 #ifdef GSTREAMER_MEDIA_PLAYER
 #include <MediaPlayer/MediaPlayer.h>
+#elif defined(UWP_BUILD)
+#include <SSSDKCommon/NullMediaSpeaker.h>
+#include <SSSDKCommon/NullEqualizer.h>
 #endif
 
 #ifdef ANDROID
@@ -870,7 +873,6 @@ bool SampleApplication::initialize(
 #endif
 
     auto initParams = builder->build();
-
     auto sampleAppComponent = getComponent(std::move(initParams));
 
     auto manufactory = Manufactory<
@@ -879,7 +881,8 @@ bool SampleApplication::initialize(
         std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>,
         std::shared_ptr<avsCommon::utils::configuration::ConfigurationNode>,
         std::shared_ptr<avsCommon::utils::DeviceInfo>,
-        std::shared_ptr<registrationManager::CustomerDataManager>>::create(sampleAppComponent);
+        std::shared_ptr<registrationManager::CustomerDataManager>,
+        std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>::create(sampleAppComponent);
 
     m_sdkInit = manufactory->get<std::shared_ptr<avsCommon::avs::initialization::AlexaClientSDKInit>>();
     if (!m_sdkInit) {
@@ -1437,6 +1440,9 @@ bool SampleApplication::initialize(
     }
     std::shared_ptr<applicationUtilities::resources::audio::MicrophoneInterface> micWrapper =
         audioInjector->getMicrophone(sharedDataStream, compatibleAudioFormat);
+#elif defined(UWP_BUILD)
+    std::shared_ptr<alexaSmartScreenSDK::sssdkCommon::NullMicrophone> micWrapper =
+        std::make_shared<alexaSmartScreenSDK::sssdkCommon::NullMicrophone>(sharedDataStream);
 #else
     ACSDK_CRITICAL(LX("No microphone module provided!"));
     return false;
@@ -1469,7 +1475,8 @@ bool SampleApplication::initialize(
         micWrapper,
         alexaClientSDK::capabilityAgents::aip::AudioProvider::null());
 #endif  // KWD
-    m_guiManager->setAplRenderingEventObserver(aplClientBridge->getAplRenderingEventObserver());
+
+    auto metricRecorder = manufactory->get<std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>();
 
     /*
      * Creating the SmartScreenClient - this component serves as an out-of-box default object that instantiates and
@@ -1533,7 +1540,7 @@ bool SampleApplication::initialize(
         true,
         nullptr,
         std::move(bluetoothDeviceManager),
-        nullptr,
+        metricRecorder,
 #ifdef ENABLE_LPM
         std::make_shared<avsCommon::utils::power::NoOpPowerResourceManager>(),
 #else
@@ -1563,6 +1570,7 @@ bool SampleApplication::initialize(
     client->addAudioPlayerObserver(m_guiManager);
     client->addAudioPlayerObserver(aplClientBridge);
     client->addFocusManagersObserver(m_guiManager);
+    client->addAudioInputProcessorObserver(m_guiManager);
     m_guiManager->setClient(client);
     m_guiClient->setGUIManager(m_guiManager);
 
@@ -1586,7 +1594,9 @@ bool SampleApplication::initialize(
     std::vector<std::shared_ptr<MediaPlayerInterface>> captionableMediaSources = m_audioMediaPlayerPool;
     captionableMediaSources.emplace_back(m_speakMediaPlayer);
     client->addCaptionPresenter(captionPresenter);
+#ifndef UWP_BUILD
     client->setCaptionMediaPlayers(captionableMediaSources);
+#endif
 #endif
 
 #ifdef ENABLE_ENDPOINT_CONTROLLERS
@@ -1704,15 +1714,20 @@ std::shared_ptr<ApplicationMediaInterfaces> SampleApplication::createApplication
     }
 #elif defined(UWP_BUILD)
     auto mediaPlayer = std::make_shared<alexaSmartScreenSDK::sssdkCommon::TestMediaPlayer>();
-    auto speaker = std::make_shared<alexaSmartScreenSDK::sssdkCommon::NullMediaSpeaker>();
+    auto nullEqualizer = std::make_shared<alexaSmartScreenSDK::sssdkCommon::NullEqualizer>();
 
-    return std::make_shared<ApplicationMediaInterfaces>(mediaPlayer, speaker);
+    auto speaker = std::make_shared<alexaSmartScreenSDK::sssdkCommon::NullMediaSpeaker>();
+    auto requiresShutdown = std::static_pointer_cast<alexaClientSDK::avsCommon::utils::RequiresShutdown>(mediaPlayer);
+
+    return std::make_shared<ApplicationMediaInterfaces>(mediaPlayer, speaker, nullEqualizer, requiresShutdown);
 #endif
 
+#ifndef UWP_BUILD
     if (applicationMediaInterfaces->requiresShutdown) {
         m_shutdownRequiredList.push_back(applicationMediaInterfaces->requiresShutdown);
     }
     return applicationMediaInterfaces;
+#endif
 }
 
 #ifdef ENABLE_ENDPOINT_CONTROLLERS

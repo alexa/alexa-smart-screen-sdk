@@ -18,9 +18,11 @@
 
 #include <APLClient/AplClientBinding.h>
 #include "APLClient/Extensions/AplCoreExtensionInterface.h"
-#include <APLClient/Extensions/Backstack/AplBackstackExtension.h>
+#include <APLClient/Extensions/AudioPlayer/AplAudioPlayerExtension.h>
+#include <APLClient/Extensions/AudioPlayer/AplAudioPlayerAlarmsExtension.h>
 #include <APLClient/Extensions/Backstack/AplBackstackExtension.h>
 #include <APLClient/AplOptionsInterface.h>
+#include <mutex>
 #include <string>
 #include "APLClientSandbox/Executor.h"
 #include "GUIManager.h"
@@ -31,6 +33,8 @@ class GUIManager;
 class AplClientBridge
         : public APLClient::AplOptionsInterface
         , public APLClient::Extensions::Backstack::AplBackstackExtensionObserverInterface
+        , public APLClient::Extensions::AudioPlayer::AplAudioPlayerExtensionObserverInterface
+        , public APLClient::Extensions::AudioPlayer::AplAudioPlayerAlarmsExtensionObserverInterface
         , public std::enable_shared_from_this<AplClientBridge> {
 public:
     static std::shared_ptr<AplClientBridge> create();
@@ -72,10 +76,31 @@ public:
      */
     void onMessage(const std::string& message);
 
-     /// @name AplBackstackExtensionObserverInterface Functions
-     /// @{
-     void onRestoreDocumentState(std::shared_ptr<APLClient::AplDocumentState> documentState) override;
-     /// @}
+    /// @name AplBackstackExtensionObserverInterface Functions
+    /// @{
+    void onRestoreDocumentState(std::shared_ptr<APLClient::AplDocumentState> documentState) override;
+    /// @}
+
+    /// @name AplAudioPlayerExtensionObserverInterface Functions
+    /// @{
+    void onAudioPlayerPlay() override;
+    void onAudioPlayerPause() override;
+    void onAudioPlayerNext() override;
+    void onAudioPlayerPrevious() override;
+    void onAudioPlayerSeekToPosition(int offsetInMilliseconds) override;
+    void onAudioPlayerToggle(const std::string& name, bool checked) override;
+    void onAudioPlayerLyricDataFlushed(const std::string& token,
+                                       long durationInMilliseconds,
+                                       const std::string& lyricData) override;
+    void onAudioPlayerSkipForward() override;
+    void onAudioPlayerSkipBackward() override;
+    /// @}
+
+    /// @name AplAudioPlayerAlarmsExtensionObserverInterface Functions
+    /// @{
+    void onAudioPlayerAlarmDismiss() override;
+    void onAudioPlayerAlarmSnooze() override;
+    /// @}
 
     bool handleBack();
 
@@ -130,6 +155,7 @@ public:
     void logMessage(APLClient::LogLevel level, const std::string& source, const std::string& message) override;
     int getMaxNumberOfConcurrentDownloads() override;
     void onExtensionEvent(
+        const std::string& token,
         const std::string& uri,
         const std::string& name,
         const std::string& source,
@@ -137,6 +163,15 @@ public:
         unsigned int event,
         std::shared_ptr<APLClient::Extensions::AplCoreExtensionEventCallbackResultInterface> resultCallback) override;
     /// @}
+
+    /**
+     * Retrieves the current time
+     * @return The time
+     */
+    std::chrono::milliseconds getCurrentTime() {
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch());
+    }
 
 private:
     /// Private constructor
@@ -151,6 +186,9 @@ private:
     /// Pointer to the APL Client Renderer
     std::shared_ptr<APLClient::AplClientRenderer> m_aplClientRenderer;
 
+    /// Mutex to prevent more than one resource being downloaded simultaneously
+    std::mutex m_downloadMutex;
+
     /// Promise set when a resoure request it made, should be resolved once it has been retrieved
     std::promise<std::string> m_resourcePromise;
 
@@ -162,6 +200,21 @@ private:
 
     /// Pointer to the @c AplBackstackExtension
     std::shared_ptr<APLClient::Extensions::Backstack::AplBackstackExtension> m_backstackExtension;
+
+    /// Pointer to the @c AplAudioPlayerExtension
+    std::shared_ptr<APLClient::Extensions::AudioPlayer::AplAudioPlayerExtension> m_audioPlayerExtension;
+
+    /// Pointer to the @c AplAudioPlayerAlarmsExtension
+    std::shared_ptr<APLClient::Extensions::AudioPlayer::AplAudioPlayerAlarmsExtension> m_audioPlayerAlarmsExtension;
+
+    /// audioPlayer offset at current session
+    int audioPlayerOffset;
+
+    /// audioPlayer initialize time
+    int audioPlayerStartTime;
+
+    /// audioPlayer is playing or not.
+    bool audioPlayerPlaying = false;
 };
 
 #endif  // APLCLIENTSANDBOX_INCLUDE_APLCLIENTBINDING_H_

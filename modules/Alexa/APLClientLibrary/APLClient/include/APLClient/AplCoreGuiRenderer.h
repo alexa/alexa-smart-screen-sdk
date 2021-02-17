@@ -60,9 +60,8 @@ public:
     /**
      * Clears the currently rendered document
      *
-     * @param token The APL token
      */
-    void clearDocument(const std::string& token);
+    void clearDocument();
 
     /**
      * Executes the given sequence of APL commands

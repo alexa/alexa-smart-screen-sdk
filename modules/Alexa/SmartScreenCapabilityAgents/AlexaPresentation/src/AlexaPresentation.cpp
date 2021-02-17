@@ -73,6 +73,8 @@ static const std::string ALEXAPRESENTATION_MIN_STATE_REPORT_INTERVAL_KEY = "minS
 /// The key in our config file to set the time in ms between proactive state report checks - 0 disables the feature
 static const std::string ALEXAPRESENTATION_STATE_REPORT_CHECK_INTERVAL_KEY = "stateReportCheckIntervalMs";
 
+/// StaticRequestToken value for providing Change Report state
+static const int PROACTIVE_STATE_REQUEST_TOKEN = 0;
 /**
  * Create a LogEntry using this file's TAG and the specified event string.
  *
@@ -165,8 +167,9 @@ static const std::string DYNAMIC_TOKEN_LIST{"dynamicTokenList"};
 static const std::chrono::milliseconds DEFAULT_DOCUMENT_INTERACTION_TIMEOUT_MS{30000};
 
 /// The AlexaPresentation context state signature.
-static const avsCommon::avs::NamespaceAndName RENDERED_DOCUMENT_STATE{ALEXA_PRESENTATION_APL_NAMESPACE,
-                                                                      VISUAL_CONTEXT_NAME};
+static const avsCommon::avs::NamespaceAndName RENDERED_DOCUMENT_STATE{
+    ALEXA_PRESENTATION_APL_NAMESPACE,
+    VISUAL_CONTEXT_NAME};
 
 std::map<AlexaPresentation::MetricEvent, std::string> AlexaPresentation::MetricsDataPointNames = {
     {AlexaPresentation::MetricEvent::RENDER_DOCUMENT, "AlexaPresentation.RenderDocument.TimeTaken"},
@@ -295,7 +298,7 @@ void AlexaPresentation::preHandleDirective(std::shared_ptr<DirectiveInfo> info) 
 
 void AlexaPresentation::handleDirective(std::shared_ptr<DirectiveInfo> info) {
     // Must remain on the very fist line for accurate telemetry
-    std::chrono::steady_clock::time_point renderStartTime = std::chrono::steady_clock::now();
+    m_renderReceivedTime = std::chrono::steady_clock::now();
 
     ACSDK_DEBUG5(LX(__func__));
     if (!info || !info->directive) {
@@ -305,7 +308,7 @@ void AlexaPresentation::handleDirective(std::shared_ptr<DirectiveInfo> info) {
 
     if (info->directive->getNamespace() == DOCUMENT.nameSpace && info->directive->getName() == DOCUMENT.name) {
         setDocumentIdleTimeout(m_sdkConfiguredDocumentInteractionTimeout);
-        handleRenderDocumentDirective(info, renderStartTime);
+        handleRenderDocumentDirective(info);
     } else if (info->directive->getNamespace() == COMMAND.nameSpace && info->directive->getName() == COMMAND.name) {
         handleExecuteCommandDirective(info);
     } else if (
@@ -551,10 +554,12 @@ void AlexaPresentation::removeDirective(std::shared_ptr<DirectiveInfo> info) {
 }
 
 void AlexaPresentation::setHandlingCompleted(std::shared_ptr<DirectiveInfo> info) {
-    if (info && info->result) {
-        info->result->setCompleted();
+    if (info) {
+        if (info->result) {
+            info->result->setCompleted();
+        }
+        removeDirective(info);
     }
-    removeDirective(info);
 }
 
 bool AlexaPresentation::parseDirectivePayload(std::shared_ptr<DirectiveInfo> info, rapidjson::Document* document) {
@@ -572,15 +577,10 @@ bool AlexaPresentation::parseDirectivePayload(std::shared_ptr<DirectiveInfo> inf
     }
 }
 
-void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveInfo> info,
-                                                      const std::chrono::steady_clock::time_point &startTime) {
+void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveInfo> info) {
     ACSDK_DEBUG5(LX(__func__));
 
-    m_executor->submit([this, info, startTime]() {
-        for (auto& observer : m_observers) {
-            observer->onRenderDirectiveReceived(startTime);
-        }
-
+    m_executor->submit([this, info]() {
         ACSDK_DEBUG9(LX("handleRenderDocumentDirectiveInExecutor").sensitive("payload", info->directive->getPayload()));
         rapidjson::Document payload;
         if (!parseDirectivePayload(info, &payload)) {
@@ -609,28 +609,27 @@ void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveI
         std::string presentationSessionPayload;
         if (jsonUtils::findNode(payload, PRESENTATION_SESSION_FIELD, &iterator) &&
             jsonUtils::convertToValue(iterator->value, &presentationSessionPayload)) {
-
             std::string skillId;
             if (!jsonUtils::retrieveValue(presentationSessionPayload, SKILL_ID, &skillId)) {
-                ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor")
-                               .m("Failed to find presentationSession skillId"));
+                ACSDK_WARN(
+                    LX("handleRenderDocumentDirectiveInExecutor").m("Failed to find presentationSession skillId"));
             }
 
             std::string id;
             if (!jsonUtils::retrieveValue(presentationSessionPayload, PRESENTATION_SESSION_ID, &id)) {
-                ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor")
-                               .m("Failed to find presentationSession id"));
+                ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor").m("Failed to find presentationSession id"));
             }
 
             presentationSession = PresentationSession(skillId, id);
         }
 
         if (presentationSession != m_presentationSession) {
-            ACSDK_DEBUG0(LX("handleRenderDocumentDirectiveInExecutor").m("PresentationSessionChanged")
-                             .d("previousSkillId",m_presentationSession.skillId)
+            ACSDK_DEBUG0(LX("handleRenderDocumentDirectiveInExecutor")
+                             .m("PresentationSessionChanged")
+                             .d("previousSkillId", m_presentationSession.skillId)
                              .d("newSkillId", presentationSession.skillId));
             for (auto& observer : m_observers) {
-                observer->onPresentationSessionChanged();
+                observer->onPresentationSessionChanged(presentationSession.id, presentationSession.skillId);
             }
             m_presentationSession = presentationSession;
         }
@@ -698,7 +697,7 @@ void AlexaPresentation::handleExecuteCommandDirective(std::shared_ptr<DirectiveI
             return;
         }
 
-        m_lastExecuteCommandTokenAndDirective = std::make_pair(info->directive->getMessageId(), info);
+        m_lastExecuteCommandTokenAndDirective = std::make_pair(presentationToken, info);
         executeExecuteCommandEvent(info);
     });
 }
@@ -839,9 +838,13 @@ void AlexaPresentation::executeRenderDocumentCallbacks(bool isClearCard) {
     for (auto& observer : m_observers) {
         if (isClearCard) {
             m_presentationSession = {};
-            observer->clearDocument();
+            observer->clearDocument(m_lastRenderedAPLToken);
         } else {
             observer->renderDocument(m_lastDisplayedDirective->directive->getPayload(), newToken, windowId);
+            if (m_renderReceivedTime.time_since_epoch().count() != 0) {
+                observer->onRenderDirectiveReceived(m_lastRenderedAPLToken, m_renderReceivedTime);
+                m_renderReceivedTime = {};
+            }
         }
     }
 
@@ -878,8 +881,10 @@ void AlexaPresentation::executeCommandEvent(std::shared_ptr<DirectiveInfo> info)
         return;
     }
 
+    std::string presentationToken = getAPLToken(info->directive->getPayload());
+
     for (auto& observer : m_observers) {
-        observer->executeCommands(info->directive->getPayload(), info->directive->getMessageId());
+        observer->executeCommands(info->directive->getPayload(), presentationToken);
     }
 }
 
@@ -894,8 +899,10 @@ void AlexaPresentation::dataSourceUpdateEvent(std::shared_ptr<DirectiveInfo> inf
         return;
     }
 
+    std::string presentationToken = getAPLToken(info->directive->getPayload());
+
     for (auto& observer : m_observers) {
-        observer->dataSourceUpdate(sourceType, info->directive->getPayload(), info->directive->getMessageId());
+        observer->dataSourceUpdate(sourceType, info->directive->getPayload(), presentationToken);
     }
 
     setHandlingCompleted(info);
@@ -1259,7 +1266,7 @@ void AlexaPresentation::executeProvideState(unsigned int stateRequestToken) {
 
     if (m_lastDisplayedDirective && !m_lastRenderedAPLToken.empty() &&
         ALEXA_PRESENTATION_APL_NAMESPACE == m_lastDisplayedDirective->directive->getNamespace()) {
-        m_visualStateProvider->provideState(stateRequestToken);
+        m_visualStateProvider->provideState(m_lastRenderedAPLToken, stateRequestToken);
     } else {
         m_contextManager->setState(RENDERED_DOCUMENT_STATE, "", StateRefreshPolicy::SOMETIMES, stateRequestToken);
         m_lastReportedState.clear();
@@ -1289,7 +1296,7 @@ void AlexaPresentation::onVisualContextAvailable(const unsigned int requestToken
         CapabilityState state(payload);
         m_lastReportTime = std::chrono::steady_clock::now();
         m_stateReportPending = false;
-        if (0 == requestToken) {
+        if (PROACTIVE_STATE_REQUEST_TOKEN == requestToken) {
             // Proactive visualContext report
             if (m_lastReportedState != visualContext) {
                 m_contextManager->reportStateChange(
@@ -1300,13 +1307,14 @@ void AlexaPresentation::onVisualContextAvailable(const unsigned int requestToken
             if (m_lastDisplayedDirective && !m_lastRenderedAPLToken.empty() &&
                 ALEXA_PRESENTATION_APL_NAMESPACE == m_lastDisplayedDirective->directive->getNamespace()) {
                 m_contextManager->provideStateResponse(RENDERED_DOCUMENT_STATE, state, requestToken);
-                m_lastReportedState = visualContext;
             } else {
                 // Since requesting the visualContext, APL is no longer being displayed
                 // Set presentationSession as the state.
-                m_contextManager->setState(RENDERED_DOCUMENT_STATE,
-                                           m_presentationSession.getPresentationSessionPayload(),
-                                           StateRefreshPolicy::SOMETIMES, requestToken);
+                m_contextManager->setState(
+                    RENDERED_DOCUMENT_STATE,
+                    m_presentationSession.getPresentationSessionPayload(),
+                    StateRefreshPolicy::SOMETIMES,
+                    requestToken);
                 m_lastReportedState.clear();
             }
         }
@@ -1396,7 +1404,7 @@ void AlexaPresentation::processExecuteCommandsResult(
             setHandlingCompleted(m_lastExecuteCommandTokenAndDirective.second);
         } else {
             sendExceptionEncounteredAndReportFailed(
-            m_lastExecuteCommandTokenAndDirective.second, "Commands execution failed: " + error);
+                m_lastExecuteCommandTokenAndDirective.second, "Commands execution failed: " + error);
         }
 
         m_lastExecuteCommandTokenAndDirective.first.clear();
@@ -1451,7 +1459,7 @@ void AlexaPresentation::processActivityEvent(
                 break;
             case smartScreenSDKInterfaces::ActivityEvent::INTERRUPT:
                 for (auto& observer : m_observers) {
-                    observer->interruptCommandSequence();
+                    observer->interruptCommandSequence(m_lastRenderedAPLToken);
                 }
                 if (DialogUXState::IDLE == m_dialogUxState &&
                     InteractionState::INACTIVE == m_documentInteractionState) {
@@ -1504,10 +1512,7 @@ void AlexaPresentation::triggerMetricsEventWithData(
     switch (metricEvent) {
         case MetricEvent::TEXT_MEASURE_COUNT:
         case MetricEvent::DROP_FRAME: {
-            if (m_currentActiveCountPoints.find(metricEvent) == m_currentActiveCountPoints.end()) {
-                m_currentActiveCountPoints[metricEvent] = 0;
-            }
-            m_currentActiveCountPoints[metricEvent] = count;
+            m_currentActiveCountPoints[metricEvent] += count;
             endMetricsEvent(metricEvent, activityName);
             break;
         }
@@ -1683,7 +1688,7 @@ void AlexaPresentation::executeProactiveStateReport() {
 
     if (!m_stateReportPending && duration.count() > m_minStateReportInterval.count()) {
         m_stateReportPending = true;
-        m_visualStateProvider->provideState(0);
+        m_visualStateProvider->provideState(m_lastRenderedAPLToken, PROACTIVE_STATE_REQUEST_TOKEN);
     }
 }
 
@@ -1693,7 +1698,7 @@ void AlexaPresentation::proactiveStateReport() {
 
 void AlexaPresentation::notifyAbort() {
     for (auto observer : m_observers) {
-        observer->onRenderingAborted();
+        observer->onRenderingAborted(m_lastRenderedAPLToken);
     }
 }
 

@@ -22,10 +22,6 @@
 
 #include "SampleApp/GUI/GUIManager.h"
 
-#ifdef ENABLE_APL_TELEMETRY
-    #include "SampleApp/TelemetrySink.h"
-#endif
-
 #ifdef UWP_BUILD
 #include <UWPSampleApp/Utils.h>
 #include <SSSDKCommon/AudioFileUtil.h>
@@ -55,19 +51,19 @@ static const std::string TAG("GUIManager");
 static const std::string APL_INTERFACE("Alexa.Presentation.APL");
 
 /// String to identify the Shuffle Toggle of PlaybackController.
-static const std::string SHUFFLE_TOGGLE_ID("SHUFFLE");
+static const std::string SHUFFLE_TOGGLE_ID("shuffle");
 
 /// String to identify the Loop Toggle of PlaybackController.
-static const std::string LOOP_TOGGLE_ID("LOOP");
+static const std::string LOOP_TOGGLE_ID("loop");
 
 /// String to identify the Repeat Toggle of PlaybackController.
-static const std::string REPEAT_TOGGLE_ID("REPEAT");
+static const std::string REPEAT_TOGGLE_ID("repeat");
 
 /// String to identify the Repeat Toggle of PlaybackController.
-static const std::string THUMBSUP_TOGGLE_ID("THUMBSUP");
+static const std::string THUMBSUP_TOGGLE_ID("thumbsUp");
 
 /// String to identify the Repeat Toggle of PlaybackController.
-static const std::string THUMBSDOWN_TOGGLE_ID("THUMBSDOWN");
+static const std::string THUMBSDOWN_TOGGLE_ID("thumbsDown");
 
 /// The name of the do not disturb confirmation setting.
 static const std::string DO_NOT_DISTURB_NAME = "DoNotDisturb";
@@ -76,7 +72,7 @@ static const std::string DO_NOT_DISTURB_NAME = "DoNotDisturb";
 static const std::map<std::string, avsCommon::avs::PlaybackToggle> TOGGLE_COMMAND_ID_TO_TOGGLE = {
     {SHUFFLE_TOGGLE_ID, avsCommon::avs::PlaybackToggle::SHUFFLE},
     {LOOP_TOGGLE_ID, avsCommon::avs::PlaybackToggle::LOOP},
-    {REPEAT_TOGGLE_ID, avsCommon::avs::PlaybackToggle::REPEAT},
+    {REPEAT_TOGGLE_ID, avsCommon::avs::PlaybackToggle::LOOP},
     {THUMBSUP_TOGGLE_ID, avsCommon::avs::PlaybackToggle::THUMBS_UP},
     {THUMBSDOWN_TOGGLE_ID, avsCommon::avs::PlaybackToggle::THUMBS_DOWN}};
 
@@ -135,10 +131,12 @@ GUIManager::GUIManager(
     m_isSpeakingOrListening = false;
     m_clearAlertChannelOnForegrounded = false;
     m_clearPlayerInfoCardOnContentFocusLost = false;
+    m_audioInputProcessorState = AudioInputProcessorObserverInterface::State::IDLE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME] = FocusState::NONE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME] = FocusState::NONE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::CONTENT_CHANNEL_NAME] = FocusState::NONE;
-    m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::COMMUNICATIONS_CHANNEL_NAME] = FocusState::NONE;
+    m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::COMMUNICATIONS_CHANNEL_NAME] =
+        FocusState::NONE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME] = FocusState::NONE;
 
 #ifdef UWP_BUILD
@@ -150,16 +148,14 @@ GUIManager::GUIManager(
     m_micWrapper->startStreamingMicrophoneData();
 }
 
-void GUIManager::renderTemplateCard(
-    const std::string& jsonPayload,
-    FocusState focusState) {
+void GUIManager::renderTemplateCard(const std::string& jsonPayload, FocusState focusState) {
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::RENDER_TEMPLATE;
     m_guiClient->renderTemplateCard(jsonPayload, focusState);
 }
 
-void GUIManager::clearTemplateCard() {
+void GUIManager::clearTemplateCard(const std::string& token) {
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::NONE;
-    m_guiClient->clearTemplateCard();
+    m_guiClient->clearTemplateCard(token);
 }
 
 void GUIManager::renderPlayerInfoCard(
@@ -171,29 +167,26 @@ void GUIManager::renderPlayerInfoCard(
     m_guiClient->renderPlayerInfoCard(jsonPayload, info, focusState, mediaProperties);
 }
 
-void GUIManager::clearPlayerInfoCard() {
-    m_guiClient->clearPlayerInfoCard();
+void GUIManager::clearPlayerInfoCard(const std::string& token) {
+    m_guiClient->clearPlayerInfoCard(token);
 }
 
-void GUIManager::interruptCommandSequence() {
-    m_guiClient->interruptCommandSequence();
+void GUIManager::interruptCommandSequence(const std::string& token) {
+    m_guiClient->interruptCommandSequence(token);
 }
 
-void GUIManager::onPresentationSessionChanged() {
-    m_guiClient->onPresentationSessionChanged();
+void GUIManager::onPresentationSessionChanged(const std::string& id, const std::string& skillId) {
+    m_guiClient->onPresentationSessionChanged(id, skillId);
 }
 
-void GUIManager::renderDocument(
-        const std::string& jsonPayload,
-        const std::string& token,
-        const std::string& windowId) {
+void GUIManager::renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) {
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::ALEXA_PRESENTATION;
     m_guiClient->renderDocument(jsonPayload, token, windowId);
 }
 
-void GUIManager::clearDocument() {
+void GUIManager::clearDocument(const std::string& token) {
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::NONE;
-    m_guiClient->clearDocument();
+    m_guiClient->clearDocument(token);
 }
 
 void GUIManager::executeCommands(const std::string& jsonPayload, const std::string& token) {
@@ -262,16 +255,16 @@ void GUIManager::handleMicrophoneToggle() {
     });
 }
 
-void GUIManager::handleUserEvent(std::string userEventPayload) {
+void GUIManager::handleUserEvent(const std::string& token, std::string userEventPayload) {
     m_executor.submit([this, userEventPayload]() { m_ssClient->sendUserEvent(userEventPayload); });
 }
 
-void GUIManager::handleDataSourceFetchRequestEvent(std::string type, std::string payload) {
+void GUIManager::handleDataSourceFetchRequestEvent(const std::string& token, std::string type, std::string payload) {
     m_executor.submit([this, type, payload] { m_ssClient->sendDataSourceFetchRequestEvent(type, payload); });
 }
 
-void GUIManager::handleRuntimeErrorEvent(std::string payload) {
-    m_executor.submit([this, payload] { m_ssClient->sendRuntimeErrorEvent(payload); });
+void GUIManager::handleRuntimeErrorEvent(const std::string& token, std::string payload) {
+    m_executor.submit([this, token, payload] { m_ssClient->sendRuntimeErrorEvent(payload); });
 }
 
 void GUIManager::handlePlaybackPlay() {
@@ -456,8 +449,9 @@ void GUIManager::sendSendDtmfFailed(const std::string& callId) {
 }
 #endif
 
-void GUIManager::handleVisualContext(uint64_t token, std::string payload) {
-    m_executor.submit([this, token, payload]() { m_ssClient->handleVisualContext(token, payload); });
+void GUIManager::handleVisualContext(const std::string& token, uint64_t stateRequestToken, std::string payload) {
+    m_executor.submit(
+        [this, stateRequestToken, payload]() { m_ssClient->handleVisualContext(stateRequestToken, payload); });
 }
 
 bool GUIManager::handleFocusAcquireRequest(
@@ -465,7 +459,12 @@ bool GUIManager::handleFocusAcquireRequest(
     std::shared_ptr<avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
     return m_executor
         .submit([this, channelName, channelObserver]() {
-            return m_ssClient->getAudioFocusManager()->acquireChannel(channelName, channelObserver, APL_INTERFACE);
+            auto activity = alexaClientSDK::acl::FocusManagerInterface::Activity::create(
+                APL_INTERFACE,
+                channelObserver,
+                std::chrono::milliseconds::zero(),
+                avsCommon::avs::ContentType::MIXABLE);
+            return m_ssClient->getAudioFocusManager()->acquireChannel(channelName, activity);
         })
         .get();
 }
@@ -481,12 +480,7 @@ bool GUIManager::handleFocusReleaseRequest(
 }
 
 void GUIManager::handleRenderDocumentResult(std::string token, bool result, std::string error) {
-    m_executor.submit([this, token, result, error]() {
-        m_ssClient->handleRenderDocumentResult(token, result, error);
-        if (!result && m_aplRenderingEventObserver) {
-            m_aplRenderingEventObserver->onRenderingEvent(APLClient::AplRenderingEvent::RENDER_ABORTED);
-        }
-    });
+    m_executor.submit([this, result, token, error]() { m_ssClient->handleRenderDocumentResult(token, result, error); });
 }
 
 void GUIManager::handleExecuteCommandsResult(std::string token, bool result, std::string error) {
@@ -494,15 +488,8 @@ void GUIManager::handleExecuteCommandsResult(std::string token, bool result, std
         [this, token, result, error]() { m_ssClient->handleExecuteCommandsResult(token, result, error); });
 }
 
-void GUIManager::handleActivityEvent(const std::string& source, smartScreenSDKInterfaces::ActivityEvent event) {
+void GUIManager::handleActivityEvent(smartScreenSDKInterfaces::ActivityEvent event, const std::string& source) {
     m_executor.submit([this, source, event]() {
-        m_ssClient->handleActivityEvent(
-            source, event, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
-    });
-}
-
-void GUIManager::handleActivityEvent(smartScreenSDKInterfaces::ActivityEvent event) {
-    m_executor.submit([this, event]() {
         if (smartScreenSDKInterfaces::ActivityEvent::INTERRUPT == event && m_isSpeakingOrListening) {
             ACSDK_DEBUG3(LX(__func__).d(
                 "Interrupted activity while speaking or listening",
@@ -511,7 +498,9 @@ void GUIManager::handleActivityEvent(smartScreenSDKInterfaces::ActivityEvent eve
             m_ssClient->clearAllExecuteCommands();
         }
         m_ssClient->handleActivityEvent(
-            TAG, event, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
+            source.empty() ? TAG : source,
+            event,
+            NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
     });
 }
 
@@ -543,25 +532,28 @@ void GUIManager::executeBackNavigation() {
      * 3. Back from audio content content/PlayerInfo card to 'home' state.
      */
 
-    bool dialogChannelActive = FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME];
-    bool alertChannelActive = FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME];
+    bool dialogChannelActive =
+        FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME];
+    bool alertChannelActive =
+        FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME];
 
     /**
      * Always stop the foreground activity unless we're playing audio content, AND dialog and alerts aren't active,
      * AND we are still presenting GUI over PlayerInfo.  In that case we should only clear the card.
      */
-    bool stopForegroundActivity = !(PlayerActivity::PLAYING == m_playerActivityState &&
-                         NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType &&
-                         !dialogChannelActive &&
-                         !alertChannelActive);
+    bool stopForegroundActivity =
+        !(PlayerActivity::PLAYING == m_playerActivityState &&
+          NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType && !dialogChannelActive &&
+          !alertChannelActive);
 
     /**
      * Always clear the displayed card unless audio content is playing AND dialog or alerts are active without UI.
      * In that case we should stop the foreground activity, but not clear the PlayerInfo card.
      */
-    bool clearCard = !(PlayerActivity::PLAYING == m_playerActivityState &&
-            NonPlayerInfoDisplayType::NONE == m_activeNonPlayerInfoDisplayType &&
-            (dialogChannelActive || alertChannelActive));
+    bool clearCard =
+        !(PlayerActivity::PLAYING == m_playerActivityState &&
+          NonPlayerInfoDisplayType::NONE == m_activeNonPlayerInfoDisplayType &&
+          (dialogChannelActive || alertChannelActive));
 
     /**
      * Stopping foreground audio activity happens before we allow GUIClient to handle 'visual' back navigation.
@@ -583,7 +575,7 @@ void GUIManager::executeBackNavigation() {
      */
     if (!m_guiClient->handleNavigationEvent(NavigationEvent::BACK)) {
         /// Clear clout context unless waiting to clear Alert channel first
-        if (!m_clearAlertChannelOnForegrounded){
+        if (!m_clearAlertChannelOnForegrounded) {
             m_ssClient->forceClearDialogChannelFocus();
         }
         if (clearCard) {
@@ -604,12 +596,10 @@ void GUIManager::executeExitNavigation() {
 }
 
 void GUIManager::forceExit() {
-    m_executor.submit([this]() {
-        executeExitNavigation();
-    });
+    m_executor.submit([this]() { executeExitNavigation(); });
 }
 
-void GUIManager::setDocumentIdleTimeout(std::chrono::milliseconds timeout) {
+void GUIManager::setDocumentIdleTimeout(const std::string& token, std::chrono::milliseconds timeout) {
     m_executor.submit([this, timeout]() { m_ssClient->setDocumentIdleTimeout(timeout); });
 }
 
@@ -622,9 +612,6 @@ void GUIManager::handleRenderComplete() {
         bool isAlexaPresentationPresenting =
             NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType;
         m_ssClient->handleRenderComplete(isAlexaPresentationPresenting);
-        if (isAlexaPresentationPresenting && m_aplRenderingEventObserver) {
-            m_aplRenderingEventObserver->onRenderingEvent(APLClient::AplRenderingEvent::DOCUMENT_RENDERED);
-        }
     });
 }
 
@@ -635,10 +622,9 @@ void GUIManager::handleDisplayMetrics(uint64_t dropFrameCount) {
     });
 }
 
-void GUIManager::handleDisplayMetrics(const std::vector<APLClient::DisplayMetric> &metrics) {
+void GUIManager::handleDisplayMetrics(const std::vector<APLClient::DisplayMetric>& metrics) {
     m_executor.submit([this, metrics]() {
-        m_aplRenderingEventObserver->onMetricsReported(metrics);
-        for (const auto &metric : metrics) {
+        for (const auto& metric : metrics) {
             // for backwards compatibility, to remove when the viewhost changes are merged
             if (metric.name == "APL-Web.RootContext.dropFrame") {
                 handleDisplayMetrics(metric.value);
@@ -653,7 +639,7 @@ void GUIManager::handleAPLEvent(APLClient::AplRenderingEvent event) {
 
 void GUIManager::handleToggleDoNotDisturbEvent() {
     m_ssClient->getSettingsManager()->setValue<settings::DO_NOT_DISTURB>(
-        !m_ssClient->getSettingsManager()->getValue<settings::DO_NOT_DISTURB>().second);
+        !m_ssClient->getSettingsManager()->getValue<settings::DO_NOT_DISTURB>(false).second);
 }
 
 void GUIManager::onAuthStateChange(AuthObserverInterface::State newState, AuthObserverInterface::Error newError) {
@@ -666,8 +652,9 @@ void GUIManager::onCapabilitiesStateChange(
     const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints) {
 }
 
-void GUIManager::provideState(const unsigned int stateRequestToken) {
-    m_executor.submit([this, stateRequestToken]() { m_guiClient->provideState(stateRequestToken); });
+void GUIManager::provideState(const std::string& aplToken, const unsigned int stateRequestToken) {
+    m_executor.submit(
+        [this, aplToken, stateRequestToken]() { m_guiClient->provideState(aplToken, stateRequestToken); });
 }
 
 void GUIManager::onDialogUXStateChanged(DialogUXState state) {
@@ -698,24 +685,29 @@ void GUIManager::onUserEvent() {
 
 void GUIManager::onStateChanged(AudioInputProcessorObserverInterface::State state) {
     m_audioInputProcessorState = state;
+
+    // Interrupt activity on speech recognizing
+    if (state == AudioInputProcessorObserverInterface::State::RECOGNIZING) {
+        handleActivityEvent(
+            smartScreenSDKInterfaces::ActivityEvent::INTERRUPT,
+            "AudioInputProcessor" + AudioInputProcessorObserverInterface::stateToString(state));
+    }
 }
 
 void GUIManager::onPlayerActivityChanged(avsCommon::avs::PlayerActivity state, const Context& context) {
     m_executor.submit([this, state]() { m_playerActivityState = state; });
 }
 
-void GUIManager::onFocusChanged(const std::string &channelName, FocusState newFocus) {
+void GUIManager::onFocusChanged(const std::string& channelName, FocusState newFocus) {
     m_executor.submit([this, channelName, newFocus]() {
-        ACSDK_DEBUG(LX("ChannelFocusChanged")
-             .d("channelName", channelName)
-             .d("newFocus",focusStateToString(newFocus)));
+        ACSDK_DEBUG(
+            LX("ChannelFocusChanged").d("channelName", channelName).d("newFocus", focusStateToString(newFocus)));
 
         m_channelFocusStates[channelName] = newFocus;
 
         /// Handle use case to clear Alerts channel when foregrounded.
         if (channelName == avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME &&
-            FocusState::FOREGROUND == newFocus &&
-            m_clearAlertChannelOnForegrounded) {
+            FocusState::FOREGROUND == newFocus && m_clearAlertChannelOnForegrounded) {
             m_ssClient->stopForegroundActivity();
             m_ssClient->forceClearDialogChannelFocus();
             m_clearAlertChannelOnForegrounded = false;
@@ -723,9 +715,9 @@ void GUIManager::onFocusChanged(const std::string &channelName, FocusState newFo
 
         /// Handle use case to clear PlayerInfo when Content channel loses focus.
         if (channelName == avsCommon::sdkInterfaces::FocusManagerInterface::CONTENT_CHANNEL_NAME &&
-            FocusState::NONE == newFocus &&
-            m_clearPlayerInfoCardOnContentFocusLost) {
-            if (FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME]){
+            FocusState::NONE == newFocus && m_clearPlayerInfoCardOnContentFocusLost) {
+            if (FocusState::NONE !=
+                m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME]) {
                 m_ssClient->clearCard();
             }
             m_clearPlayerInfoCardOnContentFocusLost = false;
@@ -734,16 +726,13 @@ void GUIManager::onFocusChanged(const std::string &channelName, FocusState newFo
 }
 
 void GUIManager::setClient(std::shared_ptr<smartScreenClient::SmartScreenClient> client) {
-    m_executor.submit([this, client]() {
-        if (!client) {
-            ACSDK_CRITICAL(LX(__func__).d("reason", "null client"));
-        }
-        m_ssClient = client;
+    auto result = m_executor.submit([this, client]() {
+      if (!client) {
+          ACSDK_CRITICAL(LX(__func__).d("reason", "null client"));
+      }
+      m_ssClient = client;
     });
-}
-
-void GUIManager::setAplRenderingEventObserver(APLClient::AplRenderingEventObserverPtr observer) {
-    m_aplRenderingEventObserver = std::move(observer);
+    result.wait();
 }
 
 std::chrono::milliseconds GUIManager::getAudioItemOffset() {
@@ -771,43 +760,47 @@ void GUIManager::doShutdown() {
     m_micWrapper.reset();
 }
 
-void GUIManager::onRenderDirectiveReceived(const std::chrono::steady_clock::time_point& receiveTime) {
-    m_aplRenderingEventObserver->onRenderDirectiveReceived(receiveTime);
+void GUIManager::onRenderDirectiveReceived(
+    const std::string& token,
+    const std::chrono::steady_clock::time_point& receiveTime) {
+    m_guiClient->onRenderDirectiveReceived(token, receiveTime);
 }
 
-void GUIManager::onRenderingAborted() {
-    m_aplRenderingEventObserver->onRenderingEvent(APLClient::AplRenderingEvent::RENDER_ABORTED);
+void GUIManager::onRenderingAborted(const std::string& token) {
+    m_guiClient->onRenderingAborted(token);
 }
 
 void GUIManager::onMetricRecorderAvailable(
-        std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) {
-#ifdef ENABLE_APL_TELEMETRY
-    if (metricRecorder) {
-        auto sink = std::make_shared<TelemetrySink>(metricRecorder);
-        m_aplRenderingEventObserver->onTelemetrySinkUpdated(sink);
-    }
-#endif
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) {
+    m_guiClient->onMetricRecorderAvailable(metricRecorder);
 }
 
 bool GUIManager::configureSettingsNotifications() {
-    m_settingsManager = m_ssClient->getSettingsManager();
-    m_callbacks = alexaClientSDK::settings::SettingCallbacks<alexaClientSDK::settings::DeviceSettingsManager>::create(
-        m_settingsManager);
+    bool future =
+        m_executor
+            .submit([this]() {
+                m_settingsManager = m_ssClient->getSettingsManager();
+                m_callbacks =
+                    alexaClientSDK::settings::SettingCallbacks<alexaClientSDK::settings::DeviceSettingsManager>::create(
+                        m_settingsManager);
 
-    if (!m_callbacks) {
-        ACSDK_ERROR(LX("configureSettingsNotificationsFailed").d("reason", "createCallbacksFailed"));
-        return false;
-    }
+                if (!m_callbacks) {
+                    ACSDK_ERROR(LX("configureSettingsNotificationsFailed").d("reason", "createCallbacksFailed"));
+                    return false;
+                }
 
-    bool ok = m_callbacks->add<alexaClientSDK::settings::DeviceSettingsIndex::DO_NOT_DISTURB>(
-        [this](bool enable, alexaClientSDK::settings::SettingNotifications notifications) {
-            if (m_doNotDisturbObserver && m_settingsManager) {
-                m_doNotDisturbObserver->onDoNotDisturbSettingChanged(
-                    m_settingsManager->getValue<settings::DO_NOT_DISTURB>().second);
-            }
-        });
+                bool callback = m_callbacks->add<alexaClientSDK::settings::DeviceSettingsIndex::DO_NOT_DISTURB>(
+                    [this](bool enable, alexaClientSDK::settings::SettingNotifications notifications) {
+                        if (m_doNotDisturbObserver && m_settingsManager) {
+                            m_doNotDisturbObserver->onDoNotDisturbSettingChanged(
+                                m_settingsManager->getValue<settings::DO_NOT_DISTURB>(false).second);
+                        }
+                    });
+                return callback;
+            })
+            .get();
 
-    return ok;
+    return future;
 }
 
 void GUIManager::setDoNotDisturbSettingObserver(
@@ -818,7 +811,7 @@ void GUIManager::setDoNotDisturbSettingObserver(
 void GUIManager::handleOnMessagingServerConnectionOpened() {
     if (m_doNotDisturbObserver && m_settingsManager) {
         m_doNotDisturbObserver->onDoNotDisturbSettingChanged(
-            m_settingsManager->getValue<settings::DO_NOT_DISTURB>().second);
+            m_settingsManager->getValue<settings::DO_NOT_DISTURB>(false).second);
     }
 }
 

@@ -57,7 +57,6 @@
 #include <SDKComponent/SDKComponent.h>
 
 #include "SmartScreenClient/DefaultClientComponent.h"
-#include "SmartScreenClient/DeviceSettingsManagerBuilder.h"
 #include "SmartScreenClient/StubApplicationAudioPipelineFactory.h"
 #include "SmartScreenClient/SmartScreenClient.h"
 
@@ -90,11 +89,9 @@ static const std::string VISUAL_CHANNEL_CONFIG_KEY = "visualChannels";
 
 std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     const std::shared_ptr<SmartScreenClientManufactory>& manufactory,
-    std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface> alertsMediaPlayer,
     std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface> bluetoothMediaPlayer,
     std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface> ringtoneMediaPlayer,
     std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface> systemSoundMediaPlayer,
-    std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> alertsSpeaker,
     std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> bluetoothSpeaker,
     std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> ringtoneSpeaker,
     std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> systemSoundSpeaker,
@@ -115,10 +112,7 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> commsSpeaker,
     std::shared_ptr<alexaClientSDK::avsCommon::avs::AudioInputStream> sharedDataStream,
 #endif
-    std::shared_ptr<avsCommon::sdkInterfaces::audio::AudioFactoryInterface> audioFactory,
-    std::shared_ptr<acsdkAlerts::storage::AlertStorageInterface> alertStorage,
     std::shared_ptr<acsdkNotificationsInterfaces::NotificationsStorageInterface> notificationsStorage,
-    std::unique_ptr<settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
     std::shared_ptr<acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
         alexaDialogStateObservers,
@@ -126,25 +120,21 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
         connectionObservers,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceConnectionRuleInterface>>
         enabledConnectionRules,
-    std::shared_ptr<avsCommon::sdkInterfaces::SystemTimeZoneInterface> systemTimezone,
     avsCommon::sdkInterfaces::softwareInfo::FirmwareVersion firmwareVersion,
     bool sendSoftwareInfoOnConnected,
     std::shared_ptr<avsCommon::sdkInterfaces::SoftwareInfoSenderObserverInterface> softwareInfoSenderObserver,
     std::unique_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceManagerInterface> bluetoothDeviceManager,
     std::shared_ptr<avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics,
     const std::shared_ptr<ExternalCapabilitiesBuilderInterface>& externalCapabilitiesBuilder,
-    bool startAlertSchedulingOnInitialization,
     capabilityAgents::aip::AudioProvider firstInteractionAudioProvider,
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> visualStateProvider,
     const std::string& APLMaxVersion) {
     std::unique_ptr<SmartScreenClient> smartScreenClient(new SmartScreenClient());
     if (!smartScreenClient->initialize(
             manufactory,
-            alertsMediaPlayer,
             bluetoothMediaPlayer,
             ringtoneMediaPlayer,
             systemSoundMediaPlayer,
-            alertsSpeaker,
             bluetoothSpeaker,
             ringtoneSpeaker,
             systemSoundSpeaker,
@@ -163,22 +153,17 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
             commsSpeaker,
             sharedDataStream,
 #endif
-            audioFactory,
-            alertStorage,
             notificationsStorage,
-            std::move(deviceSettingStorage),
             bluetoothStorage,
             alexaDialogStateObservers,
             connectionObservers,
             enabledConnectionRules,
-            systemTimezone,
             firmwareVersion,
             sendSoftwareInfoOnConnected,
             softwareInfoSenderObserver,
             std::move(bluetoothDeviceManager),
             diagnostics,
             externalCapabilitiesBuilder,
-            startAlertSchedulingOnInitialization,
             firstInteractionAudioProvider,
             visualStateProvider,
             APLMaxVersion)) {
@@ -278,6 +263,8 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     stubAudioPipelineFactory->addApplicationMediaInterfaces(
         acsdkNotifications::NOTIFICATIONS_MEDIA_PLAYER_NAME, notificationsMediaPlayer, notificationsSpeaker);
     stubAudioPipelineFactory->addApplicationMediaInterfaces(
+        acsdkAlerts::ALERTS_MEDIA_PLAYER_NAME, alertsMediaPlayer, alertsSpeaker);
+    stubAudioPipelineFactory->addApplicationMediaInterfaces(
         capabilityAgents::speechSynthesizer::SPEAK_MEDIA_PLAYER_NAME, speakMediaPlayer, speakSpeaker);
     for (const auto& adapter : adapterCreationMap) {
         auto mediaPlayerIt = externalMusicProviderMediaPlayers.find(adapter.first);
@@ -308,7 +295,7 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     auto audioMediaPlayerFactoryAdapter = mediaPlayer::PooledMediaResourceProvider::adaptMediaPlayerFactoryInterface(
         std::move(audioMediaPlayerFactory), audioChannelVolumeInterfaces);
 
-    auto component = getComponent(
+    SmartScreenClientComponent component = getComponent(
         authDelegate,
         contextManager,
         localeAssetsManager,
@@ -329,7 +316,12 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
         audioMediaPlayerFactoryAdapter,
         messageStorage,
         powerResourceManager,
-        adapterCreationMap);
+        adapterCreationMap,
+        systemTimezone,
+        std::move(deviceSettingStorage),
+        startAlertSchedulingOnInitialization,
+        audioFactory,
+        std::move(alertStorage));
     auto manufactory = SmartScreenClientManufactory::create(component);
 
     auto speakerManager = manufactory->get<std::shared_ptr<SpeakerManagerInterface>>();
@@ -350,11 +342,9 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
 
     return create(
         std::move(manufactory),
-        alertsMediaPlayer,
         bluetoothMediaPlayer,
         ringtoneMediaPlayer,
         systemSoundMediaPlayer,
-        alertsSpeaker,
         bluetoothSpeaker,
         ringtoneSpeaker,
         systemSoundSpeaker,
@@ -373,22 +363,17 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
         commsSpeaker,
         sharedDataStream,
 #endif
-        audioFactory,
-        alertStorage,
         notificationsStorage,
-        std::move(deviceSettingStorage),
         bluetoothStorage,
         alexaDialogStateObservers,
         connectionObservers,
         enabledConnectionRules,
-        systemTimezone,
         firmwareVersion,
         sendSoftwareInfoOnConnected,
         softwareInfoSenderObserver,
         std::move(bluetoothDeviceManager),
         diagnostics,
         externalCapabilitiesBuilder,
-        startAlertSchedulingOnInitialization,
         firstInteractionAudioProvider,
         visualStateProvider,
         APLMaxVersion);
@@ -396,11 +381,9 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
 
 bool SmartScreenClient::initialize(
     const std::shared_ptr<SmartScreenClientManufactory>& manufactory,
-    std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface> alertsMediaPlayer,
     std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface> bluetoothMediaPlayer,
     std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface> ringtoneMediaPlayer,
     std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface> systemSoundMediaPlayer,
-    std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> alertsSpeaker,
     std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> bluetoothSpeaker,
     std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> ringtoneSpeaker,
     std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> systemSoundSpeaker,
@@ -421,10 +404,7 @@ bool SmartScreenClient::initialize(
     std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface> commsSpeaker,
     std::shared_ptr<alexaClientSDK::avsCommon::avs::AudioInputStream> sharedDataStream,
 #endif
-    std::shared_ptr<avsCommon::sdkInterfaces::audio::AudioFactoryInterface> audioFactory,
-    std::shared_ptr<acsdkAlerts::storage::AlertStorageInterface> alertStorage,
     std::shared_ptr<acsdkNotificationsInterfaces::NotificationsStorageInterface> notificationsStorage,
-    std::shared_ptr<settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
     std::shared_ptr<acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
         alexaDialogStateObservers,
@@ -432,27 +412,15 @@ bool SmartScreenClient::initialize(
         connectionObservers,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceConnectionRuleInterface>>
         enabledConnectionRules,
-    std::shared_ptr<avsCommon::sdkInterfaces::SystemTimeZoneInterface> systemTimezone,
     avsCommon::sdkInterfaces::softwareInfo::FirmwareVersion firmwareVersion,
     bool sendSoftwareInfoOnConnected,
     std::shared_ptr<avsCommon::sdkInterfaces::SoftwareInfoSenderObserverInterface> softwareInfoSenderObserver,
     std::unique_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceManagerInterface> bluetoothDeviceManager,
     std::shared_ptr<avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics,
     const std::shared_ptr<ExternalCapabilitiesBuilderInterface>& externalCapabilitiesBuilder,
-    bool startAlertSchedulingOnInitialization,
     capabilityAgents::aip::AudioProvider firstInteractionAudioProvider,
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> visualStateProvider,
     const std::string& APLMaxVersion) {
-
-    if (!audioFactory) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullAudioFactory"));
-        return false;
-    }
-
-    if (!alertsMediaPlayer) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullAlertsMediaPlayer"));
-        return false;
-    }
 
     if (!bluetoothMediaPlayer) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "nullBluetoothMediaPlayer"));
@@ -469,16 +437,8 @@ bool SmartScreenClient::initialize(
         return false;
     }
 
-    if (!deviceSettingStorage) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullDeviceSettingStorage"));
-        return false;
-    }
-
     // Initialize various locals from manufactory.
     auto metricRecorder = manufactory->get<std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>();
-    if (!metricRecorder) {
-        ACSDK_DEBUG7(LX(__func__).m("metrics disabled"));
-    }
 
     auto customerDataManager = manufactory->get<std::shared_ptr<registrationManager::CustomerDataManager>>();
     if (!customerDataManager) {
@@ -533,6 +493,23 @@ bool SmartScreenClient::initialize(
         manufactory->get<std::shared_ptr<avsCommon::sdkInterfaces::PowerResourceManagerInterface>>();
     if (!powerResourceManager) {
         ACSDK_DEBUG7(LX(__func__).m("power resource management disabled"));
+    }
+
+    auto systemTimezone = manufactory->get<std::shared_ptr<avsCommon::sdkInterfaces::SystemTimeZoneInterface>>();
+    if (!systemTimezone) {
+        ACSDK_DEBUG7(LX(__func__).m("using default null SystemTimeZone"));
+    }
+
+    auto deviceSettingStorage = manufactory->get<std::shared_ptr<settings::storage::DeviceSettingStorageInterface>>();
+    if (!deviceSettingStorage) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullDeviceSettingStorage"));
+        return false;
+    }
+
+    auto audioFactory = manufactory->get<std::shared_ptr<avsCommon::sdkInterfaces::audio::AudioFactoryInterface>>();
+    if (!audioFactory) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullAudioFactory"));
+        return false;
     }
 
     // Initialize various members from manufactory.
@@ -657,6 +634,24 @@ bool SmartScreenClient::initialize(
         return false;
     }
 
+    m_deviceSettingsManager = manufactory->get<std::shared_ptr<settings::DeviceSettingsManager>>();
+    if (!m_deviceSettingsManager) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "createDeviceSettingsManagerFailed"));
+        return false;
+    }
+
+    m_systemClockMonitor = manufactory->get<std::shared_ptr<avsCommon::utils::timing::SystemClockMonitor>>();
+    if (!m_systemClockMonitor) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullSystemClockMonitor"));
+        return false;
+    }
+
+    m_alertsCapabilityAgent = manufactory->get<std::shared_ptr<acsdkAlerts::AlertsCapabilityAgent>>();
+    if (!m_alertsCapabilityAgent) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateAlertsCapabilityAgent"));
+        return false;
+    }
+
     m_dialogUXStateAggregator = std::make_shared<avsCommon::avs::DialogUXStateAggregator>(metricRecorder);
 
     m_softwareReporterCapabilityAgent =
@@ -726,50 +721,8 @@ bool SmartScreenClient::initialize(
         return false;
     }
 
-    m_deviceSettingStorage = deviceSettingStorage;
-    if (!m_deviceSettingStorage->open()) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "deviceSettingStorageOpenFailed"));
-        return false;
-    }
-
-    /*
-     * Creating the DoNotDisturb Capability Agent.
-     *
-     * TODO(ACSDK-2279): Keep this here till we can inject DND setting into the DND CA.
-     */
-    m_dndCapabilityAgent = capabilityAgents::doNotDisturb::DoNotDisturbCapabilityAgent::create(
-        m_exceptionSender, m_connectionManager, m_deviceSettingStorage);
-
-    if (!m_dndCapabilityAgent) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateDNDCapabilityAgent"));
-        return false;
-    }
-
-    addConnectionObserver(m_dndCapabilityAgent);
-
-    DeviceSettingsManagerBuilder settingsManagerBuilder{
-        m_deviceSettingStorage, m_connectionManager, m_connectionManager, customerDataManager};
-    settingsManagerBuilder.withDoNotDisturbSetting(m_dndCapabilityAgent)
-        .withAlarmVolumeRampSetting()
-        .withWakeWordConfirmationSetting()
-        .withSpeechConfirmationSetting()
-        .withTimeZoneSetting(systemTimezone)
-        .withNetworkInfoSetting();
-
-    if (localeAssetsManager->getDefaultSupportedWakeWords().empty()) {
-        settingsManagerBuilder.withLocaleSetting(localeAssetsManager);
-    } else {
-        settingsManagerBuilder.withLocaleAndWakeWordsSettings(localeAssetsManager);
-    }
-
-    m_deviceSettingsManager = settingsManagerBuilder.build();
-    if (!m_deviceSettingsManager) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "createDeviceSettingsManagerFailed"));
-        return false;
-    }
-
     m_deviceTimeZoneOffset = calculateDeviceTimezoneOffset(
-        settingsManagerBuilder.getSetting<settings::DeviceSettingsIndex::TIMEZONE>()->get());
+        m_deviceSettingsManager->getSetting<settings::DeviceSettingsIndex::TIMEZONE>()->get());
 
     /*
      * Creating the User Inactivity Monitor - This component is responsibly for
@@ -787,10 +740,10 @@ bool SmartScreenClient::initialize(
         systemSoundMediaPlayer, audioFactory->systemSounds());
 
     auto wakeWordConfirmationSetting =
-        settingsManagerBuilder.getSetting<settings::DeviceSettingsIndex::WAKEWORD_CONFIRMATION>();
+        m_deviceSettingsManager->getSetting<settings::DeviceSettingsIndex::WAKEWORD_CONFIRMATION>();
     auto speechConfirmationSetting =
-        settingsManagerBuilder.getSetting<settings::DeviceSettingsIndex::SPEECH_CONFIRMATION>();
-    auto wakeWordsSetting = settingsManagerBuilder.getSetting<settings::DeviceSettingsIndex::WAKE_WORDS>();
+        m_deviceSettingsManager->getSetting<settings::DeviceSettingsIndex::SPEECH_CONFIRMATION>();
+    auto wakeWordsSetting = m_deviceSettingsManager->getSetting<settings::DeviceSettingsIndex::WAKE_WORDS>();
 
 /*
  * Creating the Audio Input Processor - This component is the Capability Agent
@@ -843,7 +796,7 @@ bool SmartScreenClient::initialize(
     // when internet is disconnected during dialog, terminate dialog
     addInternetConnectionObserver(m_audioInputProcessor);
 
-    m_audioInputProcessor->addObserver(m_dialogUXStateAggregator);
+    addAudioInputProcessorObserver(m_dialogUXStateAggregator);
 
     m_connectionRetryTrigger = ConnectionRetryTrigger::create(m_connectionManager, m_audioInputProcessor);
     if (!m_connectionRetryTrigger) {
@@ -880,13 +833,10 @@ bool SmartScreenClient::initialize(
 
     // create @c SpeakerInterfaces for each @c Type
     std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAvsSpeakers{systemSoundSpeaker};
-    std::vector<std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>> allAlertSpeakers{alertsSpeaker};
     // parse additional Speakers into the right speaker list.
     for (const auto& it : additionalSpeakers) {
         if (ChannelVolumeInterface::Type::AVS_SPEAKER_VOLUME == it.first) {
             allAvsSpeakers.push_back(it.second);
-        } else if (ChannelVolumeInterface::Type::AVS_ALERTS_VOLUME == it.first) {
-            allAlertSpeakers.push_back(it.second);
         }
     }
 
@@ -904,7 +854,7 @@ bool SmartScreenClient::initialize(
 
     // create @c ChannelVolumeInterface instances for all @c SpeakerInterface instances
     std::vector<std::shared_ptr<avsCommon::sdkInterfaces::ChannelVolumeInterface>> allAvsChannelVolumeInterfaces,
-        allAlertChannelVolumeInterfaces, allChannelVolumeInterfaces;
+        allChannelVolumeInterfaces;
 
     // create allAvsChannelVolumeInterfaces using allAvsSpeakers
     for (auto& it : allAvsSpeakers) {
@@ -921,62 +871,12 @@ bool SmartScreenClient::initialize(
         channelVolumeFactory->createChannelVolumeInterface(ringtoneSpeaker);
     allAvsChannelVolumeInterfaces.push_back(ringtoneChannelVolumeInterface);
 
-    // create @c ChannelVolumeInterface for allAlertSpeakers
-    for (auto& it : allAlertSpeakers) {
-        allAlertChannelVolumeInterfaces.push_back(
-            channelVolumeFactory->createChannelVolumeInterface(it, ChannelVolumeInterface::Type::AVS_ALERTS_VOLUME));
-    }
-
     allChannelVolumeInterfaces.insert(
         allChannelVolumeInterfaces.end(), allAvsChannelVolumeInterfaces.begin(), allAvsChannelVolumeInterfaces.end());
-    allChannelVolumeInterfaces.insert(
-        allChannelVolumeInterfaces.end(),
-        allAlertChannelVolumeInterfaces.begin(),
-        allAlertChannelVolumeInterfaces.end());
 
     for (const auto& channelVolumeInterface : allChannelVolumeInterfaces) {
         m_speakerManager->addChannelVolumeInterface(channelVolumeInterface);
     }
-
-    auto alertRenderer = acsdkAlerts::renderer::Renderer::create(alertsMediaPlayer, metricRecorder);
-    if (!alertRenderer) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateAlarmRenderer"));
-        return false;
-    }
-
-    /*
-     * Creating the Alerts Capability Agent - This component is the Capability
-     * Agent that implements the Alerts interface of AVS.
-     */
-    m_alertsCapabilityAgent = acsdkAlerts::AlertsCapabilityAgent::create(
-        m_connectionManager,
-        m_connectionManager,
-        m_certifiedSender,
-        m_audioFocusManager,
-        m_speakerManager,
-        m_contextManager,
-        m_exceptionSender,
-        alertStorage,
-        audioFactory->alerts(),
-        alertRenderer,
-        customerDataManager,
-        settingsManagerBuilder.getSetting<settings::ALARM_VOLUME_RAMP>(),
-        m_deviceSettingsManager,
-        metricRecorder,
-        startAlertSchedulingOnInitialization);
-
-    if (!m_alertsCapabilityAgent) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateAlertsCapabilityAgent"));
-        return false;
-    }
-
-    /*
-     * Creating the System Clock Monitor - This component notifies the time sensitive
-     * components when the system clock resynchronizes.
-     */
-    m_systemClockMonitor = std::shared_ptr<avsCommon::utils::timing::SystemClockMonitor>(
-        new avsCommon::utils::timing::SystemClockMonitor());
-    m_systemClockMonitor->addSystemClockMonitorObserver(m_alertsCapabilityAgent);
 
     addConnectionObserver(m_dialogUXStateAggregator);
 
@@ -1184,7 +1084,7 @@ bool SmartScreenClient::initialize(
      * Creating the TimeZone Handler - This component is responsible for handling directives related to time zones.
      */
     auto timezoneHandler = capabilityAgents::system::TimeZoneHandler::create(
-        settingsManagerBuilder.getSetting<settings::TIMEZONE>(), m_exceptionSender);
+        m_deviceSettingsManager->getSetting<settings::TIMEZONE>(), m_exceptionSender);
     if (!timezoneHandler) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateTimeZoneHandler"));
         return false;
@@ -1194,7 +1094,7 @@ bool SmartScreenClient::initialize(
      * Creating the Locale Handler - This component is responsible for handling directives related to locales.
      */
     auto localeHandler = capabilityAgents::system::LocaleHandler::create(
-        m_exceptionSender, settingsManagerBuilder.getSetting<settings::DeviceSettingsIndex::LOCALE>());
+        m_exceptionSender, m_deviceSettingsManager->getSetting<settings::DeviceSettingsIndex::LOCALE>());
     if (!localeHandler) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateLocaleHandler"));
         return false;
@@ -1204,7 +1104,7 @@ bool SmartScreenClient::initialize(
      * Creating the ReportState Handler - This component is responsible for the ReportState directives.
      */
     auto reportGenerator = capabilityAgents::system::StateReportGenerator::create(
-        m_deviceSettingsManager, settingsManagerBuilder.getConfigurations());
+        m_deviceSettingsManager, m_deviceSettingsManager->getConfigurations());
     if (!reportGenerator.hasValue()) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateStateReportGenerator"));
         return false;
@@ -1328,7 +1228,6 @@ bool SmartScreenClient::initialize(
      */
     m_defaultEndpointBuilder->withCapability(m_speechSynthesizer, m_speechSynthesizer);
     m_defaultEndpointBuilder->withCapability(m_audioInputProcessor, m_audioInputProcessor);
-    m_defaultEndpointBuilder->withCapability(m_alertsCapabilityAgent, m_alertsCapabilityAgent);
     m_defaultEndpointBuilder->withCapability(m_apiGatewayCapabilityAgent, m_apiGatewayCapabilityAgent);
 #ifdef ENABLE_PCC
     if (m_phoneCallControllerCapabilityAgent) {
@@ -1360,8 +1259,6 @@ bool SmartScreenClient::initialize(
         m_defaultEndpointBuilder->withCapability(m_equalizerCapabilityAgent, m_equalizerCapabilityAgent);
     }
 
-    m_defaultEndpointBuilder->withCapability(m_dndCapabilityAgent, m_dndCapabilityAgent);
-
     // System CA is split into multiple directive handlers.
     m_defaultEndpointBuilder->withCapabilityConfiguration(systemCapabilityProvider);
     if (!m_directiveSequencer->addDirectiveHandler(std::move(localeHandler)) ||
@@ -1376,7 +1273,7 @@ bool SmartScreenClient::initialize(
     }
 
     if (externalCapabilitiesBuilder) {
-        externalCapabilitiesBuilder->withSettingsStorage(m_deviceSettingStorage);
+        externalCapabilitiesBuilder->withSettingsStorage(deviceSettingStorage);
         externalCapabilitiesBuilder->withInternetConnectionMonitor(m_internetConnectionMonitor);
         externalCapabilitiesBuilder->withDialogUXStateAggregator(m_dialogUXStateAggregator);
         externalCapabilitiesBuilder->withVisualFocusManager(m_visualFocusManager);
@@ -1504,7 +1401,7 @@ static const std::string APL_INTERFACE("Alexa.Presentation.APL");
 void SmartScreenClient::forceClearDialogChannelFocus() {
     ACSDK_DEBUG5(LX(__func__).m("Force Clear Dialog Channel"));
     m_audioFocusManager->acquireChannel(
-            avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME, shared_from_this(), APL_INTERFACE);
+        avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME, shared_from_this(), APL_INTERFACE);
 }
 
 void SmartScreenClient::onFocusChanged(
@@ -1521,9 +1418,10 @@ void SmartScreenClient::onFocusChanged(
  * This function is called when the user clicks on an APL card in response to an Expect Speech,
  * setting the state of AIP to IDLE
  */
-void SmartScreenClient::onUserEvent(alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface::State state) {
+void SmartScreenClient::onUserEvent(
+    alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface::State state) {
     ACSDK_DEBUG0(LX(__func__).m(AudioInputProcessorObserverInterface::stateToString(state)));
-    if(state == AudioInputProcessorObserverInterface::State::EXPECTING_SPEECH){
+    if (state == AudioInputProcessorObserverInterface::State::EXPECTING_SPEECH) {
         m_audioInputProcessor->resetState();
     }
 }
@@ -1777,13 +1675,13 @@ void SmartScreenClient::removeSpeechSynthesizerObserver(
 }
 
 void SmartScreenClient::addFocusManagersObserver(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface> observer) {
     m_audioFocusManager->addObserver(observer);
     m_visualFocusManager->addObserver(observer);
 }
 
 void SmartScreenClient::removeFocusManagersObserver(
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface> observer) {
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface> observer) {
     m_audioFocusManager->removeObserver(observer);
     m_visualFocusManager->removeObserver(observer);
 }
@@ -1990,11 +1888,12 @@ void SmartScreenClient::handleVisualContext(uint64_t token, std::string payload)
     m_alexaPresentation->onVisualContextAvailable(token, payload);
 }
 
-void SmartScreenClient::handleRenderDocumentResult(std::string token, bool result, std::string error) {
+void SmartScreenClient::handleRenderDocumentResult(const std::string& token, bool result, std::string error) {
     m_alexaPresentation->processRenderDocumentResult(token, result, error);
+    m_templateRuntime->processPresentationResult(token);
 }
 
-void SmartScreenClient::handleExecuteCommandsResult(std::string token, bool result, std::string error) {
+void SmartScreenClient::handleExecuteCommandsResult(const std::string& token, bool result, std::string error) {
     m_alexaPresentation->processExecuteCommandsResult(token, result, error);
 }
 
@@ -2113,11 +2012,6 @@ SmartScreenClient::~SmartScreenClient() {
         ACSDK_DEBUG5(LX("SpeechSynthesizerShutdown"));
         m_speechSynthesizer->shutdown();
     }
-    if (m_alertsCapabilityAgent) {
-        m_systemClockMonitor->removeSystemClockMonitorObserver(m_alertsCapabilityAgent);
-        ACSDK_DEBUG5(LX("AlertsShutdown"));
-        m_alertsCapabilityAgent->shutdown();
-    }
     if (m_softwareInfoSender) {
         ACSDK_DEBUG5(LX("SoftwareInfoShutdown"));
         m_softwareInfoSender->shutdown();
@@ -2169,12 +2063,6 @@ SmartScreenClient::~SmartScreenClient() {
         m_meetingClientControllerCapabilityAgent->shutdown();
     }
 #endif
-    if (m_dndCapabilityAgent) {
-        ACSDK_DEBUG5(LX("DNDCapabilityAgentShutdown"));
-        removeConnectionObserver(m_dndCapabilityAgent);
-        m_dndCapabilityAgent->shutdown();
-    }
-
     if (m_visualCharacteristics) {
         m_visualCharacteristics->shutdown();
     }
@@ -2188,11 +2076,6 @@ SmartScreenClient::~SmartScreenClient() {
         }
         ACSDK_DEBUG5(LX("EqualizerCapabilityAgentShutdown"));
         m_equalizerCapabilityAgent->shutdown();
-    }
-
-    if (m_deviceSettingStorage) {
-        ACSDK_DEBUG5(LX("CloseSettingStorage"));
-        m_deviceSettingStorage->close();
     }
 
     if (m_diagnostics) {
@@ -2245,11 +2128,12 @@ void SmartScreenClient::releaseAllObserversOnDialogChannel() {
     }
 }
 
-void SmartScreenClient::addDialogChannelObserverInterface(const std::shared_ptr<ChannelObserverInterface> &observer) {
+void SmartScreenClient::addDialogChannelObserverInterface(const std::shared_ptr<ChannelObserverInterface>& observer) {
     m_dialogChannelObserverInterfaces.insert(observer);
 }
 
-void SmartScreenClient::removeDialogChannelObserverInterface(const std::shared_ptr<ChannelObserverInterface> &observer) {
+void SmartScreenClient::removeDialogChannelObserverInterface(
+    const std::shared_ptr<ChannelObserverInterface>& observer) {
     m_dialogChannelObserverInterfaces.erase(observer);
 }
 

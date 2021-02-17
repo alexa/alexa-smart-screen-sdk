@@ -18,8 +18,7 @@ list(APPEND SampleApp_SOURCES
     SampleEqualizerModeController.cpp
     SmartScreenCaptionPresenter.cpp
     SmartScreenCaptionStateManager.cpp
-    TelemetrySink.cpp
-    main.cpp)
+    TelemetrySink.cpp)
 
 if (PORTAUDIO)
     list(APPEND SampleApp_SOURCES PortAudioMicrophoneWrapper.cpp)
@@ -40,9 +39,9 @@ IF (HAS_EXTERNAL_MEDIA_PLAYER_ADAPTERS)
     endforeach(myfile)
 ENDIF()
 
-add_executable(SampleApp ${SampleApp_SOURCES})
+add_library(SmartScreenSampleAppLib SHARED ${SampleApp_SOURCES})
 
-target_include_directories(SampleApp PUBLIC
+target_include_directories(SmartScreenSampleAppLib PUBLIC
     "${SampleApp_SOURCE_DIR}/include"
     "${ASDK_INCLUDE_DIRS}"
     "${AudioResources_SOURCE_DIR}/include"
@@ -53,7 +52,7 @@ target_include_directories(SampleApp PUBLIC
     "${Communication_SOURCE_DIR}/include"
     "${APLClient_SOURCE_DIR}/include")
 
-target_link_libraries(SampleApp
+target_link_libraries(SmartScreenSampleAppLib
     "${ASDK_LDFLAGS}"
     APLClient
     Communication
@@ -70,25 +69,25 @@ target_link_libraries(SampleApp
     "${PORTAUDIO_LIB_PATH}")
 
 if (PCC)
-    target_link_libraries(SampleApp AVSCommon)
+    target_link_libraries(SmartScreenSampleAppLib AVSCommon)
 endif()
 
 if (ANDROID)
-    target_include_directories(SampleApp PUBLIC "${AndroidUtilities}/include")
-    target_link_libraries(SampleApp AndroidUtilities)
+    target_include_directories(SmartScreenSampleAppLib PUBLIC "${AndroidUtilities}/include")
+    target_link_libraries(SmartScreenSampleAppLib AndroidUtilities)
     if (ANDROID_MEDIA_PLAYER)
-        target_include_directories(SampleApp PUBLIC "${AndroidSLESMediaPlayer}/include")
-        target_link_libraries(SampleApp AndroidSLESMediaPlayer)
+        target_include_directories(SmartScreenSampleAppLib PUBLIC "${AndroidSLESMediaPlayer}/include")
+        target_link_libraries(SmartScreenSampleAppLib AndroidSLESMediaPlayer)
     endif()
 endif()
 
 if (GSTREAMER_MEDIA_PLAYER)
-    target_include_directories(SampleApp PUBLIC "${MediaPlayer_SOURCE_DIR}/include")
-    target_link_libraries(SampleApp MediaPlayer)
+    target_include_directories(SmartScreenSampleAppLib PUBLIC "${MediaPlayer_SOURCE_DIR}/include")
+    target_link_libraries(SmartScreenSampleAppLib MediaPlayer)
 endif()
 
 if(KWD)
-    target_link_libraries(SampleApp KeywordDetectorProvider)
+    target_link_libraries(SmartScreenSampleAppLib KeywordDetectorProvider)
 endif()
 
 if(NOT WEBSOCKETPP_INCLUDE_DIR)
@@ -103,8 +102,8 @@ if(NOT ASIO_INCLUDE_DIR)
     endif()
 endif()
 
-target_compile_definitions(SampleApp PUBLIC ASIO_STANDALONE)
-target_include_directories(SampleApp PUBLIC
+target_compile_definitions(SmartScreenSampleAppLib PUBLIC ASIO_STANDALONE)
+target_include_directories(SmartScreenSampleAppLib PUBLIC
         "${ASIO_INCLUDE_DIR}"
         "${WEBSOCKETPP_INCLUDE_DIR}")
 
@@ -118,15 +117,15 @@ else()
     find_package(OpenSSL REQUIRED)
     add_definitions(-DENABLE_WEBSOCKET_SSL)
 
-    target_include_directories(SampleApp PUBLIC "${OPENSSL_INCLUDE_DIR}")
-    target_link_libraries(SampleApp
+    target_include_directories(SmartScreenSampleAppLib PUBLIC "${OPENSSL_INCLUDE_DIR}")
+    target_link_libraries(SmartScreenSampleAppLib
             "${OPENSSL_SSL_LIBRARY}"
             "${OPENSSL_CRYPTO_LIBRARY}")
 endif()
 
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    target_link_libraries(SampleApp
+    target_link_libraries(SmartScreenSampleAppLib
         "-rpath ${ASDK_LIBRARY_DIRS}"
         "-framework CoreAudio"
         "-framework AudioToolbox" 
@@ -134,7 +133,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         "-framework CoreServices" 
         "-framework Carbon")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    target_link_libraries(SampleApp
+    target_link_libraries(SmartScreenSampleAppLib
       rt m pthread asound atomic
       "-Wl,-rpath,${ASDK_LIBRARY_DIRS}")
 endif()
@@ -148,55 +147,8 @@ if(NOT YOGA_LIB_DIR)
 endif()
 
 
-set(SampleAppTest_SOURCES)
-list(APPEND SampleAppTest_SOURCES
-        AplClientBridge.cpp
-        ConnectionObserver.cpp
-        CachingDownloadManager.cpp
-        ConsolePrinter.cpp
-        DownloadMonitor.cpp
-        GUILogBridge.cpp
-        GUI/GUIClient.cpp
-        GUI/GUIManager.cpp
-        JsonUIManager.cpp
-        KeywordObserver.cpp
-        LocaleAssetsManager.cpp
-        SampleEqualizerModeController.cpp
-        SmartScreenCaptionPresenter.cpp
-        SmartScreenCaptionStateManager.cpp
-        TelemetrySink.cpp
-        )
+add_executable(SampleApp main.cpp)
+target_link_libraries(SampleApp SmartScreenSampleAppLib)
 
-add_library(SampleAppTest SHARED ${SampleAppTest_SOURCES})
-
-target_include_directories(SampleAppTest PUBLIC
-        "${SampleApp_INCLUDE_DIR}"
-        "${SampleApp_SOURCE_DIR}/include"
-        "${ASDK_INCLUDE_DIRS}"
-        "${AudioResources_SOURCE_DIR}/include"
-        "${RegistrationManager_SOURCE_DIR}/include"
-        "${ESP_SOURCE_DIR}/include"
-        "${PORTAUDIO_INCLUDE_DIR}"
-        "${Utils_SOURCE_DIR}/include"
-        "${Communication_SOURCE_DIR/include}"
-        "${APLClient_SOURCE_DIR/include}"
-        "${SmartScreenSDKInterfaces_SOURCE_DIR}/test"
-        "${TemplateRuntime_SOURCE_DIR}/include"
-        "${SmartScreenSDKInterfaces_SOURCE_DIR}/include"
-        )
-
-target_link_libraries(SampleAppTest
-        "${ASDK_LDFLAGS}"
-        APLClient
-        Communication
-        AlexaPresentation
-        SmartScreenClient
-        CapabilitiesDelegate
-        CBLAuthDelegate
-        DeviceSettings
-        SQLiteStorage
-        SSSDKCommon
-        acsdkEqualizerImplementations
-        TemplateRuntime
-        Utils
-        "${PORTAUDIO_LIB_PATH}")
+# install target
+asdk_install_targets(SmartScreenSampleAppLib TRUE)

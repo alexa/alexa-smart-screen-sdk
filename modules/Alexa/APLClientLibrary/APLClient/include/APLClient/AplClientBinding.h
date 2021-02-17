@@ -62,6 +62,13 @@ public:
      */
     Telemetry::DownloadMetricsEmitterPtr createDownloadMetricsEmitter();
 
+    /**
+     * Set an instance @c AplMetricsSinkInterface to the @c AplConfiguration
+     *
+     * @param a shared pointer of @c AplMetricsSinkInterface to be used.
+     */
+    void onTelemetrySinkUpdated(APLClient::Telemetry::AplMetricsSinkInterfacePtr sink);
+
 private:
     AplConfigurationPtr m_aplConfiguration;
 };

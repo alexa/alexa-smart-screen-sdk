@@ -121,7 +121,7 @@ export class VoiceChrome extends React.Component<IVoiceChromeProps, IVoiceChrome
                     });
                     clearTimeout(this.lastDoNotDisturbVoiceChromeStateTimeout);
                     this.lastDoNotDisturbVoiceChromeStateTimeout =
-                        setTimeout(this.setVoiceChromeStateStringWithCurrentAlexaState.bind(this), 5000);
+                        window.setTimeout(this.setVoiceChromeStateStringWithCurrentAlexaState.bind(this), 5000);
                     return;
                 }
             }

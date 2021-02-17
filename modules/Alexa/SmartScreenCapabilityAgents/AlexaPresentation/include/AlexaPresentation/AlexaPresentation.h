@@ -322,7 +322,6 @@ private:
      * @c Alexa.Presentation.APL @c RenderDocument directive.
      */
     struct PresentationSession {
-
         /**
          * Default Constructor.
          */
@@ -334,11 +333,7 @@ private:
          * @param skillId the identifier of the skill/speechlet.
          * @param id The identifier of the presentation session.
          */
-        PresentationSession(
-            std::string skillId,
-            std::string id) :
-            skillId{std::move(skillId)},
-            id{std::move(id)} {};
+        PresentationSession(std::string skillId, std::string id) : skillId{std::move(skillId)}, id{std::move(id)} {};
 
         /// The identifier of the Skill/ Speechlet who sends this directive.
         std::string skillId;
@@ -441,8 +436,7 @@ private:
      *
      * @param info The @c DirectiveInfo containing the @c AVSDirective and the @c DirectiveHandlerResultInterface.
      */
-    void handleRenderDocumentDirective(std::shared_ptr<DirectiveInfo> info,
-                                       const std::chrono::steady_clock::time_point &startTime);
+    void handleRenderDocumentDirective(std::shared_ptr<DirectiveInfo> info);
 
     /**
      * This function handles a @c ExecuteCommand directive.
@@ -609,7 +603,7 @@ private:
     /**
      * Notify all observers that rendering has been aborted.
      */
-     void notifyAbort();
+    void notifyAbort();
 
     /// Timer that is responsible for clearing the display on IDLE.
     alexaClientSDK::avsCommon::utils::timing::Timer m_idleTimer;
@@ -797,6 +791,9 @@ private:
 
     /// This is the worker thread for the @c AlexaPresentation CA.
     std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor> m_executor;
+
+    /// Time at which the current document was received
+    std::chrono::steady_clock::time_point m_renderReceivedTime;
 };
 
 }  // namespace alexaPresentation

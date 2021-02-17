@@ -66,6 +66,26 @@ public:
     virtual void onAudioPlayerSeekToPosition(int offsetInMilliseconds) = 0;
 
     /**
+     * Used to notify the observer when the extension has issued a Toggle event.
+     * The observer should report the provided TOGGLE control state for the @c AudioPlayer.
+     * https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/playbackcontroller.html#togglecommandissued
+     * @param name The name of the toggle.
+     * @param checked The checked state of the toggle.
+     */
+    virtual void onAudioPlayerToggle(const std::string& name, bool checked) = 0;
+
+    /**
+     * Used to notify the observer when the extension has flushed lyrics viewed data.
+     * The observer should report the provided LyricsViewed data for the @c AudioPlayer.Presentation
+     * @param token Meta-information about the track that displayed lyrics.
+     * @param durationInMilliseconds The time in milliseconds that lyrics were displayed.
+     * @param lyricData Opaque serialized data object for reporting lyrics viewed.
+     */
+    virtual void onAudioPlayerLyricDataFlushed(const std::string& token,
+                                               long durationInMilliseconds,
+                                               const std::string& lyricData) = 0;
+
+    /**
      * ADDITIONAL API - Supports Full AVS PlaybackController API usage.
      * Used to notify the observer when the extension has issued a SkipForward event.
      * https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/playbackcontroller.html#buttoncommandissued
@@ -80,16 +100,6 @@ public:
      * https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/playbackcontroller.html#buttoncommandissued
      */
     virtual void onAudioPlayerSkipBackward() = 0;
-
-    /**
-     * ADDITIONAL API - Supports Full AVS PlaybackController API usage.
-     * Used to notify the observer when the extension has issued a Toggle event.
-     * The observer should report the provided TOGGLE control state for the @c AudioPlayer.
-     * https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/playbackcontroller.html#togglecommandissued
-     * @param name The name of the toggle.
-     * @param checked The checked state of the toggle.
-     */
-    virtual void onAudioPlayerToggle(const std::string& name, bool checked) = 0;
 };
 
 }  // namespace AudioPlayer

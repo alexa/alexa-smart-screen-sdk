@@ -77,6 +77,7 @@ export interface IExtensionEvent {
     name: string;
     source: any;
     params: any;
+    event?: APL.Event;
 }
 /**
  * keyboard handler type
@@ -111,6 +112,8 @@ export interface IAPLOptions {
     audioPlayerFactory?: AudioPlayerFactory;
     /** Callback for executed SendEvent commands */
     onSendEvent?: (event: ISendEvent) => void;
+    /** Callback for logging PEGTL Parsing Session Error */
+    onPEGTLError?: (error: string) => void;
     /** Callback for Finish command */
     onFinish?: () => void;
     /** Callback for Extension command */
@@ -159,6 +162,7 @@ export default abstract class APLRenderer<Options = {
     top: Component;
     /** A reference to the APL extension manager */
     extensionManager: IExtensionManager;
+    private isEdge;
     readonly options: Options;
     audioPlayer: AudioPlayerWrapper;
     /**
@@ -261,7 +265,12 @@ export default abstract class APLRenderer<Options = {
     private sendTouchPointerEvent;
     private handleKeyDown;
     private handleKeyUp;
+    /**
+     * Get APL.Keyboard object
+     * for MS edge Gamepad, repeat/altKey/ctrlKey/metaKey/shiftKey are undefined, need set default to false
+     */
     private getKeyboard;
+    private getKeyboardCodeInEdge;
     private passKeyboardEventToCore;
     private isDPadKey;
 }

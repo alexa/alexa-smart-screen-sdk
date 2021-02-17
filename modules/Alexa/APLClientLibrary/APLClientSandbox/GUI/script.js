@@ -148,6 +148,12 @@ let resetViewhost = () => {
     if(document.getElementById("bacstackExtensions").checked){
         supportedExtensions.push('aplext:backstack:10');
     }
+    if(document.getElementById("audioPlayerExtensions").checked){
+        supportedExtensions.push('aplext:audioplayer:10');
+    }
+    if(document.getElementById("musicAlarmsExtensions").checked){
+        supportedExtensions.push('aplext:musicalarm:10');
+    }
 
     const options = {
         view: rendererElement,

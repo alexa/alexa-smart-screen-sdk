@@ -13,16 +13,16 @@
  * permissions and limitations under the License.
  */
 
-#include <memory>
-
 #include "APLClient/AplClientBinding.h"
 #include "APLClient/AplClientRenderer.h"
 #include "APLClient/AplCoreEngineLogBridge.h"
+#include "APLClient/Telemetry/AplMetricsRecorder.h"
+#include "APLClient/Telemetry/NullAplMetricsRecorder.h"
 
 namespace APLClient {
 
-AplClientBinding::AplClientBinding(AplOptionsInterfacePtr options)
-    : m_aplConfiguration{std::make_shared<AplConfiguration>(options)} {
+AplClientBinding::AplClientBinding(AplOptionsInterfacePtr options) :
+        m_aplConfiguration{std::make_shared<AplConfiguration>(options)} {
     apl::LoggerFactory::instance().initialize(std::make_shared<AplCoreEngineLogBridge>(options));
 }
 
@@ -32,6 +32,16 @@ std::shared_ptr<AplClientRenderer> AplClientBinding::createRenderer(const std::s
 
 Telemetry::DownloadMetricsEmitterPtr AplClientBinding::createDownloadMetricsEmitter() {
     return std::make_shared<Telemetry::DownloadMetricsEmitter>(m_aplConfiguration->getMetricsRecorder());
+}
+
+void AplClientBinding::onTelemetrySinkUpdated(APLClient::Telemetry::AplMetricsSinkInterfacePtr sink) {
+    Telemetry::AplMetricsRecorderInterfacePtr recorder;
+    if (sink) {
+        recorder = Telemetry::AplMetricsRecorder::create(sink);
+    } else {
+        recorder = std::make_shared<Telemetry::NullAplMetricsRecorder>();
+    }
+    m_aplConfiguration->setMetricsRecorder(recorder);
 }
 
 }  // namespace APLClient

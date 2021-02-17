@@ -12,6 +12,10 @@ export declare class Content {
      */
     static create(doc: string): Content;
     /**
+     * Get Content created from Core.
+     */
+    getContent(): APL.Content;
+    /**
      * Retrieve a set of packages that have been requested.  This method only returns an
      * individual package a single time.  Once it has been called, the "requested" packages
      * are moved internally into a "pending" list of packages.

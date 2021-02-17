@@ -6,9 +6,11 @@ import APLRenderer from '../APLRenderer';
 import { PropertyKey } from '../enums/PropertyKey';
 import { UpdateType } from '../enums/UpdateType';
 import { ILogger } from '../logging/ILogger';
-import { IAVGGradient } from './avg/AVG';
 import { GradientSpreadMethod } from '../enums/GradientSpreadMethod';
 import { GradientUnits } from '../enums/GradientUnits';
+import { IAVGGradient } from './avg/Gradient';
+export declare const SVG_NS = "http://www.w3.org/2000/svg";
+export declare const uuidv4: any;
 export declare const IDENTITY_TRANSFORM = "matrix(1.000000,0.000000,0.000000,1.000000,0.000000,0.000000)";
 /**
  * @ignore
@@ -113,7 +115,6 @@ export declare abstract class Component<PropsType = IGenericPropType> extends Ev
     static getPatternUrl(pattern: APL.GraphicPattern, transform: string, parent: Element, logger: ILogger): string;
     hasValidBounds(): boolean;
     static getClipPathElementId(pathData: string, parent: Element): string;
-    static getGradientElementId(gradient: IAVGGradient, transform: string, parent: Element, logger: ILogger): string;
     inflateAndAddChild(index: number, data: string): Component | undefined;
     remove(): boolean;
     protected boundsUpdated(): void;

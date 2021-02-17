@@ -8,6 +8,7 @@ export declare class VideoPlayer implements IPlayer {
     protected player: HTMLVideoElement;
     protected eventListener: IMediaEventListener;
     protected playbackState: PlaybackState;
+    private playerEndTime;
     constructor(eventListener: IMediaEventListener);
     configure(parent: HTMLElement, scale: 'contain' | 'cover'): void;
     applyCssShadow: (shadowParams: string) => void;
@@ -16,11 +17,14 @@ export declare class VideoPlayer implements IPlayer {
     pause(): void;
     mute(): void;
     unmute(): void;
+    setVolume(volume: number): void;
     flush(): void;
-    setCurrentTime(offset: number): void;
+    setCurrentTime(offsetInSecond: number): void;
+    setEndTime(endTimeInSecond: number): void;
     getCurrentPlaybackPosition(): number;
     getDuration(): number;
     getMediaState(): PlaybackState;
     getMediaId(): string;
     private sendPlaying();
+    private onVideoTimeUpdated();
 }

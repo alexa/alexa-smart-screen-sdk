@@ -140,21 +140,18 @@ public:
 
     /// @name AlexaPresentationObserverInterface Functions
     /// @{
-    void renderDocument(
-            const std::string& jsonPayload,
-            const std::string& token,
-            const std::string& windowId) override;
+    void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
 
-    void clearDocument() override;
+    void clearDocument(const std::string& token) override;
 
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
 
     void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
         override;
 
-    void interruptCommandSequence() override;
+    void interruptCommandSequence(const std::string& token) override;
 
-    void onPresentationSessionChanged() override;
+    void onPresentationSessionChanged(const std::string& id, const std::string& skillId) override;
     /// @}
 
     /**
@@ -200,6 +197,13 @@ public:
      */
     void setExecutor(const std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor>& executor);
 
+    /**
+     * Process result of renderTemplate OR renderPlayerInfo directive.
+     *
+     * @param token document presentationToken.
+     */
+    void processPresentationResult(const std::string& token);
+
 private:
     /**
      * Utility structure to correspond a directive with its audioItemId.
@@ -219,8 +223,7 @@ private:
         AudioItemPair(
             std::string itemId,
             std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityAgent::DirectiveInfo> renderPlayerInfoDirective) :
-                audioItemId{itemId},
-                directive{renderPlayerInfoDirective} {};
+                audioItemId{itemId}, directive{renderPlayerInfoDirective} {};
 
         /// The ID of the @c AudioItem.
         std::string audioItemId;
@@ -476,6 +479,9 @@ private:
      *     before the Executor Thread Variables are destroyed.
      */
     std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor> m_executor;
+
+    std::string m_playerInfoCardToken;
+    std::string m_nonPlayerInfoCardToken;
 };
 
 }  // namespace templateRuntime

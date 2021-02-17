@@ -5,6 +5,7 @@ AplClientBinding.cpp
 AplConfiguration.cpp
 Extensions/AplCoreExtensionManager.cpp
 Extensions/AudioPlayer/AplAudioPlayerExtension.cpp
+Extensions/AudioPlayer/AplAudioPlayerAlarmsExtension.cpp
 Extensions/Backstack/AplBackstackExtension.cpp
 Telemetry/AplMetricsRecorder.cpp
 Telemetry/AplMetricsRecorderInterface.cpp
@@ -30,6 +31,10 @@ if(NOT APLCORE_INCLUDE_DIR)
     message(FATAL_ERROR "APLCore Include Dir is required")
 endif()
 
+if(NOT APLCORE_BUILD_INCLUDE_DIR)
+    message(FATAL_ERROR "APLCore Build Include Dir is required")
+endif()
+
 if(NOT APLCORE_LIB_DIR)
     message(FATAL_ERROR "APLCore Lib Dir is required")
 endif()
@@ -38,6 +43,7 @@ if(APL_CORE)
     if (NOT MSVC)
         target_include_directories(APLClient PUBLIC
                 "${APLCORE_INCLUDE_DIR}"
+                "${APLCORE_BUILD_INCLUDE_DIR}"
                 "${YOGA_INCLUDE_DIR}")
 
         target_link_libraries(APLClient ${APLCORE_LIB_DIR}/libapl.a)
@@ -49,6 +55,7 @@ if(APL_CORE)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /permissive- /GS /TP /W3 /Zc:wchar_t /DAPL_CORE_UWP /Zc:inline /Zc:twoPhase- /fp:precise /DWIN32_LEAN_AND_MEAN /DNOGDI /DWIN32 /D_WINDOWS")
         target_include_directories(APLClient PUBLIC
                 "${APLCORE_INCLUDE_DIR}"
+                "${APLCORE_BUILD_INCLUDE_DIR}"
                 "${YOGA_INCLUDE_DIR}")
 
         target_link_libraries(APLClient ${APLCORE_LIB_DIR}/apl.lib)

@@ -15,6 +15,9 @@
 
 #include <ACL/AVSConnectionManager.h>
 #include <acsdkManufactory/ComponentAccumulator.h>
+#include <acsdkAlerts/AlertsComponent.h>
+#include <acsdkDeviceSettingsManager/DeviceSettingsManagerComponent.h>
+#include <acsdkDoNotDisturb/DoNotDisturbComponent.h>
 #include <acsdkShared/SharedComponent.h>
 #include <AVSCommon/Utils/LibcurlUtils/HTTPContentFetcherFactory.h>
 
@@ -30,6 +33,7 @@
 #include <AVSCommon/AVS/ExceptionEncounteredSender.h>
 #include <AVSCommon/SDKInterfaces/AuthDelegateInterface.h>
 #include <AVSCommon/Utils/Logger/Logger.h>
+#include <AVSCommon/Utils/LibcurlUtils/DefaultSetCurlOptionsCallbackFactory.h>
 #include <AVSGatewayManager/AVSGatewayManager.h>
 #include <AVSGatewayManager/Storage/AVSGatewayManagerStorage.h>
 #include <Alexa/AlexaEventProcessedNotifier.h>
@@ -160,45 +164,29 @@ getCreateApplicationAudioPipelineFactory(
     };
 }
 
-acsdkManufactory::Component<
-    std::shared_ptr<avsCommon::sdkInterfaces::AuthDelegateInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::AVSConnectionManagerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>,
-    std::shared_ptr<avsCommon::utils::configuration::ConfigurationNode>,
-    std::shared_ptr<avsCommon::utils::DeviceInfo>,
-    std::shared_ptr<registrationManager::CustomerDataManager>,
-    std::shared_ptr<avsCommon::sdkInterfaces::HTTPContentFetcherInterfaceFactoryInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::storage::MiscStorageInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::InternetConnectionMonitorInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::AVSGatewayManagerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::CapabilitiesDelegateInterface>,
-    std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>,
-    std::shared_ptr<avsCommon::avs::attachment::AttachmentManagerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::ChannelVolumeFactoryInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::ExpectSpeechTimeoutHandlerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::ExceptionEncounteredSenderInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::SpeakerManagerInterface>,
-    std::shared_ptr<capabilityAgents::alexa::AlexaInterfaceMessageSender>,
-    acsdkManufactory::Annotated<
-        avsCommon::sdkInterfaces::endpoints::DefaultEndpointAnnotation,
-        avsCommon::sdkInterfaces::endpoints::EndpointBuilderInterface>,
-    std::shared_ptr<acsdkEqualizerInterfaces::EqualizerRuntimeSetupInterface>,
-    std::shared_ptr<ApplicationAudioPipelineFactoryInterface>,
-    std::shared_ptr<captions::CaptionManagerInterface>,
-    std::shared_ptr<afml::interruptModel::InterruptModel>,
-    acsdkManufactory::
-        Annotated<avsCommon::sdkInterfaces::AudioFocusAnnotation, avsCommon::sdkInterfaces::FocusManagerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::RenderPlayerInfoCardsProviderRegistrarInterface>,
-    std::shared_ptr<acsdkAudioPlayerInterfaces::AudioPlayerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::PlaybackRouterInterface>,
-    std::shared_ptr<acsdkShutdownManagerInterfaces::ShutdownManagerInterface>,
-    std::shared_ptr<certifiedSender::CertifiedSender>,
-    std::shared_ptr<acsdkExternalMediaPlayer::ExternalMediaPlayer>,
-    std::shared_ptr<acsdkExternalMediaPlayerInterfaces::ExternalMediaPlayerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::PowerResourceManagerInterface>,
-    std::shared_ptr<acsdkStartupManagerInterfaces::StartupManagerInterface>>
-getComponent(
+/**
+ * Returns an std::function that finishes configuring the @c DeviceSettingStorageInterface.
+ * @param DeviceSettingStorageInterface The storage interface to finish configuring.
+ * @return A shared pointer to an @c DeviceSettingStorageInterface.
+ */
+static std::function<std::shared_ptr<settings::storage::DeviceSettingStorageInterface>()>
+getCreateDeviceSettingStorageInterface(std::shared_ptr<settings::storage::DeviceSettingStorageInterface> storage) {
+    return [storage]() -> std::shared_ptr<settings::storage::DeviceSettingStorageInterface> {
+      if (!storage) {
+          ACSDK_ERROR(LX("getCreateDeviceSettingStorageInterfaceFailed").d("isStorageNull", !storage));
+          return nullptr;
+      }
+
+      if (!storage->open()) {
+          ACSDK_ERROR(LX("getCreateDeviceSettingStorageInterfaceFailed").d("reason", "failed to open"));
+          return nullptr;
+      }
+
+      return storage;
+    };
+}
+
+SmartScreenClientComponent getComponent(
     const std::shared_ptr<avsCommon::sdkInterfaces::AuthDelegateInterface>& authDelegate,
     const std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface>& contextManager,
     const std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>& localeAssetsManager,
@@ -220,8 +208,14 @@ getComponent(
         audioMediaResourceProvider,
     const std::shared_ptr<certifiedSender::MessageStorageInterface>& messageStorage,
     const std::shared_ptr<avsCommon::sdkInterfaces::PowerResourceManagerInterface>& powerResourceManager,
-    const acsdkExternalMediaPlayer::ExternalMediaPlayer::AdapterCreationMap& adapterCreationMap) {
+    const acsdkExternalMediaPlayer::ExternalMediaPlayer::AdapterCreationMap& adapterCreationMap,
+    const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SystemTimeZoneInterface>& systemTimeZone,
+    const std::shared_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface>& deviceSettingStorage,
+    bool startAlertSchedulingOnInitialization,
+    const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::AudioFactoryInterface>& audioFactory,
+    const std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface>& alertStorage) {
     return ComponentAccumulator<>()
+        .addComponent(acsdkDeviceSettingsManager::getComponent())
         .addComponent(acsdkShared::getComponent())
         .addInstance(authDelegate)
         .addInstance(contextManager)
@@ -239,9 +233,13 @@ getComponent(
         .addInstance(expectSpeechTimeoutHandler)
         .addInstance(equalizerRuntimeSetup)
         .addRetainedFactory(getCreateApplicationAudioPipelineFactory(stubAudioPipelineFactory))
+        .addRetainedFactory(getCreateDeviceSettingStorageInterface(deviceSettingStorage))
         .addInstance(audioMediaResourceProvider)
         .addInstance(messageStorage)
         .addInstance(powerResourceManager)
+        .addInstance(systemTimeZone)
+        .addInstance(audioFactory)
+        .addInstance(alertStorage)
         .addComponent(capabilityAgents::speakerManager::getComponent())
         .addComponent(captions::getComponent())
         .addRetainedFactory(HTTPContentFetcherFactory::createHTTPContentFetcherInterfaceFactoryInterface)
@@ -259,6 +257,7 @@ getComponent(
             alexaClientSDK::endpoints::DefaultEndpointBuilder::createDefaultEndpointCapabilitiesRegistrarInterface)
         .addRetainedFactory(alexaClientSDK::endpoints::DefaultEndpointBuilder::createDefaultEndpointBuilderInterface)
         .addRetainedFactory(createAlexaEventProcessedNotifierInterface)
+        .addRetainedFactory(DefaultSetCurlOptionsCallbackFactory::createSetCurlOptionsCallbackFactoryInterface)
         .addRequiredFactory(AlexaInterfaceCapabilityAgent::createDefaultAlexaInterfaceCapabilityAgent)
         .addRetainedFactory(capabilityAgents::playbackController::PlaybackController::createPlaybackHandlerInterface)
         .addRequiredFactory(capabilityAgents::playbackController::PlaybackRouter::createPlaybackRouterInterface)
@@ -266,7 +265,9 @@ getComponent(
         .addComponent(afml::getComponent())
         .addRetainedFactory(capabilityAgents::templateRuntime::RenderPlayerInfoCardsProviderRegistrar::
                                 createRenderPlayerInfoCardsProviderRegistrarInterface)
+        .addComponent(acsdkAlerts::getComponent(startAlertSchedulingOnInitialization))
         .addComponent(acsdkAudioPlayer::getBackwardsCompatibleComponent())
+        .addComponent(acsdkDoNotDisturb::getComponent())
         .addRetainedFactory(certifiedSender::CertifiedSender::create)
         .addComponent(acsdkExternalMediaPlayer::getBackwardsCompatibleComponent(adapterCreationMap));
 }

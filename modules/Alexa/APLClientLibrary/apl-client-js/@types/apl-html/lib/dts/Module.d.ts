@@ -5,6 +5,7 @@
 /// <reference path="./Content.d.ts" />
 /// <reference path="./Component.d.ts" />
 /// <reference path="./Extension.d.ts" />
+/// <reference path="./ExtensionClient.d.ts" />
 /// <reference path="./Graphic.d.ts" />
 /// <reference path="./GraphicElement.d.ts" />
 /// <reference path="./GraphicPattern.d.ts" />
@@ -68,6 +69,8 @@ declare namespace APL {
         public onRuntimeInitialized: () => void;
         public Content: typeof Content;
         public ExtensionCommandDefinition: typeof ExtensionCommandDefinition;
+        public ExtensionFilterDefinition: typeof ExtensionFilterDefinition;
+        public ExtensionClient: typeof ExtensionClient;
         public ExtensionEventHandler: typeof ExtensionEventHandler;
         public Context: typeof Context;
         public Logger: typeof Logger;

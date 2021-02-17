@@ -37,8 +37,6 @@ JsonUIManager::JsonUIManager(
     std::shared_ptr<smartScreenSDKInterfaces::GUIClientInterface> guiClientInterface,
     std::shared_ptr<avsCommon::utils::DeviceInfo> deviceInfo) :
         m_dialogState{DialogUXState::IDLE},
-        m_capabilitiesState{CapabilitiesObserverInterface::State::UNINITIALIZED},
-        m_capabilitiesError{CapabilitiesObserverInterface::Error::UNINITIALIZED},
         m_authState{AuthObserverInterface::State::UNINITIALIZED},
         m_authCheckCounter{0},
         m_connectionStatus{avsCommon::sdkInterfaces::ConnectionStatusObserverInterface::Status::DISCONNECTED},

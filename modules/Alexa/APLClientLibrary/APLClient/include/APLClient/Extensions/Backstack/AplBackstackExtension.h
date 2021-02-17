@@ -23,7 +23,7 @@ namespace APLClient {
 namespace Extensions {
 namespace Backstack {
 
-static const std::string PROPERTY_BACK_TYPE_COUNT = "count";
+static const std::string URI = "aplext:backstack:10";
 static const std::string PROPERTY_BACK_TYPE_INDEX = "index";
 static const std::string PROPERTY_BACK_TYPE_ID = "id";
 

@@ -26,8 +26,6 @@
 #include <AVSCommon/SDKInterfaces/FocusManagerObserverInterface.h>
 #include <AVSCommon/Utils/RequiresShutdown.h>
 
-#include <APLClient/AplRenderingEvent.h>
-#include <APLClient/AplRenderingEventObserver.h>
 #include <AlexaPresentation/AlexaPresentation.h>
 #include <TemplateRuntimeCapabilityAgent/TemplateRuntime.h>
 
@@ -100,7 +98,7 @@ public:
     void renderTemplateCard(const std::string& jsonPayload, alexaClientSDK::avsCommon::avs::FocusState focusState)
         override;
 
-    void clearTemplateCard() override;
+    void clearTemplateCard(const std::string& token) override;
 
     void renderPlayerInfoCard(
         const std::string& jsonPayload,
@@ -108,7 +106,7 @@ public:
         alexaClientSDK::avsCommon::avs::FocusState focusState,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) override;
 
-    void clearPlayerInfoCard() override;
+    void clearPlayerInfoCard(const std::string& token) override;
     /// @}
 
     /// @name AlexaPresentationObserverInterface Functions
@@ -116,20 +114,21 @@ public:
 
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
 
-    void clearDocument() override;
+    void clearDocument(const std::string& token) override;
 
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
 
     void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
         override;
 
-    void interruptCommandSequence() override;
+    void interruptCommandSequence(const std::string& token) override;
 
-    void onPresentationSessionChanged() override;
+    void onPresentationSessionChanged(const std::string& id, const std::string& skillId) override;
 
-    void onRenderDirectiveReceived(const std::chrono::steady_clock::time_point& receiveTime) override;
+    void onRenderDirectiveReceived(const std::string& token, const std::chrono::steady_clock::time_point& receiveTime)
+        override;
 
-    void onRenderingAborted() override;
+    void onRenderingAborted(const std::string& token) override;
 
     /// @}
 
@@ -153,7 +152,7 @@ public:
 
     /// @name VisualStateProviderInterface Methods
     /// @{
-    void provideState(const unsigned int stateRequestToken) override;
+    void provideState(const std::string& aplToken, const unsigned int stateRequestToken) override;
     /// }
 
     /// @name GUIServerInterface methods
@@ -178,15 +177,15 @@ public:
 
     void handlePlaybackToggle(const std::string& name, bool checked) override;
 
-    void handleUserEvent(std::string userEventPayload) override;
+    void handleUserEvent(const std::string& token, std::string userEventPayload) override;
 
     void onUserEvent() override;
 
-    void handleVisualContext(uint64_t token, std::string payload) override;
+    void handleVisualContext(const std::string& token, uint64_t stateRequestToken, std::string payload) override;
 
-    void handleDataSourceFetchRequestEvent(std::string type, std::string payload) override;
+    void handleDataSourceFetchRequestEvent(const std::string& token, std::string type, std::string payload) override;
 
-    void handleRuntimeErrorEvent(std::string payload) override;
+    void handleRuntimeErrorEvent(const std::string& token, std::string payload) override;
 
     bool handleFocusAcquireRequest(
         std::string channelName,
@@ -201,14 +200,12 @@ public:
     void handleExecuteCommandsResult(std::string token, bool result, std::string error) override;
 
     void handleActivityEvent(
-        const std::string& source,
-        alexaSmartScreenSDK::smartScreenSDKInterfaces::ActivityEvent event) override;
-
-    void handleActivityEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::ActivityEvent event) override;
+        alexaSmartScreenSDK::smartScreenSDKInterfaces::ActivityEvent event,
+        const std::string& source = "") override;
 
     void handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::NavigationEvent event) override;
 
-    void setDocumentIdleTimeout(std::chrono::milliseconds timeout) override;
+    void setDocumentIdleTimeout(const std::string& token, std::chrono::milliseconds timeout) override;
 
     void handleDeviceWindowState(std::string payload) override;
 
@@ -220,7 +217,7 @@ public:
 
     void handleDisplayMetrics(uint64_t dropFrameCount) override;
 
-    void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric> &metrics) override;
+    void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric>& metrics) override;
 
     void handleToggleDoNotDisturbEvent() override;
 
@@ -257,12 +254,6 @@ public:
      */
     void setClient(std::shared_ptr<smartScreenClient::SmartScreenClient> client);
 
-    /**
-     * Sets an observer to notify of APL rendering event
-     *
-     * @param observer The event observer to notify
-     */
-    void setAplRenderingEventObserver(APLClient::AplRenderingEventObserverPtr observer);
     void onMetricRecorderAvailable(
         std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) override;
 
@@ -394,11 +385,6 @@ private:
     std::shared_ptr<alexaSmartScreenSDK::smartScreenClient::SmartScreenClient> m_ssClient;
 
     /**
-     * The observer to notify on APL rendering events.
-     */
-    APLClient::AplRenderingEventObserverPtr m_aplRenderingEventObserver;
-
-    /**
      * An internal executor that performs execution of callable objects passed to it sequentially but asynchronously.
      */
     alexaClientSDK::avsCommon::utils::threading::Executor m_executor;
@@ -451,7 +437,7 @@ private:
     alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface::State m_audioInputProcessorState;
 
     /// Map of channel focus states by channelName.
-    std::unordered_map<std::string, alexaClientSDK::avsCommon::avs::FocusState>  m_channelFocusStates;
+    std::unordered_map<std::string, alexaClientSDK::avsCommon::avs::FocusState> m_channelFocusStates;
 
     /// Utility flag used for clearing Alert Channel when Foregrounded.
     bool m_clearAlertChannelOnForegrounded;

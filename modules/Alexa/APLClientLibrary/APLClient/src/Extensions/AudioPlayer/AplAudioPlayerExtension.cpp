@@ -14,6 +14,7 @@
  */
 
 #include <string>
+#include <utility>
 #include "APLClient/Extensions/AudioPlayer/AplAudioPlayerExtension.h"
 
 namespace APLClient {
@@ -23,7 +24,6 @@ namespace AudioPlayer {
 /// String to identify log entries originating from this file.
 static const std::string TAG("AplAudioPlayerExtension");
 
-static const std::string URI = "aplext:audioplayer:10";
 static const std::string SETTING_PLAYBACK_STATE_NAME = "playbackStateName";
 static const std::string COMMAND_PLAY_NAME = "Play";
 static const std::string COMMAND_PAUSE_NAME = "Pause";
@@ -31,6 +31,9 @@ static const std::string COMMAND_PREVIOUS_NAME = "Previous";
 static const std::string COMMAND_NEXT_NAME = "Next";
 static const std::string COMMAND_SEEK_TO_POSITION_NAME = "SeekToPosition";
 static const std::string COMMAND_TOGGLE_NAME = "Toggle";
+static const std::string COMMAND_ADD_LYRICS_VIEWED = "AddLyricsViewed";
+static const std::string COMMAND_ADD_LYRICS_DURATION_IN_MILLISECONDS = "AddLyricsDurationInMilliseconds";
+static const std::string COMMAND_FLUSH_LYRIC_DATA = "FlushLyricData";
 static const std::string COMMAND_SKIP_FORWARD_NAME = "SkipForward";
 static const std::string COMMAND_SKIP_BACKWARD_NAME = "SkipBackward";
 static const std::string EVENTHANDLER_ON_PLAYER_ACTIVITY_UPDATED_NAME = "OnPlayerActivityUpdated";
@@ -38,12 +41,32 @@ static const std::string PROPERTY_OFFSET = "offset";
 static const std::string PROPERTY_TOGGLE_NAME = "name";
 static const std::string PROPERTY_TOGGLE_CHECKED = "checked";
 static const std::string PROPERTY_PLAYER_ACTIVITY = "playerActivity";
+static const std::string PROPERTY_TOKEN = "token";
+static const std::string PROPERTY_LINES = "lines";
+static const std::string PROPERTY_DURATION_IN_MILLISECONDS = "durationInMilliseconds";
+
+/// List of accepted toggle command names.
+static const std::vector<std::string> TOGGLE_COMMAND_NAMES = {
+    "thumbsUp",
+    "thumbsDown",
+    "shuffle",
+    "repeat"
+};
+
+/// List of accepted player activity.
+static const std::vector<std::string> PLAYER_ACTIVITY = {
+    "PLAYING",
+    "STOPPED",
+    "PAUSED",
+    "BUFFER_UNDERRUN"
+};
 
 AplAudioPlayerExtension::AplAudioPlayerExtension(std::shared_ptr<AplAudioPlayerExtensionObserverInterface> observer) :
-        m_observer{observer} {
+        m_observer{std::move(observer)} {
     m_playbackStateName = "";
+    m_activeSkillId = "";
     m_playbackState = apl::LiveMap::create();
-    m_playbackState->set(PROPERTY_PLAYER_ACTIVITY, "IDLE");
+    m_playbackState->set(PROPERTY_PLAYER_ACTIVITY, "STOPPED");
     m_playbackState->set(PROPERTY_OFFSET, 0);
 }
 
@@ -64,12 +87,21 @@ std::list<apl::ExtensionCommandDefinition> AplAudioPlayerExtension::getCommandDe
          apl::ExtensionCommandDefinition(URI, COMMAND_SEEK_TO_POSITION_NAME)
              .allowFastMode(true)
              .property(PROPERTY_OFFSET, 0, true),
-         apl::ExtensionCommandDefinition(URI, COMMAND_SKIP_FORWARD_NAME).allowFastMode(true),
-         apl::ExtensionCommandDefinition(URI, COMMAND_SKIP_BACKWARD_NAME).allowFastMode(true),
          apl::ExtensionCommandDefinition(URI, COMMAND_TOGGLE_NAME)
              .allowFastMode(true)
              .property(PROPERTY_TOGGLE_NAME, "", true)
-             .property(PROPERTY_TOGGLE_CHECKED, false, true)});
+             .property(PROPERTY_TOGGLE_CHECKED, false, true),
+         apl::ExtensionCommandDefinition(URI, COMMAND_SKIP_FORWARD_NAME).allowFastMode(true),
+         apl::ExtensionCommandDefinition(URI, COMMAND_SKIP_BACKWARD_NAME).allowFastMode(true),
+         apl::ExtensionCommandDefinition(URI, COMMAND_ADD_LYRICS_VIEWED)
+            .allowFastMode(true)
+            .property(PROPERTY_TOKEN, "", true)
+            .property(PROPERTY_LINES, apl::ObjectArray(), true),
+         apl::ExtensionCommandDefinition(URI, COMMAND_ADD_LYRICS_DURATION_IN_MILLISECONDS)
+            .allowFastMode(true)
+            .property(PROPERTY_TOKEN, "", true)
+            .property(PROPERTY_DURATION_IN_MILLISECONDS, 0, true),
+         apl::ExtensionCommandDefinition(URI, COMMAND_FLUSH_LYRIC_DATA).allowFastMode(true)});
     return extCmdDefs;
 }
 std::list<apl::ExtensionEventHandler> AplAudioPlayerExtension::getEventHandlers() {
@@ -131,10 +163,39 @@ void AplAudioPlayerExtension::onExtensionEvent(
             m_observer->onAudioPlayerSkipBackward();
         } else if (COMMAND_TOGGLE_NAME == name) {
             if (confirmEventParams(TAG, {PROPERTY_TOGGLE_NAME, PROPERTY_TOGGLE_CHECKED}, params)) {
-                m_observer->onAudioPlayerToggle(
-                    params.get(PROPERTY_TOGGLE_NAME).getString(), params.get(PROPERTY_TOGGLE_CHECKED).getBoolean());
+                auto toggleName = params.get(PROPERTY_TOGGLE_NAME).getString();
+                if (std::find(TOGGLE_COMMAND_NAMES.begin(), TOGGLE_COMMAND_NAMES.end(), toggleName) != TOGGLE_COMMAND_NAMES.end()) {
+                    m_observer->onAudioPlayerToggle(toggleName, params.get(PROPERTY_TOGGLE_CHECKED).getBoolean());
+                } else {
+                    logMessage(apl::LogLevel::ERROR, TAG, __func__, "Invalid Toggle Command Name: " + eventDebugString);
+                    succeeded = false;
+                }
             } else {
                 succeeded = false;
+            }
+        } else if (COMMAND_ADD_LYRICS_VIEWED == name) {
+            if (confirmEventParams(TAG, {PROPERTY_TOKEN, PROPERTY_LINES}, params)) {
+                auto tokenObject = params.get(PROPERTY_TOKEN);
+                auto token = tokenObject.isString() ? tokenObject.getString() : "";
+                if (auto lyricData = getActiveLyricsViewedData(true, token)) {
+                    lyricData->addLyricLinesData(params.get(PROPERTY_LINES).getArray());
+                }
+            } else {
+                succeeded = false;
+            }
+        } else if (COMMAND_ADD_LYRICS_DURATION_IN_MILLISECONDS == name) {
+            if (confirmEventParams(TAG, {PROPERTY_TOKEN, PROPERTY_DURATION_IN_MILLISECONDS}, params)) {
+                auto tokenObject = params.get(PROPERTY_TOKEN);
+                auto token = tokenObject.isString() ? tokenObject.getString() : "";
+                if (auto lyricData = getActiveLyricsViewedData(true, token)) {
+                    lyricData->durationInMilliseconds += params.get(PROPERTY_DURATION_IN_MILLISECONDS).getDouble();
+                }
+            } else {
+                succeeded = false;
+            }
+        } else if (COMMAND_FLUSH_LYRIC_DATA == name) {
+            if (auto lyricData = getActiveLyricsViewedData()) {
+                flushLyricData(lyricData);
             }
         } else {
             logMessage(apl::LogLevel::ERROR, TAG, __func__, "Invalid Command: " + eventDebugString);
@@ -150,7 +211,43 @@ void AplAudioPlayerExtension::onExtensionEvent(
     }
 }
 
+std::shared_ptr<AplAudioPlayerExtension::LyricsViewedData> AplAudioPlayerExtension::getActiveLyricsViewedData(bool initIfNull, const std::string& token) {
+    if (!m_activeSkillId.empty()) {
+        auto lvdi = m_lyricsViewedData.find(m_activeSkillId);
+        if (lvdi != m_lyricsViewedData.end()) {
+            auto lyricsViewedData = lvdi->second;
+            // If token has changed for the active skill's lyric data, flush the data and set the new token.
+            if (!token.empty() && lyricsViewedData->token != token) {
+                flushLyricData(lyricsViewedData);
+                lyricsViewedData->token = token;
+            }
+            return lyricsViewedData;
+        }
+    }
+
+    if (initIfNull) {
+        m_lyricsViewedData[m_activeSkillId] = std::make_shared<LyricsViewedData>(token);
+        return m_lyricsViewedData[m_activeSkillId];
+    }
+
+    return nullptr;
+}
+
+void AplAudioPlayerExtension::flushLyricData(const std::shared_ptr<LyricsViewedData>& lyricsViewedData) {
+    if (!lyricsViewedData->lyricData->empty()) {
+        m_observer->onAudioPlayerLyricDataFlushed(lyricsViewedData->token,
+                                                  lyricsViewedData->durationInMilliseconds,
+                                                  lyricsViewedData->getLyricDataPayload());
+    }
+    lyricsViewedData->reset();
+}
+
 void AplAudioPlayerExtension::updatePlayerActivity(const std::string& state, int offset) {
+    if (std::find(PLAYER_ACTIVITY.begin(), PLAYER_ACTIVITY.end(), state) == PLAYER_ACTIVITY.end()) {
+        logMessage(apl::LogLevel::ERROR, TAG, __func__, "Invalid Player Activity: " + state);
+        return;
+    }
+
     m_playbackState->set(PROPERTY_PLAYER_ACTIVITY, state);
     m_playbackState->set(PROPERTY_OFFSET, offset);
 
@@ -167,6 +264,14 @@ void AplAudioPlayerExtension::updatePlayerActivity(const std::string& state, int
 
 void AplAudioPlayerExtension::updatePlaybackProgress(int offset) {
     m_playbackState->set(PROPERTY_OFFSET, offset);
+}
+
+void AplAudioPlayerExtension::setActivePresentationSession(const std::string &id, const std::string &skillId) {
+    m_activeSkillId = skillId;
+    /// If there's available lyricsViewedData for the newly active skillId, report it immediately
+    if (auto lyricsViewedData = getActiveLyricsViewedData()) {
+        flushLyricData(lyricsViewedData);
+    }
 }
 
 }  // namespace AudioPlayer

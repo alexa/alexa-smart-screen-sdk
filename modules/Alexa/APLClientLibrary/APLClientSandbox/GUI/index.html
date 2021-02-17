@@ -90,7 +90,6 @@
             <button class="tab" onclick="switchTab(event, 'viewportsTab')">Viewports</button>
             <button class="tab" onclick="switchTab(event, 'commandTab')">Command</button>
             <button class="tab" onclick="switchTab(event, 'optionsTab')">Options</button>
-
         </div>
         <div id="docTab" class="content">
             <label for="document">Document</label><br><textarea id="document" style="height: 220px; width: 90%;">{}</textarea>
@@ -172,6 +171,16 @@
         <label class="switch">
           <input type="checkbox" id="bacstackExtensions">
           <span class="slider"></span>
+        </label>
+        <span style= "font-size: 18px;">AudioPlayer Extension</span>
+        <label class="switch">
+            <input type="checkbox" id="audioPlayerExtensions">
+            <span class="slider"></span>
+        </label>
+        <span style= "font-size: 18px;">MusicAlarms Extension</span>
+        <label class="switch">
+            <input type="checkbox" id="musicAlarmsExtensions">
+            <span class="slider"></span>
         </label>
         <button value="render" onclick="renderDocument()">Render</button>
         <button value="execute" onclick="executeCommand()">Execute</button>

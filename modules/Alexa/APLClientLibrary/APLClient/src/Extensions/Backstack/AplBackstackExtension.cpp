@@ -23,7 +23,6 @@ namespace Backstack {
 /// String to identify log entries originating from this file.
 static const std::string TAG("AplBackstackExtension");
 
-static const std::string URI = "aplext:backstack:10";
 static const std::string ENVIRONMENT_RESPONSIBLE_FOR_BACK_BUTTON = "responsibleForBackButton";
 static const std::string ENVIRONMENT_BACKSTACK = "backstack";
 static const std::string SETTING_PROPERTY_BACKSTACK_ID = "backstackId";
@@ -32,10 +31,12 @@ static const std::string COMMAND_GO_BACK_NAME = "GoBack";
 static const std::string COMMAND_CLEAR_NAME = "Clear";
 static const std::string PROPERTY_BACK_TYPE = "backType";
 static const std::string PROPERTY_BACK_VALUE = "backValue";
+static const std::string PROPERTY_BACK_TYPE_COUNT = "count";
 
 AplBackstackExtension::AplBackstackExtension(std::shared_ptr<AplBackstackExtensionObserverInterface> observer) :
         m_observer{observer} {
     m_backstackArrayName = "";
+    m_responsibleForBackButton = false;
 }
 
 void AplBackstackExtension::setResponsibleForBackButton(bool isResponsibleForBackButton) {

@@ -416,12 +416,6 @@ void AplCoreConnectionManager::dataSourceUpdate(
 void AplCoreConnectionManager::provideState(unsigned int stateRequestToken) {
     auto aplOptions = m_aplConfiguration->getAplOptions();
 
-    if (!m_Root) {
-        aplOptions->logMessage(LogLevel::WARN, "provideStateFailed", "Root context is null");
-        sendError("Root context is null");
-        return;
-    }
-
     auto timer = m_aplConfiguration->getMetricsRecorder()->createTimer(
             Telemetry::AplMetricsRecorderInterface::CURRENT_DOCUMENT,
             "APL-Web.RootContext.notifyVisualContext");
@@ -1077,7 +1071,7 @@ void AplCoreConnectionManager::processEvent(const apl::Event& event) {
          */
         auto token = ++m_SequenceNumber;
         auto resultCallback = addPendingEvent(token, event, false) ? shared_from_this() : nullptr;
-        aplOptions->onExtensionEvent(uri.getString(), name.getString(), sourceStr, paramsStr, token, resultCallback);
+        aplOptions->onExtensionEvent(m_aplToken, uri.getString(), name.getString(), sourceStr, paramsStr, token, resultCallback);
         return;
     }
 
@@ -1094,14 +1088,14 @@ bool AplCoreConnectionManager::addPendingEvent(unsigned int token, const apl::Ev
         ref.addTerminateCallback([this, token, isViewhostEvent](const apl::TimersPtr&) {
             auto it = m_PendingEvents.find(token);
             if (it != m_PendingEvents.end()) {
-                m_PendingEvents.erase(it);  // Remove the pending event
-
                 if (isViewhostEvent) {
                     auto msg = AplCoreViewhostMessage(EVENT_TERMINATE_KEY);
                     rapidjson::Value payload(rapidjson::kObjectType);
                     payload.AddMember("token", token, msg.alloc());
                     send(msg.setPayload(std::move(payload)));
                 }
+
+                m_PendingEvents.erase(it);  // Remove the pending event
             } else {
                 m_aplConfiguration->getAplOptions()->logMessage(LogLevel::WARN, __func__, "Event was not pending");
             }
@@ -1234,6 +1228,10 @@ void AplCoreConnectionManager::addExtensions(
         extension->setEventHandler(shared_from_this());
         m_extensionManager->addExtension(extension);
     }
+}
+
+std::shared_ptr<AplCoreExtensionInterface> AplCoreConnectionManager::getExtension(const std::string& uri) {
+    return m_extensionManager->getExtension(uri);
 }
 
 void AplCoreConnectionManager::reset() {

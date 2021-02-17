@@ -13,7 +13,7 @@ import {
   IEnvironment
 } from 'apl-client';
 import {IClient} from '../lib/messages/client';
-import {IAPLCoreMessage, IExecuteCommandsMessage, IAPLEventMessage} from '../lib/messages/messages';
+import {IAPLCoreMessage, IAPLEventMessage} from '../lib/messages/messages';
 import {FocusManager} from '../lib/focus/FocusManager';
 import {AVSAudioPlayer} from '../lib/media/AVSAudioPlayer';
 import {AVSVideoFactory} from '../lib/media/AVSVideo';
@@ -42,6 +42,8 @@ export interface IAPLRendererWindowProps {
   activityTracker : ActivityTracker;
   onRendererInit?() : void;
   onRendererDestroyed?() : void;
+  aplCoreMessageHandlerCallback :
+      (windowId : string, aplCoreMessageHandler : (message : IAPLCoreMessage) => void) => void;
 }
 
 export class WebsocketConnectionWrapper extends APLClient {
@@ -54,17 +56,37 @@ export class WebsocketConnectionWrapper extends APLClient {
   }
 
   public sendMessage(message : any) {
+    this.client.sendMessage(message);
+  }
+}
+
+export class WindowWebsocketClient extends APLClient {
+  protected client : WebsocketConnectionWrapper;
+  protected windowId : string;
+
+  constructor(client : WebsocketConnectionWrapper) {
+    super();
+    this.client = client;
+  }
+
+  public setWindowId(id : string) {
+    this.windowId = id;
+  }
+
+  public sendMessage(message : any) {
     switch (message.type) {
       case 'executeCommands' :
       case 'renderComplete':
-      case 'displayMetrics':
-      case 'renderStaticDocument' : {
+      case 'renderStaticDocument' :
+      case 'displayMetrics': {
+        message.windowId = this.windowId;
         this.client.sendMessage(message);
         break;
       }
       default : {
         const aplEvent : IAPLEventMessage = {
           type: 'aplEvent',
+          windowId: this.windowId,
           payload: message
         };
         this.client.sendMessage(aplEvent);
@@ -87,7 +109,7 @@ type APLWindowFlexType = 'flex-start' | 'flex-end' | 'center';
 
 export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, IAPLRendererWindowState> {
   protected rendererViewportDiv : any;
-  protected client : WebsocketConnectionWrapper;
+  protected client : WindowWebsocketClient;
   protected windowConfig : IAPLRendererWindowConfig;
   protected renderer : APLWSRenderer;
   protected windowFlexAlignItems : APLWindowFlexType;
@@ -97,11 +119,11 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
   protected windowInactiveTransition : string;
   protected windowActiveTransitionInMS : number;
   protected windowInactiveTransitionInMS : number;
-  protected static activeRenderer : APLWSRenderer;
 
   constructor(props : IAPLRendererWindowProps) {
     super(props);
-    this.client = props.client;
+    this.client = new WindowWebsocketClient(props.client);
+    this.client.setWindowId(this.props.id);
     this.windowConfig = props.windowConfig;
     this.rendererViewportDiv = React.createRef();
 
@@ -153,6 +175,11 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
     this.state = {
       windowState : APLRendererWindowState.INACTIVE
     };
+
+    const handleAPLCoreMessage = (message : IAPLCoreMessage) => {
+      this.client.handleMessage(message);
+    };
+    props.aplCoreMessageHandlerCallback(this.props.id, handleAPLCoreMessage);
   }
 
   public render() {
@@ -192,12 +219,6 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
     );
   }
 
-  protected static releaseActiveRendererContext() {
-    if (this.activeRenderer && this.activeRenderer.context) {
-      this.activeRenderer.context.delete();
-    }
-  }
-
   protected createAudioPlayer(eventListener : IAudioEventListener) : AudioPlayer {
     return new AVSAudioPlayer(this.props.focusManager, this.props.activityTracker, eventListener);
   }
@@ -225,10 +246,8 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
       supportedExtensions: this.windowConfig.supportedExtensions
     } as any;
 
-    APLRendererWindow.releaseActiveRendererContext();
     this.destroyRenderer();
     this.renderer = APLWSRenderer.create(options);
-    APLRendererWindow.activeRenderer = this.renderer;
 
     this.renderer.init().then(() => {
       console.log(`APL Renderer init resolved with viewport: \
@@ -247,7 +266,6 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
         windowState : this.props.windowState
       });
 
-      // this.renderer.onRenderComplete();
       this.client.sendMessage({
         type: 'renderComplete',
         payload : { }
@@ -291,7 +309,6 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
   }
 
   public componentWillUnmount() {
-    console.log('component unmounting');
     this.props.activityTracker.reset();
     this.props.focusManager.reset();
     this.destroyRenderer();

@@ -26,51 +26,50 @@ namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
 TelemetrySink::TelemetrySink(
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>
-        metricRecorder)
-    : m_metricRecorder{std::move(metricRecorder)} {}
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) :
+        m_metricRecorder{std::move(metricRecorder)} {
+}
 
-void TelemetrySink::reportTimer(const std::map<std::string, std::string> &metadata,
-                                   const std::string& name,
-                                   const std::chrono::nanoseconds& value) {
+void TelemetrySink::reportTimer(
+    const std::map<std::string, std::string>& metadata,
+    const std::string& name,
+    const std::chrono::nanoseconds& value) {
     auto durationInMillis = std::chrono::duration_cast<std::chrono::milliseconds>(value);
     alexaClientSDK::avsCommon::utils::metrics::MetricEventBuilder builder;
     builder.setActivityName(name);
     builder.setPriority(alexaClientSDK::avsCommon::utils::metrics::Priority::HIGH);
-    builder.addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointDurationBuilder(durationInMillis)
-            .setName(name)
-            .build());
-    for (const auto entry : metadata) {
+    builder.addDataPoint(
+        alexaClientSDK::avsCommon::utils::metrics::DataPointDurationBuilder(durationInMillis).setName(name).build());
+    for (const auto& entry : metadata) {
         builder.addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointStringBuilder{}
-                .setName(entry.first)
-                .setValue(entry.second)
-                .build());
+                                 .setName(entry.first)
+                                 .setValue(entry.second)
+                                 .build());
     }
 
     auto event = builder.build();
     m_metricRecorder->recordMetric(event);
 }
 
-void TelemetrySink::reportCounter(const std::map<std::string, std::string> &metadata,
-                                          const std::string& name,
-                                          uint64_t value) {
+void TelemetrySink::reportCounter(
+    const std::map<std::string, std::string>& metadata,
+    const std::string& name,
+    uint64_t value) {
     alexaClientSDK::avsCommon::utils::metrics::MetricEventBuilder builder;
     builder.setActivityName(name);
     builder.setPriority(alexaClientSDK::avsCommon::utils::metrics::Priority::HIGH);
-    builder.addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointCounterBuilder()
-            .setName(name)
-            .increment(value)
-            .build());
-    for (const auto entry : metadata) {
+    builder.addDataPoint(
+        alexaClientSDK::avsCommon::utils::metrics::DataPointCounterBuilder().setName(name).increment(value).build());
+    for (const auto& entry : metadata) {
         builder.addDataPoint(alexaClientSDK::avsCommon::utils::metrics::DataPointStringBuilder{}
-                .setName(entry.first)
-                .setValue(entry.second)
-                .build());
+                                 .setName(entry.first)
+                                 .setValue(entry.second)
+                                 .build());
     }
 
     auto event = builder.build();
     m_metricRecorder->recordMetric(event);
 }
 
-} // namespace sampleApp
-} // namespace alexaSmartScreenSDK
+}  // namespace sampleApp
+}  // namespace alexaSmartScreenSDK

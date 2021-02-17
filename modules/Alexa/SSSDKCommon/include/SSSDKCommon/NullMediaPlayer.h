@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <AVSCommon/SDKInterfaces/Audio/EqualizerInterface.h>
+#include <acsdkEqualizerInterfaces/EqualizerInterface.h>
 #include <AVSCommon/Utils/RequiresShutdown.h>
 #include <AVSCommon/Utils/MediaPlayer/MediaPlayerInterface.h>
 
@@ -30,14 +30,14 @@ using SourceId = avsCommon::utils::mediaPlayer::MediaPlayerInterface::SourceId;
 
 class NullMediaPlayer
         : public avsCommon::utils::mediaPlayer::MediaPlayerInterface
-        , public avsCommon::sdkInterfaces::audio::EqualizerInterface
+        , public acsdkEqualizerInterfaces::EqualizerInterface
         , public avsCommon::utils::RequiresShutdown {
 public:
     NullMediaPlayer();
 
     /// @name EqualizerInterface methods.
     ///@{
-    void setEqualizerBandLevels(avsCommon::sdkInterfaces::audio::EqualizerBandLevelMap bandLevelMap) override;
+    void setEqualizerBandLevels(acsdkEqualizerInterfaces::EqualizerBandLevelMap bandLevelMap) override;
 
     int getMinimumBandLevel() override;
 

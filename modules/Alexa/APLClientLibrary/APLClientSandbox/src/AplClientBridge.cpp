@@ -20,6 +20,8 @@
 
 #include "APLClientSandbox/AplClientBridge.h"
 
+#include <chrono>
+
 using namespace APLClient::Extensions;
 
 static const std::chrono::milliseconds RESOURCE_DOWNLOAD_TIMEOUT{3000};
@@ -40,7 +42,13 @@ void AplClientBridge::loadExtensions() {
     // Backstack Extension
     m_backstackExtension = std::make_shared<Backstack::AplBackstackExtension>(shared_from_this());
 
-    addExtensions({m_backstackExtension});
+    // AudioPlayer Extension
+    m_audioPlayerExtension = std::make_shared<AudioPlayer::AplAudioPlayerExtension>(shared_from_this());
+
+    // AudioPlayerAlarms Extension
+    m_audioPlayerAlarmsExtension = std::make_shared<AudioPlayer::AplAudioPlayerAlarmsExtension>(shared_from_this());
+
+    addExtensions({m_backstackExtension, m_audioPlayerExtension, m_audioPlayerAlarmsExtension});
 }
 
 void AplClientBridge::addExtensions(std::unordered_set<std::shared_ptr<AplCoreExtensionInterface>> extensions) {
@@ -50,6 +58,11 @@ void AplClientBridge::addExtensions(std::unordered_set<std::shared_ptr<AplCoreEx
 void AplClientBridge::updateTick() {
         m_executor.submit([this]() {
         m_aplClientRenderer->onUpdateTick();
+        // update audioPlayer
+        if (audioPlayerPlaying && m_audioPlayerExtension) {
+            int offset = getCurrentTime().count() - audioPlayerStartTime;
+            m_audioPlayerExtension->updatePlaybackProgress(offset);
+        }
         if (auto manager = m_manager.lock()) {
             manager->onUpdateComplete();
         } else {
@@ -70,13 +83,21 @@ void AplClientBridge::renderDocument(
             }
         }
 
+        // When rendering new document, setup audioPlayerExtension session
+        if (m_audioPlayerExtension) {
+            m_audioPlayerExtension->setActivePresentationSession("sandbox", "sandboxTest");
+            audioPlayerStartTime = getCurrentTime().count();
+            audioPlayerOffset = 0;
+            audioPlayerPlaying = false;
+        }
+
         m_aplClientRenderer->renderDocument(document, data, supportedViewports, "");
     });
 }
 
 void AplClientBridge::clearDocument() {
     m_executor.submit([this]() {
-        m_aplClientRenderer->clearDocument("");
+        m_aplClientRenderer->clearDocument();
         if (m_backstackExtension) {
             m_backstackExtension->reset();
         }
@@ -127,6 +148,7 @@ std::string AplClientBridge::downloadResource(const std::string& source) {
     Logger::debug("AplClientBridge::downloadResource", source);
     ResourceRequestMessage message(source);
     if (auto manager = m_manager.lock()) {
+        std::lock_guard<std::mutex> mtx(m_downloadMutex);
         m_resourcePromiseUrl = source;
         m_resourcePromise = std::promise<std::string>();
         manager->sendMessage(message);
@@ -201,6 +223,7 @@ void AplClientBridge::onRuntimeErrorEvent(const std::string& token, const std::s
 }
 
 void AplClientBridge::onExtensionEvent(
+    const std::string& aplToken,
     const std::string& uri,
     const std::string& name,
     const std::string& source,
@@ -252,4 +275,68 @@ int AplClientBridge::getMaxNumberOfConcurrentDownloads() {
 
 void AplClientBridge::onRestoreDocumentState(std::shared_ptr<APLClient::AplDocumentState> documentState) {
     m_executor.submit([this, documentState]() { m_aplClientRenderer->restoreDocumentState(documentState); });
+}
+
+void AplClientBridge::onAudioPlayerPlay() {
+    Logger::info("AplClientBridge::onAudioPlayerPlay", "Play");
+    if (!audioPlayerPlaying) {
+        audioPlayerStartTime = getCurrentTime().count() - audioPlayerOffset;
+        audioPlayerPlaying = true;
+    }
+    if (m_audioPlayerExtension) {
+        m_audioPlayerExtension->updatePlayerActivity("PLAYING", audioPlayerOffset);
+    }
+}
+
+void AplClientBridge::onAudioPlayerPause() {
+    Logger::info("AplClientBridge::onAudioPlayerPause", "Pause");
+    if (audioPlayerPlaying) {
+        audioPlayerOffset = getCurrentTime().count() - audioPlayerStartTime;
+        audioPlayerPlaying = false;
+        if (m_audioPlayerExtension) {
+            m_audioPlayerExtension->updatePlayerActivity("PAUSED", audioPlayerOffset);
+        }
+    }
+}
+
+void AplClientBridge::onAudioPlayerNext() {
+    Logger::info("AplClientBridge::onAudioPlayerNext", "Next");
+}
+
+void AplClientBridge::onAudioPlayerPrevious() {
+    Logger::info("AplClientBridge::onAudioPlayerPrevious", "Previous");
+}
+
+void AplClientBridge::onAudioPlayerSeekToPosition(int offsetInMilliseconds) {
+    Logger::info("AplClientBridge::onAudioPlayerSeekToPosition", "AudioPlayerSeekToPosition", offsetInMilliseconds);
+    audioPlayerOffset = offsetInMilliseconds;
+    audioPlayerStartTime = getCurrentTime().count() - audioPlayerOffset;
+    if (m_audioPlayerExtension) {
+        m_audioPlayerExtension->updatePlaybackProgress(audioPlayerOffset);
+    }
+}
+
+void AplClientBridge::onAudioPlayerToggle(const std::string &name, bool checked) {
+    Logger::info("AplClientBridge::onAudioPlayerToggle", "onAudioPlayerToggle", name, checked);
+}
+
+void AplClientBridge::onAudioPlayerLyricDataFlushed(const std::string &token, long durationInMilliseconds,
+                                                    const std::string &lyricData) {
+    Logger::info("AplClientBridge::onAudioPlayerLyricDataFlushed", "FlushLyricData", token, durationInMilliseconds, lyricData);
+}
+
+void AplClientBridge::onAudioPlayerSkipForward() {
+    Logger::info("AplClientBridge::onAudioPlayerSkipForward", "SkipForward");
+}
+
+void AplClientBridge::onAudioPlayerSkipBackward() {
+    Logger::info("AplClientBridge::onAudioPlayerSkipBackward", "SkipBackward");
+}
+
+void AplClientBridge::onAudioPlayerAlarmDismiss() {
+    Logger::info("AplClientBridge::onAudioPlayerAlarmDismiss", "AlarmDismiss");
+}
+
+void AplClientBridge::onAudioPlayerAlarmSnooze() {
+    Logger::info("AplClientBridge::onAudioPlayerAlarmSnooze", "AlarmSnooze");
 }

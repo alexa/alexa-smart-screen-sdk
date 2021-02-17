@@ -19,7 +19,6 @@
 #include <acsdkShared/SharedComponent.h>
 #include <ContextManager/ContextManager.h>
 #include <acsdkDefaultSampleApplicationOptions/DefaultSampleApplicationOptionsComponent.h>
-#include <acsdkDefaultSampleApplicationOptions/NullMetricRecorder.h>
 
 #ifdef ACSDK_ACS_UTILS
 #include <acsdkACSSampleApplicationOptions/ACSSampleApplicationOptionsComponent.h>
@@ -31,6 +30,12 @@
 
 #include "SampleApp/LocaleAssetsManager.h"
 #include "SampleApp/SampleApplicationComponent.h"
+
+#ifdef METRICS_EXTENSION
+#include <MetricsExtension/MetricsExtension.h>
+#else
+#include <acsdkDefaultSampleApplicationOptions/NullMetricRecorder.h>
+#endif
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -48,11 +53,15 @@ Component<
 getSampleApplicationOptionsComponent() {
     return ComponentAccumulator<>()
         .addComponent(acsdkShared::getComponent())
-        .addRetainedFactory(acsdkDefaultSampleApplicationOptions::NullMetricRecorder::createMetricRecorderInterface)
 #ifdef ANDROID_LOGGER
         .addPrimaryFactory(applicationUtilities::androidUtilities::AndroidLogger::getAndroidLogger)
 #else
         .addPrimaryFactory(avsCommon::utils::logger::getConsoleLogger)
+#endif
+#ifdef METRICS_EXTENSION
+        .addRetainedFactory(alexaSmartScreenSDK::metrics::MetricsExtension::createMetricRecorderInterface)
+#else
+        .addRetainedFactory(acsdkDefaultSampleApplicationOptions::NullMetricRecorder::createMetricRecorderInterface)
 #endif
         ;
 }
@@ -63,7 +72,8 @@ Component<
     std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>,
     std::shared_ptr<avsCommon::utils::configuration::ConfigurationNode>,
     std::shared_ptr<avsCommon::utils::DeviceInfo>,
-    std::shared_ptr<registrationManager::CustomerDataManager>>
+    std::shared_ptr<registrationManager::CustomerDataManager>,
+    std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>
 getComponent(std::unique_ptr<avsCommon::avs::initialization::InitializationParameters> initParams) {
     return ComponentAccumulator<>()
 #ifdef ACSDK_ACS_UTILS

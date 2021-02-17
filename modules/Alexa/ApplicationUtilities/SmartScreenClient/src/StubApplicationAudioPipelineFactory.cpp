@@ -175,7 +175,7 @@ std::shared_ptr<PooledApplicationMediaInterfaces> StubApplicationAudioPipelineFa
         return nullptr;
     }
 
-    std::shared_ptr<PooledApplicationMediaInterfaces> pool;
+    std::shared_ptr<PooledApplicationMediaInterfaces> pool = std::make_shared<PooledApplicationMediaInterfaces>();
     for (int i = 0; i < numMediaPlayers; i++) {
         auto applicationMediaInterfaces = createApplicationMediaInterfaces(
             name, equalizerAvailable, enableLiveMode, isCaptionable, channelVolumeType, volumeCurve);

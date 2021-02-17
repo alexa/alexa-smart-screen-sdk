@@ -3,6 +3,13 @@
 # Append custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
 
+macro(include_once module)
+    if(NOT DEFINED "BuildDefaults_Include_${module}_Set")
+        set("BuildDefaults_Include_${module}_Set" ON)
+        include("${module}")
+    endif()
+endmacro()
+
 # Disallow out-of-source-builds.
 include(DisallowOutOfSourceBuilds)
 
@@ -72,3 +79,6 @@ include (Captions)
 if (HAS_EXTERNAL_MEDIA_PLAYER_ADAPTERS)
     include (ExternalMediaPlayerAdapters)
 endif()
+
+# Setup ducking options.
+include_once(LocalDucking)

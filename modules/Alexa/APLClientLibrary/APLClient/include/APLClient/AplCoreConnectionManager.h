@@ -160,6 +160,13 @@ public:
     void addExtensions(std::unordered_set<std::shared_ptr<AplCoreExtensionInterface>> extensions);
 
     /**
+     * Gets the requested extension from the client
+     * @param uri Extension Uri
+     * @return Shared pointer to @c AplCoreExtensionInterface
+     */
+    std::shared_ptr<AplCoreExtensionInterface> getExtension(const std::string& uri);
+
+    /**
      * Extension Event Callback function to invoke an extension event registered with @c AplCoreExtensionManager
      * @param uri Extension uri
      * @param name Extension event name

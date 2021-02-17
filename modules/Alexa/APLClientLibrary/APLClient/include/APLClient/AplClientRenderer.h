@@ -28,6 +28,7 @@
 #include "AplRenderingEventObserver.h"
 #include "AplRenderingEvent.h"
 #include "Telemetry/AplMetricsRecorderInterface.h"
+#include "APLClient/Extensions/Backstack/AplBackstackExtension.h"
 
 namespace APLClient {
 /**
@@ -36,7 +37,9 @@ namespace APLClient {
  * layer. The instance of this class represent a renderer targeting a single window. Therefore, the lifecycle of
  * instance of this class will be managed for every active render.
  */
-class AplClientRenderer: public AplRenderingEventObserver {
+class AplClientRenderer
+        : public AplRenderingEventObserver
+        , public std::enable_shared_from_this<AplClientRenderer> {
 public:
     /**
      * Constructor
@@ -78,7 +81,7 @@ public:
     /**
      * Clears the current APL document
      */
-    void clearDocument(const std::string& token);
+    void clearDocument();
 
     /**
      * Execute an APL command sequence
@@ -117,6 +120,11 @@ public:
     const std::string getWindowId();
 
     /**
+     * Returns the APL token currently served by this renderer
+     */
+    const std::string getCurrentAPLToken();
+
+    /**
      * Adds Extensions to the client
      * @param extensions Set of Shared Pointers to AplCoreExtensionInterfaces
      */
@@ -151,38 +159,28 @@ public:
      */
     void restoreDocumentState(AplDocumentStatePtr documentState);
 
-    /**
-     * Notify this renderer that a RenderDocument directive was received.
-     *
-     * @param receiveTime The earliest timestamp at which the directive became available.
-     */
+    /// @name AplRenderingEventObserver Functions
+    /// @{
     void onRenderDirectiveReceived(const std::chrono::steady_clock::time_point &receiveTime) override;
+    void onRenderingEvent(AplRenderingEvent event) override;
+    void onMetricsReported(const std::vector<DisplayMetric> &metrics) override;
+    void onTelemetrySinkUpdated(APLClient::Telemetry::AplMetricsSinkInterfacePtr sink) override;
+    /// @}
 
     /**
-     * Notify this renderer that a rendering event happened.
+     * Gets the instance of extension if supported
      *
-     * @param event The rendering event
+     * @param uri URI of the extension requested
+     * @return Pointer to the @c AplCoreExtensionInterface for extension if supported, else nullptr
      */
-     void onRenderingEvent(AplRenderingEvent event) override;
-
-     /**
-      * Notify this renderer that rendering metrics were reported by the viewhost.
-      *
-      * @param metrics the reported metrics
-      */
-     void onMetricsReported(const std::vector<DisplayMetric> &metrics) override;
-
-     /**
-      * Notify this renderer that a new sink should be used for telemetry.
-      *
-      * @param sink the new sink to use for telemetry.
-      */
-     void onTelemetrySinkUpdated(APLClient::Telemetry::AplMetricsSinkInterfacePtr sink) override;
+    std::shared_ptr<APLClient::Extensions::AplCoreExtensionInterface> getExtension(const std::string& uri);
 
 private:
     AplConfigurationPtr m_aplConfiguration;
 
     std::string m_windowId;
+
+    std::string m_aplToken;
 
     AplCoreConnectionManagerPtr m_aplConnectionManager;
 

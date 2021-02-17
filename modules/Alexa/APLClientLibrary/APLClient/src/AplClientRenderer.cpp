@@ -13,10 +13,13 @@
  * permissions and limitations under the License.
  */
 
+#include <memory>
+
 #include "APLClient/AplClientRenderer.h"
 #include "APLClient/AplCoreEngineLogBridge.h"
 #include "APLClient/Telemetry/AplMetricsRecorder.h"
 #include "APLClient/Telemetry/NullAplMetricsRecorder.h"
+#include "APLClient/Extensions/Backstack/AplBackstackExtension.h"
 
 namespace {
 
@@ -110,11 +113,12 @@ void AplClientRenderer::renderDocument(
         metricsRecorder->addMetadata(AplMetricsRecorderInterface::LATEST_DOCUMENT, "SKILL_ID", skillId);
     }
 
+    m_aplToken = token;
     m_aplGuiRenderer->renderDocument(document, data, viewports, token);
 }
 
-void AplClientRenderer::clearDocument(const std::string& token) {
-    m_aplGuiRenderer->clearDocument(token);
+void AplClientRenderer::clearDocument() {
+    m_aplGuiRenderer->clearDocument();
 }
 
 void AplClientRenderer::executeCommands(const std::string& jsonPayload, const std::string& token) {
@@ -142,6 +146,10 @@ void AplClientRenderer::onUpdateTick() {
 
 const std::string AplClientRenderer::getWindowId() {
     return m_windowId;
+}
+
+const std::string AplClientRenderer::getCurrentAPLToken() {
+    return m_aplToken;
 }
 
 void AplClientRenderer::addExtensions(std::unordered_set<std::shared_ptr<AplCoreExtensionInterface>> extensions) {
@@ -224,5 +232,10 @@ void AplClientRenderer::onTelemetrySinkUpdated(APLClient::Telemetry::AplMetricsS
     }
     m_aplConfiguration->setMetricsRecorder(recorder);
 }
+
+std::shared_ptr<APLClient::Extensions::AplCoreExtensionInterface> AplClientRenderer::getExtension(const std::string& uri) {
+    return m_aplConnectionManager->getExtension(uri);
+}
+
 
 }  // namespace APLClient

@@ -56,8 +56,10 @@ public:
     /**
      * Used to notify the observer when the client should clear the Template display card.  Once the card is cleared,
      * the client should call templateCardCleared().
+     *
+     * @param token Token associated to the template card
      */
-    virtual void clearTemplateCard() = 0;
+    virtual void clearTemplateCard(const std::string& aplToken) = 0;
 
     /**
      * Used to notify the observer when a RenderPlayerInfo directive is received. Once called, the client should
@@ -78,8 +80,10 @@ public:
     /**
      * Used to notify the observer when the client should clear the PlayerInfo display card.  Once the card is cleared,
      * the client should call templateCardCleared().
+     *
+     * @param token token associated to the player info card
      */
-    virtual void clearPlayerInfoCard() = 0;
+    virtual void clearPlayerInfoCard(const std::string& token) = 0;
 };
 
 }  // namespace smartScreenSDKInterfaces

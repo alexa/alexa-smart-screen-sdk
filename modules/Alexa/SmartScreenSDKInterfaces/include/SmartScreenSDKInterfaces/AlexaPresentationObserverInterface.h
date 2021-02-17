@@ -42,7 +42,9 @@ public:
      *
      * @param receiveTime The time at which the directive was received, for more accurate telemetry.
      */
-    virtual void onRenderDirectiveReceived(const std::chrono::steady_clock::time_point &receiveTime) {
+    virtual void onRenderDirectiveReceived(
+        const std::string& token,
+        const std::chrono::steady_clock::time_point& receiveTime) {
         // no-op by default
     }
 
@@ -68,13 +70,13 @@ public:
      * Used to notify the observer when the client should clear the APL display card.  Once the card is cleared,
      * the client should call clearDocument().
      */
-    virtual void clearDocument() = 0;
+    virtual void clearDocument(const std::string& token) = 0;
 
     /**
      * Used to notify the observer that rendering has been aborted, e.g. because a check failed or an error
      * was encountered.
      */
-    virtual void onRenderingAborted() {
+    virtual void onRenderingAborted(const std::string& token) {
         // no-op by default
     }
 
@@ -101,12 +103,14 @@ public:
     /**
      * Used to notify the observer when a command execution sequence should be interrupted
      */
-    virtual void interruptCommandSequence() = 0;
+    virtual void interruptCommandSequence(const std::string& token) = 0;
 
     /**
      * Used to notify observer that the active @c PresentationSession has changed.
+     * @param id The identifier of the active presentation session.
+     * @param skillId The identifier of the active Skill / Speechlet who owns the session.
      */
-    virtual void onPresentationSessionChanged() = 0;
+    virtual void onPresentationSessionChanged(const std::string& id, const std::string& skillId) = 0;
 
     /**
      * Called when a metricRecorder is available for use.
@@ -114,7 +118,7 @@ public:
      * @param metricRecorder the metric recorder to use for telemetry.
      */
     virtual void onMetricRecorderAvailable(
-            std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) {
+        std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) {
         // no-op by default
     }
 };

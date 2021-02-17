@@ -1,3 +1,21 @@
+### v2.5.0 released 02/01/2021:
+#### Enhancements
+* Upgraded dependency to Device SDK 1.22.0 [https://github.com/alexa/avs-device-sdk/tree/v1.22.0]
+* Added support for multiple concurrent APL clients
+* Added support for APL 1.5 [https://aplspec.aka.corp.amazon.com/release-1.5/html/index.html#apl-specification-1-5]
+* Ported DISABLE_DUCKING cmake configuration from Alexa-device-sdk
+* Music playback now ducks instead of pauses when APL TTS is executed
+* Updated ini patch version to 1.3.6
+
+#### Bug fixes
+* Fixed issue with video in `disallowVideo` mode
+* Fixed race condition where GUIManager tries to access SmartScreenClient before setting it
+* Fixed race condition while configuring notification settings in GUIManager, this was causing the sampleapp to crash
+* Increased Caption's font size and modified its z order to display it on top
+* Fixed the issue with typescript wrongly resolving setTimeout to nodeJS version without "window"
+* Fixed the issue with speech recognition is not interrupting APL activity
+* Fixed a regression introduced in 2.4 wherein keyboard events no longer interrupted TTS and APL activity
+
 ### v2.4.0 released 11/09/2020:
  
 #### Enhancements

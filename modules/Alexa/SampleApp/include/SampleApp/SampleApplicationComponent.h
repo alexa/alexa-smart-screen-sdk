@@ -29,6 +29,7 @@
 #include <AVSCommon/Utils/Configuration/ConfigurationNode.h>
 #include <AVSCommon/Utils/DeviceInfo.h>
 #include <AVSCommon/Utils/LibcurlUtils/HttpPostInterface.h>
+#include <AVSCommon/Utils/Metrics/MetricRecorderInterface.h>
 #include <CBLAuthDelegate/CBLAuthDelegateStorageInterface.h>
 #include <CBLAuthDelegate/CBLAuthRequesterInterface.h>
 #include <RegistrationManager/CustomerDataManager.h>
@@ -38,7 +39,6 @@ namespace sampleApp {
 
 /**
  * Get the @c Manufactory @c Component for the default @c SampleApplication options
- *
  * @return The @c Manufactory @c Component for the default @c SampleApplication options
  */
 alexaClientSDK::acsdkManufactory::Component<
@@ -61,7 +61,8 @@ alexaClientSDK::acsdkManufactory::Component<
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode>,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo>,
-    std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager>>
+    std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager>,
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>>
 getComponent(std::unique_ptr<alexaClientSDK::avsCommon::avs::initialization::InitializationParameters> initParams);
 
 }  // namespace sampleApp

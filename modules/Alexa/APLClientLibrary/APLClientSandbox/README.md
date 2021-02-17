@@ -12,7 +12,7 @@ For building refer to main README file
 Run './APLClientSandbox'
 
 ## Client Side
-Go to 'APLClientLibrary/APLClientSandbox/GUI'
+Go to 'APLClientLibrary/APLClientSandbox/GUI' (from code source)
 For building run `npm install`
 Run `npm start`
 

@@ -16,12 +16,16 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_APL_EXTENSIONS_AUDIOPLAYER_APLAUDIOPLAYEREXTENSION_H
 #define ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_APL_EXTENSIONS_AUDIOPLAYER_APLAUDIOPLAYEREXTENSION_H
 
+#include <iostream>
+
 #include "APLClient/Extensions/AplCoreExtensionInterface.h"
 #include "AplAudioPlayerExtensionObserverInterface.h"
 
 namespace APLClient {
 namespace Extensions {
 namespace AudioPlayer {
+
+static const std::string URI = "aplext:audioplayer:10";
 
 /**
  * An APL Extension designed for bi-directional communication between an @c AudioPlayer and APL document
@@ -88,7 +92,113 @@ public:
      */
     void updatePlaybackProgress(int offset);
 
+    /**
+     * Used to inform the extension of the active @c AudioPlayer.Presentation.APL presentationSession.
+     * @param id The identifier of the active presentation session.
+     * @param skillId The identifier of the active Skill / Speechlet who owns the session.
+     */
+    void setActivePresentationSession(const std::string& id, const std::string& skillId);
+
 private:
+
+    /**
+     * Utility object for tracking lyrics viewed data.
+     */
+    struct LyricsViewedData {
+        /**
+         * Default Constructor.
+         */
+        LyricsViewedData() = default;
+
+        /**
+         * Constructor.
+         *
+         * @param token the identifier of the track displaying lyrics.
+         */
+        explicit LyricsViewedData(std::string token) : token{std::move(token)} {
+            lyricData = std::make_shared<apl::ObjectArray>();
+        };
+
+        /// The identifier of the track displaying lyrics.
+        std::string token;
+
+        /// The total time in milliseconds that lyrics were viewed.
+        long durationInMilliseconds{};
+
+        /// The lyrics viewed data array.
+        apl::ObjectArrayPtr lyricData;
+
+        /**
+         * Add Lyric lines to the data array.
+         * @param lines The lines of lyrics to append.
+         */
+        void addLyricLinesData(const apl::ObjectArray& lines) const {
+            /// List of valid lyrics property.
+            const std::vector<std::string> validLyricPropertyName = {
+                    "text",
+                    "startTime",
+                    "endTime"
+            };
+            for (const auto & line : lines) {
+                apl::ObjectMapPtr m = std::make_shared<apl::ObjectMap>();
+                for (const auto & it : line.getMap()) {
+                    if (std::find(validLyricPropertyName.begin(), validLyricPropertyName.end(), it.first) != validLyricPropertyName.end()) {
+                        m->emplace(it.first, it.second);
+                    } else {
+                        logMessage(apl::LogLevel::WARN, "LyricsViewedData", __func__, "Ignoring invalid lyric property: " + it.first);
+                    }
+                }
+                lyricData->emplace_back(apl::Object(m));
+            }
+        }
+
+        /**
+         * Resets the LyricsData object
+         */
+        void reset() {
+            token = "";
+            durationInMilliseconds = 0;
+            lyricData->clear();
+        }
+
+        /**
+         * Returns string payload of the lyricData object.
+         * @return the lyricData object payload.
+         */
+        std::string getLyricDataPayload() const {
+            rapidjson::Document lyricDataJsonDoc(rapidjson::kObjectType);
+            auto& allocator = lyricDataJsonDoc.GetAllocator();
+            auto lyricsObject = apl::Object(lyricData).serialize(allocator);
+            for (rapidjson::Value::ValueIterator itr = lyricsObject.Begin(); itr != lyricsObject.End(); ++itr) { // Ok
+                if (itr->HasMember("startTime")) {
+                    (*itr)["startTime"].SetInt((int) (*itr)["startTime"].GetDouble());
+                }
+                if (itr->HasMember("endTime")) {
+                    (*itr)["endTime"].SetInt((int) (*itr)["endTime"].GetDouble());
+                }
+            }
+
+            rapidjson::StringBuffer buffer;
+            rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+            lyricsObject.Accept(writer);
+            return buffer.GetString();
+        }
+    };
+
+    /**
+     * An internal function to retrieve the active @c LyricsViewedData object from the m_lyricsViewedData map
+     * based on the m_activeSkillId;
+     * @param initIfNull If true this will initialize a @c LyricsViewedData object for the m_activeSkillId if none exists.
+     * @param token - The token for the track actively displaying lyrics.
+     */
+    std::shared_ptr<LyricsViewedData> getActiveLyricsViewedData(bool initIfNull = false, const std::string& token = "");
+
+    /**
+     * Flushes the provided @c LyricsViewedData and notifies the observer.
+     * @param lyricsViewedData The @c LyricsViewedData to flush.
+     */
+    void flushLyricData(const std::shared_ptr<LyricsViewedData>& lyricsViewedData);
+
     /// The @c AplAudioPlayerExtensionObserverInterface observer
     std::shared_ptr<AplAudioPlayerExtensionObserverInterface> m_observer;
 
@@ -97,6 +207,12 @@ private:
 
     /// The @c apl::LiveMap for AudioPlayer playbackState data.
     apl::LiveMapPtr m_playbackState;
+
+    /// The id of the active skill in session.
+    std::string m_activeSkillId;
+
+    /// The map of @c LyricsViewedData objects per skill Id.
+    std::unordered_map<std::string, std::shared_ptr<LyricsViewedData>> m_lyricsViewedData;
 };
 
 using AplAudioPlayerExtensionPtr = std::shared_ptr<AplAudioPlayerExtension>;

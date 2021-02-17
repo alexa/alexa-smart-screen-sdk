@@ -167,7 +167,7 @@ void AplCoreGuiRenderer::renderDocument(
     }
 }
 
-void AplCoreGuiRenderer::clearDocument(const std::string& token) {
+void AplCoreGuiRenderer::clearDocument() {
     m_isDocumentCleared = true;
     m_aplCoreConnectionManager->reset();
 }

@@ -224,12 +224,6 @@ private:
     /// The current dialog UX state of the SDK
     DialogUXState m_dialogState;
 
-    /// The current CapabilitiesDelegate state.
-    alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::State m_capabilitiesState;
-
-    /// The error associated with the CapabilitiesDelegate state.
-    alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error m_capabilitiesError;
-
     /// The current authorization state of the SDK.
     alexaClientSDK::avsCommon::sdkInterfaces::AuthObserverInterface::State m_authState;
 

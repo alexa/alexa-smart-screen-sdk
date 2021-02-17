@@ -8,6 +8,7 @@ declare namespace APL {
         public localTimeAdjustment(localTimeAdjustment: number): RootConfig;
         public registerExtensionEventHandler(handler: ExtensionEventHandler): RootConfig;
         public registerExtensionCommand(commandDef: ExtensionCommandDefinition): RootConfig;
+        public registerExtensionFilter(commandDef: ExtensionFilterDefinition): RootConfig;
         public registerExtensionEnvironment(uri: string, environment: any): RootConfig;
         public registerExtension(uri: string): RootConfig;
         public liveMap(name: string, obj: any): RootConfig;

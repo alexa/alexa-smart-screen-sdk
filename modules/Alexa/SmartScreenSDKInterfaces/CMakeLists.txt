@@ -9,4 +9,4 @@ target_include_directories(SmartScreenSDKInterfaces INTERFACE
     "${SmartScreenSDKInterfaces_SOURCE_DIR}/include"
     "${SmartScreenSDKInterfaces_SOURCE_DIR}/test")
 
-asdk_install()
+asdk_install_interface()

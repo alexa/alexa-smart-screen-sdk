@@ -20,6 +20,11 @@ export interface IPlayer {
      */
     pause(): void;
     /**
+     * Set volume of media
+     * @param volume [0, 1] for volume.
+     */
+    setVolume(volume: number): void;
+    /**
      * Stop media, clear prepared resources and cancel any in-flight downloads
      */
     flush(): void;

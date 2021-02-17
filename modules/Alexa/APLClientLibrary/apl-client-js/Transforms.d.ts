@@ -1,9 +1,9 @@
 import { GraphicData } from "./avg/APLGraphic";
-import { Filter } from "apl-html";
 import { GraphicPatternData } from "./avg/APLGraphicPattern";
+import { Filter } from 'apl-html';
 export declare function toRect(value: [number, number, number, number]): APL.Rect | undefined;
 export declare function toTransform(value: [number, number, number, number, number, number]): string;
-export declare function toColor(value: string): number;
+export declare function toColor(value: any): number;
 export declare function toStyledText(value: {
     text: string;
     spans: Array<[number, number, number]>;

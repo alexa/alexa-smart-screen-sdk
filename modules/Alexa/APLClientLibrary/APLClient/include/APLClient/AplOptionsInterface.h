@@ -155,6 +155,7 @@ public:
      * @param resultCallback Pointer to result callback interface
      */
     virtual void onExtensionEvent(
+        const std::string& aplToken,
         const std::string& uri,
         const std::string& name,
         const std::string& source,

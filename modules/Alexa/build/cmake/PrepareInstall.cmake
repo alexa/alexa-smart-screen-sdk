@@ -16,6 +16,24 @@ function(asdk_install)
     install(DIRECTORY "${PROJECT_SOURCE_DIR}/include" DESTINATION "${ASDK_INCLUDE_INSTALL_DIR}")
 endfunction()
 
+# Function to install an interface library
+function(asdk_install_interface)
+    install(DIRECTORY include DESTINATION "${ASDK_INCLUDE_INSTALL_DIR}")
+endfunction()
+
+# Function to install the given set of targets
+function(asdk_install_targets targets install_headers)
+    foreach(target IN LISTS targets)
+        SET(PKG_CONFIG_LIBS "${PKG_CONFIG_LIBS} -l${target}" CACHE INTERNAL "" FORCE)
+        asdk_set_soname(${target})
+        install(TARGETS "${target}" DESTINATION "${ASDK_LIB_INSTALL_DIR}")
+    endforeach()
+
+    if (${install_headers})
+        install(DIRECTORY "${PROJECT_SOURCE_DIR}/include" DESTINATION "${ASDK_INCLUDE_INSTALL_DIR}")
+    endif()
+endfunction()
+
 # Function to install the target with list of include paths
 function(asdk_install_multiple path_list)
     SET(PKG_CONFIG_LIBS "${PKG_CONFIG_LIBS} -l${PROJECT_NAME}" CACHE INTERNAL "" FORCE)
@@ -23,6 +41,13 @@ function(asdk_install_multiple path_list)
     foreach(path IN LISTS path_list)
         install(DIRECTORY ${path} DESTINATION "${ASDK_INCLUDE_INSTALL_DIR}")
     endforeach()
+endfunction()
+
+# Function to set the output name on the given target and include the specified suffix
+function(asdk_set_soname target)
+    if (NOT ${TARGET_SUFFIX} EQUAL "")
+        set_target_properties(${target} PROPERTIES OUTPUT_NAME ${target}${TARGET_SUFFIX})
+    endif()
 endfunction()
 
 # Setup pkg_config variables

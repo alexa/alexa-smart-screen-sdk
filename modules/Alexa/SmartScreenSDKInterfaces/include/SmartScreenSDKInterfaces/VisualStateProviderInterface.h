@@ -35,9 +35,10 @@ public:
      * The requester specifies a token which the @c VisualStateProvider must use when it updates
      * the state via the @c setState call to @c AlexaPresentation Capability Agent.
      *
+     * @param aplToken The token of the last displaying document to get the correct context in the @c setState call.
      * @param stateRequestToken The token to use in the @c setState call.
      */
-    virtual void provideState(const unsigned int stateRequestToken) = 0;
+    virtual void provideState(const std::string& aplToken, const unsigned int stateRequestToken) = 0;
 };
 
 }  // namespace smartScreenSDKInterfaces

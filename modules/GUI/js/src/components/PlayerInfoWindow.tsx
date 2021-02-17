@@ -8,12 +8,14 @@ import {FocusManager} from '../lib/focus/FocusManager';
 import {ActivityTracker} from '../lib/activity/ActivityTracker';
 import {
     IRenderPlayerInfoMessage,
-    IRenderStaticDocumentMessage
+    IRenderStaticDocumentMessage,
+    IAPLCoreMessage
 } from '../lib/messages/messages';
 import {
     APLRendererWindow,
     WebsocketConnectionWrapper,
-    APLRendererWindowState
+    APLRendererWindowState,
+    WindowWebsocketClient
 } from './APLRendererWindow';
 import {
     resolveRenderPlayerInfo
@@ -29,10 +31,13 @@ interface IPlayerInfoWindowProps {
     client : WebsocketConnectionWrapper;
     focusManager : FocusManager;
     activityTracker : ActivityTracker;
+    aplCoreMessageHandlerCallback :
+        (windowId : string, aplCoreMessageHandler : (message : IAPLCoreMessage) => void) => void;
 }
 
 interface IPlayerInfoWindowState {
     windowState : APLRendererWindowState;
+    targetWindowId : string;
 }
 
 export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IPlayerInfoWindowState> {
@@ -41,7 +46,6 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
     protected windowConfig : IAPLRendererWindowConfig;
     protected focusManager : FocusManager;
     protected activityTracker : ActivityTracker;
-    protected isTargetWindow : boolean;
     protected isRendering : boolean;
 
     constructor(props : IPlayerInfoWindowProps) {
@@ -52,7 +56,8 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
         this.activityTracker = this.props.activityTracker;
 
         this.state = {
-            windowState : APLRendererWindowState.INACTIVE
+            windowState : APLRendererWindowState.INACTIVE,
+            targetWindowId : RENDER_PLAYER_INFO_WINDOW_ID
         };
     }
 
@@ -91,10 +96,9 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
 
     protected handleRenderPlayerInfoMessage(renderPlayerInfoMessage : IRenderPlayerInfoMessage) {
         // If not rendering AND
-        // not the current target window,
-        // or we have a new playerInfo message or audioItemId,
+        // we have a new playerInfo message or audioItemId,
         // or toggle controls changed - send a new playerInfo renderDocument request
-        if (!this.isRendering && (!this.isTargetWindow ||
+        if (!this.isRendering && (
             !this.props.playerInfoMessage ||
             (renderPlayerInfoMessage.payload.audioItemId !==
                 this.props.playerInfoMessage.payload.audioItemId) ||
@@ -131,13 +135,13 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
             activityTracker={this.activityTracker}
             onRendererInit={this.onRendererInit.bind(this)}
             onRendererDestroyed={this.onRendererDestroyed.bind(this)}
+            aplCoreMessageHandlerCallback={this.props.aplCoreMessageHandlerCallback}
           />;
 
         return(playerInfo);
     }
 
     public componentWillReceiveProps(nextProps : IPlayerInfoWindowProps) {
-        this.isTargetWindow = nextProps.targetWindowId === RENDER_PLAYER_INFO_WINDOW_ID;
         if (this.props.playerInfoMessage !== nextProps.playerInfoMessage) {
             if (nextProps.playerInfoMessage !== undefined) {
                 this.handleRenderPlayerInfoMessage(nextProps.playerInfoMessage);

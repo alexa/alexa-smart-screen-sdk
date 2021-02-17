@@ -120,7 +120,12 @@ export interface IAPLRenderMessage extends IBaseInboundMessage {
 }
 
 export interface IAPLCoreMessage extends IBaseInboundMessage {
+    windowId? : string;
     payload : any;
+}
+
+export interface IClearDocumentMessage extends IBaseInboundMessage {
+    windowId? : string;
 }
 
 export interface IRenderCaptionsMessage extends IBaseInboundMessage {
@@ -187,6 +192,7 @@ export interface IExecuteCommandsMessage extends IBaseOutboundMessage {
 }
 
 export interface IAPLEventMessage extends IBaseOutboundMessage {
+    windowId : string;
     payload : any;
 }
 
