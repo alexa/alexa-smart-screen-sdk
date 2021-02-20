@@ -2,7 +2,7 @@
 #### Enhancements
 * Upgraded dependency to Device SDK 1.22.0 [https://github.com/alexa/avs-device-sdk/tree/v1.22.0]
 * Added support for multiple concurrent APL clients
-* Added support for APL 1.5 [https://aplspec.aka.corp.amazon.com/release-1.5/html/index.html#apl-specification-1-5]
+* Added support for APL 1.5 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
 * Ported DISABLE_DUCKING cmake configuration from Alexa-device-sdk
 * Music playback now ducks instead of pauses when APL TTS is executed
 * Updated ini patch version to 1.3.6
@@ -30,7 +30,7 @@
  
 #### Enhancements
 * Upgraded dependency to Device SDK 1.20.1 [https://github.com/alexa/avs-device-sdk/tree/v1.20.1]
-* Support for APL 1.4 [https://aplspec.aka.corp.amazon.com/release-1.4/html/index.html#apl-specification-1-4]
+* Support for APL 1.4 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-4.html]
 * Added APL Telemetry Support
 * TV Overlay Portrait is no longer supported
 * Added support for APL Extensions [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html#apl-extensions-and-the-backstack]
