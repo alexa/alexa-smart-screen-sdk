@@ -151,7 +151,7 @@ Config for device input keys.
 | backKey               | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [navigationEvent](../SDK-GUI-API.md#navigationevent) to the SDK with event type `BACK`.
 | exitKey               | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [navigationEvent](../SDK-GUI-API.md#navigationevent) to the SDK with event type `EXIT`.
 | toggleCaptionsKey     | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [toggleCaptionsEvent](../SDK-GUI-API.md#togglecaptionsevent) to the SDK.
-| toggleDoNotDisturbKey | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [toggleDoNotDisturbEvent](../SDK-GUI-API.md#toggledonotdisturbevent) to the SDK.
+| toggleDoNotDisturbKey | [Device Key](#device-key-parameters)  | Yes       | Key used in the GUI App to send a [toggleDoNotDisturb](../SDK-GUI-API.md#toggledonotdisturb) to the SDK.
 
 #### Device Key Parameters
 Config for individual device key.

@@ -138,6 +138,7 @@ GUIManager::GUIManager(
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::COMMUNICATIONS_CHANNEL_NAME] =
         FocusState::NONE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME] = FocusState::NONE;
+    m_interfaceHoldingAudioFocus = {};
 
 #ifdef UWP_BUILD
     m_micWrapper = std::dynamic_pointer_cast<alexaSmartScreenSDK::sssdkCommon::NullMicrophone>(micWrapper);
@@ -368,6 +369,36 @@ void GUIManager::stopCall() {
     });
 }
 
+void GUIManager::enableLocalVideo() {
+    m_executor.submit([this]() {
+        if (m_ssClient->isCommsEnabled()) {
+            m_ssClient->enableLocalVideo();
+        } else {
+            ACSDK_WARN(LX(__func__).m("Communication not supported."));
+        }
+    });
+}
+
+void GUIManager::disableLocalVideo() {
+    m_executor.submit([this]() {
+        if (m_ssClient->isCommsEnabled()) {
+            m_ssClient->disableLocalVideo();
+        } else {
+            ACSDK_WARN(LX(__func__).m("Communication not supported."));
+        }
+    });
+}
+
+void GUIManager::sendDtmf(alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone dtmfTone) {
+    m_executor.submit([this, dtmfTone]() {
+        if (m_ssClient->isCommsEnabled()) {
+            m_ssClient->sendDtmf(dtmfTone);
+        } else {
+            ACSDK_WARN(LX(__func__).m("Communication not supported."));
+        }
+    });
+}
+
 #ifdef ENABLE_PCC
 void GUIManager::sendCallActivated(const std::string& callId) {
     m_executor.submit([this, callId]() {
@@ -456,15 +487,20 @@ void GUIManager::handleVisualContext(const std::string& token, uint64_t stateReq
 
 bool GUIManager::handleFocusAcquireRequest(
     std::string channelName,
-    std::shared_ptr<avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
+    std::shared_ptr<avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
+    std::string avsInterface) {
     return m_executor
-        .submit([this, channelName, channelObserver]() {
+        .submit([this, channelName, channelObserver, avsInterface]() {
             auto activity = alexaClientSDK::acl::FocusManagerInterface::Activity::create(
                 APL_INTERFACE,
                 channelObserver,
                 std::chrono::milliseconds::zero(),
                 avsCommon::avs::ContentType::MIXABLE);
-            return m_ssClient->getAudioFocusManager()->acquireChannel(channelName, activity);
+            bool focusAcquired = m_ssClient->getAudioFocusManager()->acquireChannel(channelName, activity);
+            if (focusAcquired) {
+                m_interfaceHoldingAudioFocus = avsInterface;
+            }
+            return focusAcquired;
         })
         .get();
 }
@@ -474,7 +510,11 @@ bool GUIManager::handleFocusReleaseRequest(
     std::shared_ptr<avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
     return m_executor
         .submit([this, channelName, channelObserver]() {
-            return m_ssClient->getAudioFocusManager()->releaseChannel(channelName, channelObserver).get();
+            bool focusReleased = m_ssClient->getAudioFocusManager()->releaseChannel(channelName, channelObserver).get();
+            if (focusReleased) {
+                m_interfaceHoldingAudioFocus.clear();
+            }
+            return focusReleased;
         })
         .get();
 }
@@ -495,7 +535,7 @@ void GUIManager::handleActivityEvent(smartScreenSDKInterfaces::ActivityEvent eve
                 "Interrupted activity while speaking or listening",
                 smartScreenSDKInterfaces::activityEventToString(event)));
             m_ssClient->releaseAllObserversOnDialogChannel();
-            m_ssClient->clearAllExecuteCommands();
+            m_ssClient->clearActiveExecuteCommandsDirective();
         }
         m_ssClient->handleActivityEvent(
             source.empty() ? TAG : source,
@@ -580,7 +620,7 @@ void GUIManager::executeBackNavigation() {
         }
         if (clearCard) {
             /// Always stop active APL commands when clearing the card.
-            m_ssClient->clearAllExecuteCommands();
+            m_ssClient->clearActiveExecuteCommandsDirective();
             m_ssClient->clearCard();
         }
     }
@@ -646,8 +686,8 @@ void GUIManager::onAuthStateChange(AuthObserverInterface::State newState, AuthOb
 }
 
 void GUIManager::onCapabilitiesStateChange(
-    CapabilitiesObserverInterface::State newState,
-    CapabilitiesObserverInterface::Error newError,
+    avsCommon::sdkInterfaces::CapabilitiesObserverInterface::State newState,
+    avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError,
     const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& addedOrUpdatedEndpoints,
     const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints) {
 }
@@ -655,6 +695,15 @@ void GUIManager::onCapabilitiesStateChange(
 void GUIManager::provideState(const std::string& aplToken, const unsigned int stateRequestToken) {
     m_executor.submit(
         [this, aplToken, stateRequestToken]() { m_guiClient->provideState(aplToken, stateRequestToken); });
+}
+
+#ifdef ENABLE_COMMS
+void GUIManager::onCallStateInfoChange(const CallStateInfo& stateInfo) {
+    m_guiClient->sendCallStateInfo(stateInfo);
+}
+#endif
+
+void GUIManager::onCallStateChange(CallState callState) {
 }
 
 void GUIManager::onDialogUXStateChanged(DialogUXState state) {
@@ -727,10 +776,10 @@ void GUIManager::onFocusChanged(const std::string& channelName, FocusState newFo
 
 void GUIManager::setClient(std::shared_ptr<smartScreenClient::SmartScreenClient> client) {
     auto result = m_executor.submit([this, client]() {
-      if (!client) {
-          ACSDK_CRITICAL(LX(__func__).d("reason", "null client"));
-      }
-      m_ssClient = client;
+        if (!client) {
+            ACSDK_CRITICAL(LX(__func__).d("reason", "null client"));
+        }
+        m_ssClient = client;
     });
     result.wait();
 }
@@ -812,6 +861,15 @@ void GUIManager::handleOnMessagingServerConnectionOpened() {
     if (m_doNotDisturbObserver && m_settingsManager) {
         m_doNotDisturbObserver->onDoNotDisturbSettingChanged(
             m_settingsManager->getValue<settings::DO_NOT_DISTURB>(false).second);
+    }
+}
+
+void GUIManager::handleDocumentTerminated(const std::string& token, bool failed) {
+    m_ssClient->clearActiveExecuteCommandsDirective(token, failed);
+    m_ssClient->clearAPLCard();
+    // Only stop audio if it is coming from APL Audio (SpeakItem, SpeakList, etc.)
+    if (APL_INTERFACE == m_interfaceHoldingAudioFocus) {
+        m_ssClient->stopForegroundActivity();
     }
 }
 

@@ -24,7 +24,10 @@ namespace sssdkCommon {
 std::vector<int16_t> AudioFileUtil::readAudioFromFile(const std::string& fileName, bool& errorOccurred) {
     const int RIFF_HEADER_SIZE = 44;
 
-    std::ifstream inputFile(fileName.c_str(), std::ifstream::binary);
+    std::ifstream inputFile;
+    inputFile.clear();
+    inputFile.open(fileName.c_str(), std::ifstream::binary);
+
     if (!inputFile.good()) {
         errorOccurred = true;
         return {};

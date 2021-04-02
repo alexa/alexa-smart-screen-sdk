@@ -163,7 +163,7 @@ void AplClientBridge::onSetDocumentIdleTimeout(const std::string& token, const s
 
 void AplClientBridge::onFinish(const std::string& token) {
     ACSDK_DEBUG9(LX(__func__));
-    m_executor.submit([this] { m_guiManager->forceExit(); });
+    m_executor.submit([this, token] { m_guiManager->handleDocumentTerminated(token, false); });
 }
 
 void AplClientBridge::onRuntimeErrorEvent(const std::string& token, const std::string& payload) {

@@ -14,12 +14,13 @@
  */
 
 #include <acsdkExternalMediaPlayerInterfaces/ExternalMediaAdapterConstants.h>
+#include <acsdkSystemClockMonitorInterfaces/SystemClockMonitorObserverInterface.h>
 #include <ADSL/MessageInterpreter.h>
 #include <AVSCommon/AVS/Attachment/AttachmentManager.h>
+#include <AVSCommon/AVS/CapabilityChangeNotifier.h>
 #include <AVSCommon/AVS/ExceptionEncounteredSender.h>
 #include <AVSCommon/AVS/SpeakerConstants/SpeakerConstants.h>
 #include <AVSCommon/SDKInterfaces/InternetConnectionMonitorInterface.h>
-#include <AVSCommon/SDKInterfaces/SystemClockMonitorObserverInterface.h>
 #include <AVSCommon/Utils/Bluetooth/BluetoothEventBus.h>
 #include <AVSCommon/Utils/MediaPlayer/PooledMediaResourceProvider.h>
 #include <AVSCommon/Utils/Metrics/MetricRecorderInterface.h>
@@ -33,6 +34,8 @@
 #include <System/TimeZoneHandler.h>
 #include <System/UserInactivityMonitor.h>
 #include <SystemSoundPlayer/SystemSoundPlayer.h>
+#include <acsdkBluetooth/Bluetooth.h>
+#include <acsdkBluetooth/DeviceConnectionRulesAdapter.h>
 
 #ifdef ENABLE_OPUS
 #include <SpeechEncoder/OpusEncoderContext.h>
@@ -113,7 +116,7 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     std::shared_ptr<alexaClientSDK::avsCommon::avs::AudioInputStream> sharedDataStream,
 #endif
     std::shared_ptr<acsdkNotificationsInterfaces::NotificationsStorageInterface> notificationsStorage,
-    std::shared_ptr<acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface> bluetoothStorage,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
         alexaDialogStateObservers,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::ConnectionStatusObserverInterface>>
@@ -218,7 +221,7 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     std::shared_ptr<certifiedSender::MessageStorageInterface> messageStorage,
     std::shared_ptr<acsdkNotificationsInterfaces::NotificationsStorageInterface> notificationsStorage,
     std::unique_ptr<settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
-    std::shared_ptr<acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface> bluetoothStorage,
     std::shared_ptr<avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
         alexaDialogStateObservers,
@@ -252,6 +255,9 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     if (!equalizerRuntimeSetup) {
         equalizerRuntimeSetup = std::make_shared<EqualizerRuntimeSetup>(false);
     }
+
+    auto bluetoothConnectionRulesProvider =
+        std::make_shared<acsdkBluetooth::DeviceConnectionRulesAdapter>(enabledConnectionRules);
 
     auto stubAudioPipelineFactory = StubApplicationAudioPipelineFactory::create(channelVolumeFactory);
     if (!stubAudioPipelineFactory) {
@@ -321,7 +327,10 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
         std::move(deviceSettingStorage),
         startAlertSchedulingOnInitialization,
         audioFactory,
-        std::move(alertStorage));
+        std::move(alertStorage),
+        std::move(bluetoothDeviceManager),
+        std::move(bluetoothStorage),
+        bluetoothConnectionRulesProvider);
     auto manufactory = SmartScreenClientManufactory::create(component);
 
     auto speakerManager = manufactory->get<std::shared_ptr<SpeakerManagerInterface>>();
@@ -405,7 +414,7 @@ bool SmartScreenClient::initialize(
     std::shared_ptr<alexaClientSDK::avsCommon::avs::AudioInputStream> sharedDataStream,
 #endif
     std::shared_ptr<acsdkNotificationsInterfaces::NotificationsStorageInterface> notificationsStorage,
-    std::shared_ptr<acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface> bluetoothStorage,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
         alexaDialogStateObservers,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::ConnectionStatusObserverInterface>>
@@ -640,16 +649,28 @@ bool SmartScreenClient::initialize(
         return false;
     }
 
-    m_systemClockMonitor = manufactory->get<std::shared_ptr<avsCommon::utils::timing::SystemClockMonitor>>();
+    m_systemClockMonitor =
+        manufactory->get<std::shared_ptr<acsdkSystemClockMonitorInterfaces::SystemClockMonitorInterface>>();
     if (!m_systemClockMonitor) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "nullSystemClockMonitor"));
         return false;
     }
 
-    m_alertsCapabilityAgent = manufactory->get<std::shared_ptr<acsdkAlerts::AlertsCapabilityAgent>>();
+    m_alertsCapabilityAgent =
+        manufactory->get<std::shared_ptr<acsdkAlertsInterfaces::AlertsCapabilityAgentInterface>>();
     if (!m_alertsCapabilityAgent) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateAlertsCapabilityAgent"));
         return false;
+    }
+
+    m_bluetoothNotifier = manufactory->get<std::shared_ptr<acsdkBluetoothInterfaces::BluetoothNotifierInterface>>();
+    if (!m_bluetoothNotifier) {
+#ifdef BLUETOOTH_ENABLED
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateBluetoothNotifier"));
+        return false;
+#else
+        ACSDK_DEBUG5(LX("nullBluetoothNotifier").m("Bluetooth disabled"));
+#endif
     }
 
     m_dialogUXStateAggregator = std::make_shared<avsCommon::avs::DialogUXStateAggregator>(metricRecorder);
@@ -670,13 +691,13 @@ bool SmartScreenClient::initialize(
         m_connectionManager->addConnectionStatusObserver(observer);
     }
 
-    m_connectionManager->addMessageObserver(m_dialogUXStateAggregator);
+    // m_connectionManager->addMessageObserver(m_dialogUXStateAggregator);
 
     for (auto observer : alexaDialogStateObservers) {
         m_dialogUXStateAggregator->addObserver(observer);
     }
 
-    m_connectionManager->addMessageObserver(m_dialogUXStateAggregator);
+    // m_connectionManager->addMessageObserver(m_dialogUXStateAggregator);
 
     /*
      * Creating the Directive Sequencer - This is the component that deals with
@@ -744,6 +765,8 @@ bool SmartScreenClient::initialize(
     auto speechConfirmationSetting =
         m_deviceSettingsManager->getSetting<settings::DeviceSettingsIndex::SPEECH_CONFIRMATION>();
     auto wakeWordsSetting = m_deviceSettingsManager->getSetting<settings::DeviceSettingsIndex::WAKE_WORDS>();
+    auto capabilityChangeNotifier = std::make_shared<avsCommon::avs::CapabilityChangeNotifier>();
+    capabilityChangeNotifier->addObserver(localeAssetsManager);
 
 /*
  * Creating the Audio Input Processor - This component is the Capability Agent
@@ -762,6 +785,7 @@ bool SmartScreenClient::initialize(
         localeAssetsManager,
         wakeWordConfirmationSetting,
         speechConfirmationSetting,
+        capabilityChangeNotifier,
         wakeWordsSetting,
         std::make_shared<speechencoder::SpeechEncoder>(std::make_shared<speechencoder::OpusEncoderContext>()),
         firstInteractionAudioProvider,
@@ -781,6 +805,7 @@ bool SmartScreenClient::initialize(
         localeAssetsManager,
         wakeWordConfirmationSetting,
         speechConfirmationSetting,
+        capabilityChangeNotifier,
         wakeWordsSetting,
         nullptr,
         firstInteractionAudioProvider,
@@ -1129,7 +1154,8 @@ bool SmartScreenClient::initialize(
      * publishing information about the System
      * capability agent.
      */
-    auto systemCapabilityProvider = capabilityAgents::system::SystemCapabilityProvider::create(localeAssetsManager);
+    auto systemCapabilityProvider =
+        capabilityAgents::system::SystemCapabilityProvider::create(localeAssetsManager, capabilityChangeNotifier);
     if (!systemCapabilityProvider) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateSystemCapabilityProvider"));
         return false;
@@ -1148,39 +1174,6 @@ bool SmartScreenClient::initialize(
         return false;
     }
 #endif
-
-    if (bluetoothDeviceManager) {
-        ACSDK_DEBUG5(LX(__func__).m("Creating Bluetooth CA"));
-
-        // Create a temporary pointer to the eventBus inside of
-        // bluetoothDeviceManager so that
-        // the unique ptr for bluetoothDeviceManager can be moved.
-        auto eventBus = bluetoothDeviceManager->getEventBus();
-
-        auto bluetoothMediaInputTransformer =
-            acsdkBluetooth::BluetoothMediaInputTransformer::create(eventBus, m_playbackRouter);
-
-        /*
-         * Creating the Bluetooth Capability Agent - This component is responsible
-         * for handling directives from AVS
-         * regarding bluetooth functionality.
-         */
-        m_bluetooth = acsdkBluetooth::Bluetooth::create(
-            m_contextManager,
-            m_audioFocusManager,
-            m_connectionManager,
-            m_exceptionSender,
-            std::move(bluetoothStorage),
-            std::move(bluetoothDeviceManager),
-            std::move(eventBus),
-            bluetoothMediaPlayer,
-            customerDataManager,
-            enabledConnectionRules,
-            bluetoothChannelVolumeInterface,
-            bluetoothMediaInputTransformer);
-    } else {
-        ACSDK_DEBUG5(LX("bluetoothCapabilityAgentDisabled").d("reason", "nullBluetoothDeviceManager"));
-    }
 
     m_apiGatewayCapabilityAgent =
         capabilityAgents::apiGateway::ApiGatewayCapabilityAgent::create(m_avsGatewayManager, m_exceptionSender);
@@ -1250,10 +1243,6 @@ bool SmartScreenClient::initialize(
 
     m_defaultEndpointBuilder->withCapability(m_notificationsCapabilityAgent, m_notificationsCapabilityAgent);
     m_defaultEndpointBuilder->withCapability(m_interactionCapabilityAgent, m_interactionCapabilityAgent);
-
-    if (m_bluetooth) {
-        m_defaultEndpointBuilder->withCapability(m_bluetooth, m_bluetooth);
-    }
 
     if (m_equalizerCapabilityAgent) {
         m_defaultEndpointBuilder->withCapability(m_equalizerCapabilityAgent, m_equalizerCapabilityAgent);
@@ -1428,7 +1417,7 @@ void SmartScreenClient::onUserEvent(
 
 void SmartScreenClient::forceExit() {
     ACSDK_DEBUG5(LX(__func__).m("Force Exit"));
-    clearAllExecuteCommands();
+    clearActiveExecuteCommandsDirective();
     clearCard();
     stopAllActivities();
     forceClearDialogChannelFocus();
@@ -1437,6 +1426,10 @@ void SmartScreenClient::forceExit() {
 void SmartScreenClient::clearCard() {
     m_alexaPresentation->clearCard();
     m_templateRuntime->clearCard();
+}
+
+void SmartScreenClient::clearAPLCard() {
+    m_alexaPresentation->clearCard();
 }
 
 void SmartScreenClient::stopForegroundActivity() {
@@ -1558,19 +1551,18 @@ void SmartScreenClient::setCaptionMediaPlayers(
 
 void SmartScreenClient::addBluetoothDeviceObserver(
     std::shared_ptr<acsdkBluetoothInterfaces::BluetoothDeviceObserverInterface> observer) {
-    if (!m_bluetooth) {
-        ACSDK_DEBUG5(LX(__func__).m("bluetooth is disabled, not adding observer"));
+    if (!m_bluetoothNotifier) {
+        ACSDK_DEBUG5(LX(__func__).m("Bluetooth disabled"));
         return;
     }
-    m_bluetooth->addObserver(observer);
+    m_bluetoothNotifier->addObserver(observer);
 }
 
 void SmartScreenClient::removeBluetoothDeviceObserver(
     std::shared_ptr<acsdkBluetoothInterfaces::BluetoothDeviceObserverInterface> observer) {
-    if (!m_bluetooth) {
-        return;
+    if (m_bluetoothNotifier) {
+        m_bluetoothNotifier->removeObserver(observer);
     }
-    m_bluetooth->removeObserver(observer);
 }
 
 #ifdef ENABLE_REVOKE_AUTH
@@ -1854,6 +1846,22 @@ void SmartScreenClient::stopCommsCall() {
     }
 }
 
+void SmartScreenClient::enableLocalVideo() {
+#ifdef ENABLE_COMMS
+    if (m_callManager) {
+        m_callManager->enableVideo();
+    }
+#endif
+}
+
+void SmartScreenClient::disableLocalVideo() {
+#ifdef ENABLE_COMMS
+    if (m_callManager) {
+        m_callManager->disableVideo();
+    }
+#endif
+}
+
 void SmartScreenClient::addAlexaPresentationObserver(
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::AlexaPresentationObserverInterface> observer) {
     if (!m_alexaPresentation) {
@@ -1912,8 +1920,8 @@ void SmartScreenClient::setDocumentIdleTimeout(std::chrono::milliseconds timeout
     m_alexaPresentation->setDocumentIdleTimeout(timeout);
 }
 
-void SmartScreenClient::clearAllExecuteCommands() {
-    m_alexaPresentation->clearAllExecuteCommands();
+void SmartScreenClient::clearActiveExecuteCommandsDirective(const std::string& token, const bool markAsFailed) {
+    m_alexaPresentation->clearExecuteCommands(token, markAsFailed);
 }
 
 void SmartScreenClient::setDeviceWindowState(const std::string& payload) {
@@ -1968,7 +1976,7 @@ void SmartScreenClient::unmuteCommsCall() {
 }
 
 void SmartScreenClient::onSystemClockSynchronized() {
-    m_systemClockMonitor->notifySystemClockSynchronized();
+    m_systemClockMonitor->onSystemClockSynchronized();
 }
 
 void SmartScreenClient::registerExternalMediaPlayerAdapterHandler(
@@ -2035,10 +2043,6 @@ SmartScreenClient::~SmartScreenClient() {
     if (m_notificationsRenderer) {
         ACSDK_DEBUG5(LX("NotificationsRendererShutdown."));
         m_notificationsRenderer->shutdown();
-    }
-    if (m_bluetooth) {
-        ACSDK_DEBUG5(LX("BluetoothShutdown."));
-        m_bluetooth->shutdown();
     }
 
     if (m_userInactivityMonitor) {
@@ -2117,6 +2121,10 @@ std::chrono::milliseconds SmartScreenClient::calculateDeviceTimezoneOffset(const
         setenv("TZ", prevTZ, 1);
     } else {
         unsetenv("TZ");
+    }
+    if (!structtm) {
+        ACSDK_ERROR(LX(__func__).m("localtime returns NULL"));
+        return std::chrono::milliseconds::zero();
     }
     return std::chrono::milliseconds(structtm->tm_gmtoff * 1000);
 #endif

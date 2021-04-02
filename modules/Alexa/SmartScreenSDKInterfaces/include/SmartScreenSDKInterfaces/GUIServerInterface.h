@@ -16,7 +16,9 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_SMARTSCREENSDKINTERFACES_INCLUDE_SMARTSCREENSDKINTERFACES_GUISERVERINTERFACE_H_
 #define ALEXA_SMART_SCREEN_SDK_SMARTSCREENSDKINTERFACES_INCLUDE_SMARTSCREENSDKINTERFACES_GUISERVERINTERFACE_H_
 
+#include <AVSCommon/AVS/CapabilityAgent.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
+#include <AVSCommon/SDKInterfaces/CallManagerInterface.h>
 
 #include <APLClient/AplRenderingEvent.h>
 #include <APLClient/DisplayMetric.h>
@@ -120,10 +122,12 @@ public:
      *
      * @param channelName channelName to be requested.
      * @param channelObserver the channelObserver to be notified.
+     * @param avsInterface AVS interface to report as owner of channel.
      */
     virtual bool handleFocusAcquireRequest(
         std::string channelName,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) = 0;
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
+        std::string avsInterface) = 0;
 
     /**
      * Handle focus release requests.
@@ -228,6 +232,31 @@ public:
     virtual void handleAPLEvent(APLClient::AplRenderingEvent event) = 0;
 
     /**
+     * Handle accept call event.
+     */
+    virtual void acceptCall() = 0;
+
+    /**
+     * Handle stop call event.
+     */
+    virtual void stopCall() = 0;
+
+    /**
+     * Handle enable local video event.
+     */
+    virtual void enableLocalVideo() = 0;
+
+    /**
+     * Handle disable local video event.
+     */
+    virtual void disableLocalVideo() = 0;
+
+    /**
+     * Handle send DTMF tone event.
+     */
+    virtual void sendDtmf(alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone dtmfTone) = 0;
+
+    /**
      * Handle toggle Do Not Disturb event
      */
     virtual void handleToggleDoNotDisturbEvent() = 0;
@@ -236,6 +265,16 @@ public:
      * Handle an onConnectionOpened event from the messaging server
      */
     virtual void handleOnMessagingServerConnectionOpened() = 0;
+
+    /**
+     * Handle document terminated result.
+     * Handler should clear the associated APL document, and any active/pending ExecuteCommands directives for the
+     * document.
+     *
+     * @param token the apl document result token.
+     * @param failed the indication if document terminated due to failure.
+     */
+    virtual void handleDocumentTerminated(const std::string& token, bool failed) = 0;
 };
 
 }  // namespace smartScreenSDKInterfaces

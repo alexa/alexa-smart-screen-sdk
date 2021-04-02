@@ -46,7 +46,7 @@ private:
     APLClient::Telemetry::DownloadMetricsEmitterPtr m_metricsEmitter;
 };
 
-} // namespace sampleApp
-} // namespace alexaSmartScreenSDK
+}  // namespace sampleApp
+}  // namespace alexaSmartScreenSDK
 
 #endif  // ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_DOWNLOADMONITOR_H

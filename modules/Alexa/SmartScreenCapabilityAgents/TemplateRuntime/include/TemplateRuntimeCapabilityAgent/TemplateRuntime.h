@@ -461,16 +461,16 @@ private:
         m_capabilityConfigurations;
 
     /// The timeout value in ms for clearing the diplay card when TTS is FINSIHED
-    std::chrono::milliseconds m_ttsFinishedTimeout;
+    std::chrono::milliseconds m_ttsFinishedTimeout{};
 
     /// The timeout value in ms for clearing the diplay card when AudioPlay is FINSIHED
-    std::chrono::milliseconds m_audioPlaybackFinishedTimeout;
+    std::chrono::milliseconds m_audioPlaybackFinishedTimeout{};
 
     /// The timeout value in ms for clearing the diplay card when AudioPlay is STOPPED or PAUSED
-    std::chrono::milliseconds m_audioPlaybackStoppedPausedTimeout;
+    std::chrono::milliseconds m_audioPlaybackStoppedPausedTimeout{};
 
     /// The timeout value in ms for clearing the display card when it is no interaction
-    std::chrono::milliseconds m_templateCardInteractionTimeout;
+    std::chrono::milliseconds m_templateCardInteractionTimeout{};
 
     /**
      * The @c Executor which queues up operations from asynchronous API calls.

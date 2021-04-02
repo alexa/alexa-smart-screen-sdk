@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
 add_definitions("-DACSDK_LOG_MODULE=SSSDKCommon")
 add_library(SSSDKCommon SHARED
     AudioFileUtil.cpp
+    ConfigValidator.cpp
     NullEqualizer.cpp
     NullMediaSpeaker.cpp
     NullMicrophone.cpp

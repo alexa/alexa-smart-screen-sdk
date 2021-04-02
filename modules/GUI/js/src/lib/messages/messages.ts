@@ -1,5 +1,16 @@
 /*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
  */
 
 import { ActivityEvent } from '../activity/ActivityEvent';
@@ -36,6 +47,21 @@ export enum AlexaState {
     SPEAKING = 'SPEAKING'
 }
 
+export enum CallState {
+    /// Guard for unknown state.
+    UNKNOWN = 'UNKNOWN',
+    /// The call is connecting.
+    CONNECTING = 'CONNECTING',
+    /// An incoming call is causing a ringtone to be played.
+    INBOUND_RINGING = 'INBOUND_RINGING',
+    /// The call has successfully connected.
+    CALL_CONNECTED = 'CALL_CONNECTED',
+    /// The call has ended.
+    CALL_DISCONNECTED = 'CALL_DISCONNECTED',
+    /// No current call state to be relayed to the user.
+    NONE = 'NONE'
+}
+
 export type AudioPlayerState =
     'IDLE'
     | 'PLAYING'
@@ -66,7 +92,8 @@ export type InboundMessageType =
     | 'aplRender'
     | 'aplCore'
     | 'renderCaptions'
-    | 'doNotDisturbSettingChanged';
+    | 'doNotDisturbSettingChanged'
+    | 'callStateChange';
 
 export interface IBaseInboundMessage {
     type : InboundMessageType;
@@ -74,6 +101,20 @@ export interface IBaseInboundMessage {
 
 export interface IInitRequest extends IBaseInboundMessage {
     smartScreenSDKVersion : string;
+}
+
+export interface ICallStateChangeMessage extends IBaseInboundMessage {
+    callState : CallState;
+    callType : string;
+    previousSipUserAgentState : string;
+    currentSipUserAgentState : string;
+    displayName : string;
+    endpointLabel : string;
+    inboundCalleeName : string;
+    callProviderType : string;
+    inboundRingtoneUrl : string;
+    outboundRingbackUrl : string;
+    isDropIn : boolean;
 }
 
 export interface IAlexaStateChangedMessage extends IBaseInboundMessage {
@@ -151,7 +192,12 @@ export type OutboundMessageType =
     | 'navigationEvent'
     | 'logEvent'
     | 'toggleCaptions'
-    | 'toggleDoNotDisturb';
+    | 'toggleDoNotDisturb'
+    | 'acceptCall'
+    | 'stopCall'
+    | 'enableLocalVideo'
+    | 'disableLocalVideo'
+    | 'sendDtmf';
 
 export interface IBaseOutboundMessage {
     type : OutboundMessageType;
@@ -208,6 +254,10 @@ export interface ILogEventMessage extends IBaseOutboundMessage {
     level : JSLogLevel;
     component : string;
     message : string;
+}
+
+export interface ISendDtmfMessage extends IBaseOutboundMessage {
+    dtmfTone : string;
 }
 
 export const createRenderStaticDocumentMessage = (

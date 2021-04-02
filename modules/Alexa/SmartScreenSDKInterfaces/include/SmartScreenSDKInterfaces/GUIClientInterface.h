@@ -17,6 +17,7 @@
 #define ALEXA_SMART_SCREEN_SDK_SMARTSCREENSDKINTERFACES_INCLUDE_SMARTSCREENSDKINTERFACES_GUICLIENTINTERFACE_H
 
 #include <AVSCommon/AVS/FocusState.h>
+#include <AVSCommon/SDKInterfaces/CallStateObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
 
 #include "AlexaPresentationObserverInterface.h"
@@ -67,6 +68,15 @@ public:
     virtual bool releaseFocus(
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) = 0;
+
+    /**
+     * Send call state info.
+     * @param callStateInfo The call state info.
+     */
+#ifdef ENABLE_COMMS
+    virtual void sendCallStateInfo(
+        const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo& callStateInfo) = 0;
+#endif
 
     /**
      * Sends a GUI Message to the server.

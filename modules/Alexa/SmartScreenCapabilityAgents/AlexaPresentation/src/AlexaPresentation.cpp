@@ -355,15 +355,27 @@ void AlexaPresentation::clearCard() {
     });
 }
 
-void AlexaPresentation::clearAllExecuteCommands() {
-    m_executor->submit([this]() { doClearExecuteCommand("User exited"); });
+void AlexaPresentation::clearExecuteCommands(const std::string& token, const bool markAsFailed) {
+    m_executor->submit([this, token, markAsFailed]() { doClearExecuteCommand("User exited", token, markAsFailed); });
 }
 
-void AlexaPresentation::doClearExecuteCommand(const std::string& reason) {
+void AlexaPresentation::doClearExecuteCommand(
+    const std::string& reason,
+    const std::string& token,
+    const bool markAsFailed) {
     ACSDK_DEBUG5(LX(__func__));
     if (!(m_lastExecuteCommandTokenAndDirective.first.empty()) && m_lastExecuteCommandTokenAndDirective.second &&
         m_lastExecuteCommandTokenAndDirective.second->result) {
-        m_lastExecuteCommandTokenAndDirective.second->result->setFailed(reason);
+        if (!token.empty() && m_lastExecuteCommandTokenAndDirective.first != token) {
+            ACSDK_ERROR(LX(__func__).d(
+                "reason", "presentationToken in the last ExecuteCommand does not match with the provided token."));
+            return;
+        }
+        if (markAsFailed) {
+            m_lastExecuteCommandTokenAndDirective.second->result->setFailed(reason);
+        } else {
+            m_lastExecuteCommandTokenAndDirective.second->result->setCompleted();
+        }
     }
 
     m_lastExecuteCommandTokenAndDirective.first.clear();

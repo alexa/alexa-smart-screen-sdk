@@ -82,13 +82,13 @@ DeviceSettingsManagerBuilder::DeviceSettingsManagerBuilder(
 }
 
 template <size_t index>
-bool addSetting(DeviceSettingsManagerBuilder builder, DeviceSettingsManager& manager) {
+bool addSetting(const DeviceSettingsManagerBuilder& builder, DeviceSettingsManager& manager) {
     auto setting = builder.getSetting<index>();
     return addSetting<index - 1>(builder, manager) && (!setting || manager.addSetting<index>(setting));
 }
 
 template <>
-bool addSetting<0>(DeviceSettingsManagerBuilder builder, DeviceSettingsManager& manager) {
+bool addSetting<0>(const DeviceSettingsManagerBuilder& builder, DeviceSettingsManager& manager) {
     auto setting = builder.getSetting<0>();
     return !setting || manager.addSetting<0>(setting);
 }

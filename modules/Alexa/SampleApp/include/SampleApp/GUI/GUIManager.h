@@ -21,6 +21,7 @@
 #include <AVSCommon/AVS/FocusState.h>
 #include <acsdkAudioPlayerInterfaces/AudioPlayerObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/AuthObserverInterface.h>
+#include <AVSCommon/SDKInterfaces/CallStateObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/CapabilitiesObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/FocusManagerObserverInterface.h>
@@ -59,6 +60,7 @@ namespace gui {
 class GUIManager
         : public alexaClientSDK::avsCommon::sdkInterfaces::AuthObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface
+        , public alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface
@@ -189,7 +191,8 @@ public:
 
     bool handleFocusAcquireRequest(
         std::string channelName,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) override;
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
+        std::string avsInterface) override;
 
     bool handleFocusReleaseRequest(
         std::string channelName,
@@ -226,6 +229,18 @@ public:
     std::chrono::milliseconds getAudioItemOffset() override;
 
     void handleOnMessagingServerConnectionOpened() override;
+
+    void handleDocumentTerminated(const std::string& token, bool failed) override;
+
+    void acceptCall() override;
+
+    void stopCall() override;
+
+    void enableLocalVideo() override;
+
+    void disableLocalVideo() override;
+
+    void sendDtmf(alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone dtmfTone) override;
     /// }
 
     /// @name FocusManagerObserverInterface methods
@@ -246,6 +261,17 @@ public:
     /// @name AudioInputProcessorObserverInterface methods.
     /// @{
     void onStateChanged(AudioInputProcessorObserverInterface::State state) override;
+    /// @}
+
+    /// @name CallStateObserverInterface methods.
+    /// @{
+#ifdef ENABLE_COMMS
+    void onCallStateInfoChange(
+        const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo& newStateInfo)
+        override;
+#endif
+    void onCallStateChange(
+        alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallState newCallState) override;
     /// @}
 
     /**
@@ -342,16 +368,6 @@ private:
      * Reset the device and remove any customer data.
      */
     void resetDevice();
-
-    /**
-     * Should be called when the user wants to accept a call.
-     */
-    void acceptCall();
-
-    /**
-     * Should be called when the user wants to stop a call.
-     */
-    void stopCall();
 
 #ifdef ENABLE_PCC
     /**
@@ -454,6 +470,9 @@ private:
 
     /// Observer for DoNotDisturb Setting.
     std::shared_ptr<sampleApp::DoNotDisturbSettingObserver> m_doNotDisturbObserver;
+
+    /// The interface holding audio focus.
+    std::string m_interfaceHoldingAudioFocus;
 };
 
 }  // namespace gui

@@ -82,8 +82,9 @@ static const std::string ALEXA_DISPLAY_WINDOW_NAMESPACE{"Alexa.Display.Window"};
 static const std::string WINDOW_STATE_NAME{"WindowState"};
 
 /// The VisualCharacteristics context state signature.
-static const alexaClientSDK::avsCommon::avs::NamespaceAndName DEVICE_WINDOW_STATE{ALEXA_DISPLAY_WINDOW_NAMESPACE,
-                                                                                  WINDOW_STATE_NAME};
+static const alexaClientSDK::avsCommon::avs::NamespaceAndName DEVICE_WINDOW_STATE{
+    ALEXA_DISPLAY_WINDOW_NAMESPACE,
+    WINDOW_STATE_NAME};
 
 /**
  * Create a LogEntry using this file's TAG and the specified event string.

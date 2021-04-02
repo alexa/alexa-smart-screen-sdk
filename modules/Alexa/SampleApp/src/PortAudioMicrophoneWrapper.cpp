@@ -85,7 +85,7 @@ bool PortAudioMicrophoneWrapper::initialize() {
         return false;
     }
 
-    PaTime suggestedLatency;
+    PaTime suggestedLatency = 0;
     bool latencyInConfig = getConfigSuggestedLatency(suggestedLatency);
 
     if (!latencyInConfig) {

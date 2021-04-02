@@ -153,8 +153,11 @@ public:
 
     /**
      * This function clear all pending @c ExecuteCommands directives and mark them as failed.
+     * @param token The token. This should be passed in if we are clearing execute commands due to APL-specific trigger
+     * (eg. Finish command). This should be left empty if we are clearing due to global triggers (eg. back navigation)
+     * @param markAsFailed Whether to mark the cleared commands as failed.
      */
-    void clearAllExecuteCommands();
+    void clearExecuteCommands(const std::string& token = std::string(), const bool markAsFailed = true);
 
     /// @name CapabilityConfigurationInterface Functions
     /// @{
@@ -560,14 +563,22 @@ private:
     /**
      *
      * Stops the execution of all pending @c ExecuteCommand directive
+     * @param markAsFailed whether to mark cleared commands as failed
      */
-    void executeClearAllExecuteCommands();
+    void executeClearAllExecuteCommands(const bool markAsFailed = true);
 
     /**
      *
      * Stops the execution of all pending @c ExecuteCommand directive
+     * @param reason reason for clearing commands
+     * @param token The token. This should be passed in if we are clearing execute commands due to APL-specific trigger
+     * (eg. Finish command). This should be left empty if we are clearing due to global triggers (eg. back navigation)
+     * @param markAsFailed Whether to mark the cleared commands as failed.
      */
-    void doClearExecuteCommand(const std::string& reason);
+    void doClearExecuteCommand(
+        const std::string& reason,
+        const std::string& token = std::string(),
+        const bool markAsFailed = true);
 
     /**
      * Send APL Dismissed event to AVS.
@@ -656,10 +667,10 @@ private:
         m_capabilityConfigurations;
 
     /// The timeout value in ms for clearing the display card when it is no interaction received from SDK config
-    std::chrono::milliseconds m_sdkConfiguredDocumentInteractionTimeout;
+    std::chrono::milliseconds m_sdkConfiguredDocumentInteractionTimeout{};
 
     /// The timeout value in ms for clearing the display card when it is no interaction
-    std::chrono::milliseconds m_documentInteractionTimeout;
+    std::chrono::milliseconds m_documentInteractionTimeout{};
 
     /// The object to use for sending events.
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> m_messageSender;
@@ -772,10 +783,10 @@ private:
     std::chrono::time_point<std::chrono::steady_clock> m_lastReportTime;
 
     /// The minimum state reporting interval
-    std::chrono::milliseconds m_minStateReportInterval;
+    std::chrono::milliseconds m_minStateReportInterval{};
 
     /// The state reporting check interval
-    std::chrono::milliseconds m_stateReportCheckInterval;
+    std::chrono::milliseconds m_stateReportCheckInterval{};
 
     /// Whether the state has been requested from the state provider and we are awaiting the response
     bool m_stateReportPending;

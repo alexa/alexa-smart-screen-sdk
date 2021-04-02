@@ -136,6 +136,7 @@
 #include <SQLiteStorage/SQLiteMiscStorage.h>
 #include <SampleApp/SampleEqualizerModeController.h>
 #include <Settings/Storage/SQLiteDeviceSettingStorage.h>
+#include <SSSDKCommon/ConfigValidator.h>
 
 #include <acsdkEqualizerImplementations/InMemoryEqualizerConfiguration.h>
 #include <acsdkEqualizerImplementations/MiscDBEqualizerStorage.h>
@@ -146,6 +147,7 @@
 #include <algorithm>
 #include <cctype>
 #include <csignal>
+#include <rapidjson/istreamwrapper.h>
 
 #ifndef UWP_BUILD
 #include <Communication/WebSocketServer.h>
@@ -720,10 +722,11 @@ buildModeControllerAttributes(
 std::unique_ptr<SampleApplication> SampleApplication::create(
     const std::vector<std::string>& configFiles,
     const std::string& pathToInputFolder,
+    const std::string& configSchemaPath,
     const std::string& logLevel,
     std::shared_ptr<avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics) {
     auto clientApplication = std::unique_ptr<SampleApplication>(new SampleApplication);
-    if (!clientApplication->initialize(configFiles, pathToInputFolder, logLevel, diagnostics)) {
+    if (!clientApplication->initialize(configFiles, pathToInputFolder, configSchemaPath, logLevel, diagnostics)) {
         ACSDK_CRITICAL(LX("Failed to initialize SampleApplication"));
         return nullptr;
     }
@@ -809,6 +812,7 @@ bool SampleApplication::createMediaPlayersForAdapters(
 bool SampleApplication::initialize(
     const std::vector<std::string>& configFiles,
     const std::string& pathToInputFolder,
+    const std::string& configSchemaPath,
     const std::string& logLevel,
     std::shared_ptr<avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics) {
     avsCommon::utils::logger::Level logLevelValue = avsCommon::utils::logger::Level::UNKNOWN;
@@ -873,7 +877,7 @@ bool SampleApplication::initialize(
 #endif
 
     auto initParams = builder->build();
-    auto sampleAppComponent = getComponent(std::move(initParams));
+    auto sampleAppComponent = getComponent(std::move(initParams), m_shutdownRequiredList);
 
     auto manufactory = Manufactory<
         std::shared_ptr<avsCommon::avs::initialization::AlexaClientSDKInit>,
@@ -896,6 +900,42 @@ bool SampleApplication::initialize(
         return false;
     }
     auto& config = *configPtr;
+
+#ifdef ENABLE_CONFIG_VALIDATION
+
+    /*
+     * Creating config validator
+     */
+    auto configValidator = alexaSmartScreenSDK::sssdkCommon::ConfigValidator::create();
+    if (!configValidator) {
+        ACSDK_CRITICAL(LX("Failed to create config validator!"));
+        return false;
+    }
+
+    auto schemaStream = std::shared_ptr<std::ifstream>(new std::ifstream(configSchemaPath));
+
+    if (schemaStream->good()) {
+        rapidjson::IStreamWrapper isw(*schemaStream);
+        rapidjson::Document jsonSchema;
+        if (!jsonSchema.ParseStream(isw).HasParseError()) {
+            // Validating config parameters
+            if (!configValidator->validate(config, jsonSchema)) {
+                ACSDK_ERROR(LX("Configuration validation failed!"));
+                return false;
+            }
+        } else {
+            ACSDK_WARN(LX("SampleApp may not run as expected! Configuration file was not validated!")
+                           .d("reason", "failed to parse schema")
+                           .d("filename", configSchemaPath.c_str()));
+        }
+    } else {
+        ACSDK_WARN(LX("SampleApp may not run as expected! Configuration file was not validated!")
+                       .d("reason", "failed to read file")
+                       .d("filename", configSchemaPath.c_str()));
+    }
+
+#endif
+
     auto sampleAppConfig = config[SAMPLE_APP_CONFIG_KEY];
 
     auto httpContentFetcherFactory = std::make_shared<avsCommon::utils::libcurlUtils::HTTPContentFetcherFactory>();
@@ -1375,6 +1415,7 @@ bool SampleApplication::initialize(
     compatibleAudioFormat.numChannels = NUM_CHANNELS;
     compatibleAudioFormat.endianness = alexaClientSDK::avsCommon::utils::AudioFormat::Endianness::LITTLE;
     compatibleAudioFormat.encoding = alexaClientSDK::avsCommon::utils::AudioFormat::Encoding::LPCM;
+    compatibleAudioFormat.dataSigned = false;
 
     /*
      * Creating each of the audio providers. An audio provider is a simple package of data consisting of the stream
@@ -1569,6 +1610,7 @@ bool SampleApplication::initialize(
     client->addAlexaDialogStateObserver(m_guiManager);
     client->addAudioPlayerObserver(m_guiManager);
     client->addAudioPlayerObserver(aplClientBridge);
+    client->addCallStateObserver(m_guiManager);
     client->addFocusManagersObserver(m_guiManager);
     client->addAudioInputProcessorObserver(m_guiManager);
     m_guiManager->setClient(client);

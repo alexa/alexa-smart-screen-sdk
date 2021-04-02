@@ -4,8 +4,12 @@ project(AlexaSmartScreenSDK LANGUAGES CXX)
 
 if (NOT MSVC)
 	find_package(PkgConfig)
-	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.22.0)
+	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.23.0)
 	set(ASDK_LIBRARY_DIRS "${CMAKE_PREFIX_PATH}/lib")
+	# Needs to append the correct path to AVS SDK since it's not installed
+	# to cross-compiler target sysroot
+	set(ASDK_INCLUDE_DIRS "${ASDK_INCLUDE_DIRS}" "${CMAKE_PREFIX_PATH}/include")
+	set(ASDK_LDFLAGS "${ASDK_LDFLAGS}" "-L${CMAKE_PREFIX_PATH}/lib")
 else()
 	# No package manager support in MSVC yet. Emulating the same results
 	set(ASDK_INCLUDE_DIRS "${ASDK_INSTALL_PATH}/include")
@@ -38,6 +42,7 @@ else()
 		"${ASDK_LIB_DIR}/acsdkShared.lib"
 		"${ASDK_LIB_DIR}/acsdkShutdownManager.lib"
 		"${ASDK_LIB_DIR}/acsdkStartupManager.lib"
+		"${ASDK_LIB_DIR}/acsdkSystemClockMonitor.lib"
 		"${ASDK_LIB_DIR}/ADSL.lib"
 		"${ASDK_LIB_DIR}/AFML.lib"
 		"${ASDK_LIB_DIR}/AIP.lib"

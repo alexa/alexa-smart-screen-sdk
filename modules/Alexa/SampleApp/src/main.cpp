@@ -31,7 +31,7 @@ using namespace alexaSmartScreenSDK::sampleApp;
  */
 bool usesOptStyleArgs(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
-        if (!strcmp(argv[i], "-C") || !strcmp(argv[i], "-K") || !strcmp(argv[i], "-L")) {
+        if (!strcmp(argv[i], "-C") || !strcmp(argv[i], "-K") || !strcmp(argv[i], "-L") || !strcmp(argv[i], "-S")) {
             return true;
         }
     }
@@ -51,6 +51,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> configFiles;
     std::string pathToKWDInputFolder;
     std::string logLevel;
+    std::string configSchemaPath;
 
     ConsolePrinter::simplePrint(
         "SmartScreenSDKVersion " + alexaSmartScreenSDK::utils::smartScreenSDKVersion::getCurrentVersion());
@@ -75,6 +76,12 @@ int main(int argc, char* argv[]) {
                     return SampleAppReturnCode::ERROR;
                 }
                 logLevel = std::string(argv[++i]);
+            } else if (strcmp(argv[i], "-S") == 0) {
+                if (i + 1 == argc) {
+                    ConsolePrinter::simplePrint("No config schema specified for -S option");
+                    return SampleAppReturnCode::ERROR;
+                }
+                configSchemaPath = std::string(argv[++i]);
             } else {
                 ConsolePrinter::simplePrint(
                     "USAGE: " + std::string(argv[0]) + " -C <config1.json> -C <config2.json> ... -C <configN.json> " +
@@ -114,7 +121,7 @@ int main(int argc, char* argv[]) {
     SampleAppReturnCode returnCode = SampleAppReturnCode::OK;
 
     do {
-        sampleApplication = SampleApplication::create(configFiles, pathToKWDInputFolder, logLevel);
+        sampleApplication = SampleApplication::create(configFiles, pathToKWDInputFolder, configSchemaPath, logLevel);
         if (!sampleApplication) {
             ConsolePrinter::simplePrint("Failed to create to SampleApplication!");
             return SampleAppReturnCode::ERROR;

@@ -60,6 +60,15 @@ avsCommon::utils::mediaPlayer::MediaPlayerInterface::SourceId TestMediaPlayer::s
     return ++g_sourceId;
 }
 
+avsCommon::utils::mediaPlayer::MediaPlayerInterface::SourceId TestMediaPlayer::setSource(
+    std::shared_ptr<alexaClientSDK::avsCommon::avs::attachment::AttachmentReader> attachmentReader,
+    std::chrono::milliseconds offsetAdjustment,
+    const alexaClientSDK::avsCommon::utils::AudioFormat* format,
+    const alexaClientSDK::avsCommon::utils::mediaPlayer::SourceConfig& config) {
+    m_attachmentReader = std::move(attachmentReader);
+    return ++g_sourceId;
+}
+
 alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface::SourceId TestMediaPlayer::setSource(
     std::shared_ptr<std::istream> stream,
     bool repeat,

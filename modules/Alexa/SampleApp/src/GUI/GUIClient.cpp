@@ -78,6 +78,21 @@ static const std::string MESSAGE_TYPE_DISPLAY_METRICS("displayMetrics");
 /// The message type for toggling captions.
 static const std::string MESSAGE_TYPE_TOGGLE_CAPTIONS("toggleCaptions");
 
+/// The message type for answering a call.
+static const std::string MESSAGE_TYPE_ACCEPT_CALL("acceptCall");
+
+/// The message type for hanging up a call.
+static const std::string MESSAGE_TYPE_STOP_CALL("stopCall");
+
+/// The message type for enabling local video during a call.
+static const std::string MESSAGE_TYPE_ENABLE_LOCAL_VIDEO("enableLocalVideo");
+
+/// The message type for disabling local video during a call.
+static const std::string MESSAGE_TYPE_DISABLE_LOCAL_VIDEO("disableLocalVideo");
+
+/// The message type for sending DTMF keys during a PSTN call.
+static const std::string MESSAGE_TYPE_SEND_DTMF("sendDtmf");
+
 /// The message type for toggling DoNotDisturb.
 static const std::string MESSAGE_TYPE_TOGGLE_DONOTDISTURB("toggleDoNotDisturb");
 
@@ -114,11 +129,20 @@ static const std::string ERROR_TAG("error");
 /// The event json key in the message.
 static const std::string EVENT_TAG("event");
 
+/// The DTMF tone json key in the message.
+static const std::string DTMF_TONE_TAG("dtmfTone");
+
 /// The drop frame count json key in the message.
 static const std::string DROP_FRAME_COUNT_TAG("dropFrameCount");
 
 /// The payload json key in the message.
 static const std::string DEFAULT_WINDOW_ID_TAG("defaultWindowId");
+
+/// The instances json key in the message.
+static const std::string INSTANCES_TAG("instances");
+
+/// The id json key in the message.
+static const std::string ID_TAG("id");
 
 /// Interface name to use for focus requests.
 static const std::string APL_INTERFACE("Alexa.Presentation.APL");
@@ -170,7 +194,51 @@ static const std::string SUPPORTED_VIEWPORTS_FIELD = "supportedViewports";
 /// Identifier for the presentation object sent in an APL directive
 static const std::string PRESENTATION_TOKEN = "presentationToken";
 
+/// Invalid window id runtime error errors key
+static const std::string ERRORS_KEY{"errors"};
+
+/// Invalid window id runtime error type key
+static const std::string TYPE_KEY{"type"};
+
+/// Invalid window id runtime error reason key
+static const std::string REASON_KEY{"reason"};
+
+/// Invalid window id runtime error list id key
+static const std::string LIST_ID_KEY{"listId"};
+
+/// Invalid window id runtime error message key
+static const std::string MESSAGE_KEY{"message"};
+
+/// Invalid window id runtime error reason
+static const std::string INVALID_OPERATION{"INVALID_OPERATION"};
+
+/// Invalid window id runtime error reason
+static const std::string INVALID_WINDOW_ID{"Invalid window id"};
+
+/// Invalid window id runtime error message
+static const std::string INVALID_WINDOW_ID_MESSAGE{"Device has no window with id: "};
+
+/// Fallback runtime error message
+static const std::string FALLBACK_WINDOW_ID_MESSAGE{". Falling back to device default window id: "};
+
 static const std::string DEFAULT_PARAM_VALUE = "{}";
+
+/// Mapping of DTMF enum to characters for Comms dial tones
+static const std::map<std::string, alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>
+    DTMF_TONE_STRING_TO_ENUM_MAP = {
+        {"0", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_ZERO},
+        {"1", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_ONE},
+        {"2", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_TWO},
+        {"3", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_THREE},
+        {"4", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_FOUR},
+        {"5", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_FIVE},
+        {"6", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_SIX},
+        {"7", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_SEVEN},
+        {"8", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_EIGHT},
+        {"9", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_NINE},
+        {"*", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_STAR},
+        {"#", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_POUND},
+};
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -333,6 +401,21 @@ GUIClient::GUIClient(
         MESSAGE_TYPE_DISPLAY_METRICS, [this](rapidjson::Document& payload) { executeHandleDisplayMetrics(payload); });
     m_messageHandlers.emplace(
         MESSAGE_TYPE_TOGGLE_CAPTIONS, [this](rapidjson::Document& payload) { m_captionManager.toggleCaptions(); });
+    m_messageHandlers.emplace(
+        MESSAGE_TYPE_ACCEPT_CALL, [this](rapidjson::Document& payload) { executeHandleAcceptCall(payload); });
+    m_messageHandlers.emplace(
+        MESSAGE_TYPE_STOP_CALL, [this](rapidjson::Document& payload) { executeHandleStopCall(payload); });
+
+    m_messageHandlers.emplace(MESSAGE_TYPE_ENABLE_LOCAL_VIDEO, [this](rapidjson::Document& payload) {
+        executeHandleEnableLocalVideo(payload);
+    });
+    m_messageHandlers.emplace(MESSAGE_TYPE_DISABLE_LOCAL_VIDEO, [this](rapidjson::Document& payload) {
+        executeHandleDisableLocalVideo(payload);
+    });
+
+    m_messageHandlers.emplace(
+        MESSAGE_TYPE_SEND_DTMF, [this](rapidjson::Document& payload) { executeHandleSendDtmf(payload); });
+
     m_messageHandlers.emplace(MESSAGE_TYPE_TOGGLE_DONOTDISTURB, [this](rapidjson::Document& payload) {
         m_guiManager->handleToggleDoNotDisturbEvent();
     });
@@ -382,7 +465,9 @@ bool GUIClient::acquireFocus(
     ACSDK_DEBUG5(LX(__func__));
 
     return m_executor
-        .submit([this, channelName, channelObserver]() { return executeAcquireFocus(channelName, channelObserver); })
+        .submit([this, channelName, channelObserver]() {
+            return executeAcquireFocus(channelName, channelObserver, APL_INTERFACE);
+        })
         .get();
 }
 
@@ -395,10 +480,19 @@ bool GUIClient::releaseFocus(
         .get();
 }
 
+#ifdef ENABLE_COMMS
+void GUIClient::sendCallStateInfo(
+    const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo& callStateInfo) {
+    ACSDK_DEBUG5(LX(__func__));
+    m_executor.submit([this, callStateInfo]() { executeSendCallStateInfo(callStateInfo); });
+}
+#endif
+
 bool GUIClient::executeAcquireFocus(
     std::string channelName,
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
-    return m_guiManager->handleFocusAcquireRequest(channelName, channelObserver);
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
+    std::string avsInterface) {
+    return m_guiManager->handleFocusAcquireRequest(channelName, channelObserver, avsInterface);
 }
 
 bool GUIClient::executeReleaseFocus(
@@ -525,9 +619,42 @@ void GUIClient::executeHandleHoldToTalk(rapidjson::Document& message) {
     m_guiManager->handleHoldToTalk();
 }
 
+void GUIClient::executeHandleAcceptCall(rapidjson::Document& message) {
+    m_guiManager->acceptCall();
+}
+
+void GUIClient::executeHandleStopCall(rapidjson::Document& message) {
+    m_guiManager->stopCall();
+}
+
+void GUIClient::executeHandleEnableLocalVideo(rapidjson::Document& message) {
+    m_guiManager->enableLocalVideo();
+}
+
+void GUIClient::executeHandleDisableLocalVideo(rapidjson::Document& message) {
+    m_guiManager->disableLocalVideo();
+}
+
+void GUIClient::executeHandleSendDtmf(rapidjson::Document& message) {
+    std::string dtmfString;
+    if (!jsonUtils::retrieveValue(message, DTMF_TONE_TAG, &dtmfString)) {
+        ACSDK_ERROR(LX("handleSendDtmfRequestFailed").d("reason", "dtmfToneNotFound"));
+        return;
+    }
+    ACSDK_DEBUG3(LX("handleSendDtmfRequest").d(DTMF_TONE_TAG, dtmfString));
+
+    auto dtmfIterator = DTMF_TONE_STRING_TO_ENUM_MAP.find(dtmfString);
+    if (dtmfIterator == DTMF_TONE_STRING_TO_ENUM_MAP.end()) {
+        ACSDK_ERROR(LX("handleSendDtmfRequestFailed").d("unknown dtmfTone", dtmfString));
+        return;
+    }
+    alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone dtmfTone = dtmfIterator->second;
+    m_guiManager->sendDtmf(dtmfTone);
+}
+
 void GUIClient::executeHandleFocusAcquireRequest(rapidjson::Document& message) {
     ACSDK_CRITICAL(LX("handleFocusAcquireRequest"));
-    APLToken token;
+    APLToken token = 0;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleFocusAcquireRequestFailed").d("reason", "tokenNotFound"));
         return;
@@ -593,7 +720,7 @@ void GUIClient::executeFocusAcquireRequest(
         return;
     }
 
-    result = executeAcquireFocus(channelName, focusObserver);
+    result = executeAcquireFocus(channelName, focusObserver, avsInterface);
     if (!result) {
         ACSDK_ERROR(
             LX("executeFocusAcquireRequestFail").d("token", token).d("reason", "acquireChannel returned false"));
@@ -605,7 +732,7 @@ void GUIClient::executeFocusAcquireRequest(
 }
 
 void GUIClient::executeHandleFocusReleaseRequest(rapidjson::Document& message) {
-    APLToken token;
+    APLToken token = 0;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleFocusReleaseRequestFailed").d("reason", "tokenNotFound"));
         return;
@@ -656,7 +783,7 @@ void GUIClient::executeSendFocusResponse(const APLToken token, const bool result
 }
 
 void GUIClient::executeHandleOnFocusChangedReceivedConfirmation(rapidjson::Document& message) {
-    APLToken token;
+    APLToken token = 0;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleOnFocusChangedReceivedConfirmationFailed").d("reason", "tokenNotFound"));
         return;
@@ -789,13 +916,30 @@ void GUIClient::executeHandleAplEvent(rapidjson::Document& message) {
 void GUIClient::executeHandleDeviceWindowState(rapidjson::Document& message) {
     std::string payload;
     if (!jsonUtils::retrieveValue(message, PAYLOAD_TAG, &payload)) {
-        ACSDK_ERROR(LX("handleDeviceWindowStateFailed").d("reason", "payloadNotFound"));
+        ACSDK_ERROR(LX("handleDeviceWindowStateFailed").d("reason", "payloadValueNotFound"));
         return;
     }
 
-    if (!jsonUtils::retrieveValue(payload, DEFAULT_WINDOW_ID_TAG, &m_defaultWindowId)) {
+    const auto& jsonPayload = message[PAYLOAD_TAG];
+    if (!jsonPayload.IsObject()) {
+        ACSDK_ERROR(LX("handleDeviceWindowStateFailed").d("reason", "payloadObjectNotFound"));
+        return;
+    }
+
+    if (!jsonUtils::retrieveValue(jsonPayload, DEFAULT_WINDOW_ID_TAG, &m_defaultWindowId)) {
         ACSDK_ERROR(LX("handleDeviceWindowStateFailed").d("reason", "defaultWindowIdNotFound"));
         return;
+    }
+
+    const auto& instances = jsonPayload[INSTANCES_TAG];
+    if (!instances.IsArray()) {
+        ACSDK_ERROR(LX("handleDeviceWindowStateFailed").d("reason", "unableToFindWindowInstances"));
+        return;
+    }
+
+    m_reportedWindowIds.clear();
+    for (rapidjson::SizeType idx = 0; idx < instances.Size(); ++idx) {
+        m_reportedWindowIds.insert(instances[idx][ID_TAG].GetString());
     }
 
     m_guiManager->handleDeviceWindowState(payload);
@@ -875,7 +1019,7 @@ void GUIClient::executeHandleDisplayMetrics(rapidjson::Document& message) {
         m_aplClientBridge->handleDisplayMetrics(windowId, metrics);
     } else {
         // Deprecated, retained for backward compatibility only while the viewhost is updated
-        uint64_t dropFrameCount;
+        uint64_t dropFrameCount = 0;
         if (!jsonUtils::retrieveValue(payload, DROP_FRAME_COUNT_TAG, &dropFrameCount)) {
             ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "dropFrameCountNotFound"));
             return;
@@ -937,12 +1081,20 @@ void GUIClient::clearTemplateCard(const std::string& token) {
 
 void GUIClient::renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) {
     m_executor.submit([this, jsonPayload, windowId, token]() {
+        bool isWindowIdPresent = m_reportedWindowIds.find(windowId) != m_reportedWindowIds.end();
+
         std::string document = extractDocument(jsonPayload);
         std::string datasources = extractDatasources(jsonPayload);
         std::string supportedViewports = extractSupportedViewports(jsonPayload);
+        std::string targetWindowId = isWindowIdPresent ? windowId : m_defaultWindowId;
 
-        auto targetWindowId = windowId.empty() ? m_defaultWindowId : windowId;
         m_aplClientBridge->renderDocument(token, document, datasources, supportedViewports, targetWindowId);
+        if (!isWindowIdPresent && !windowId.empty()) {
+            std::ostringstream ossFormattedMessage;
+            ossFormattedMessage << INVALID_WINDOW_ID_MESSAGE << windowId << FALLBACK_WINDOW_ID_MESSAGE
+                                << m_defaultWindowId;
+            reportInvalidWindowIdRuntimeError(ossFormattedMessage.str(), token);
+        }
     });
 }
 
@@ -1074,8 +1226,16 @@ void GUIClient::executeSendGuiConfiguration() {
 #endif
 }
 
+#ifdef ENABLE_COMMS
+void GUIClient::executeSendCallStateInfo(
+    const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo& callStateInfo) {
+    auto message = messages::CallStateChangeMessage(callStateInfo);
+    sendMessage(message);
+}
+#endif
+
 bool GUIClient::executeProcessInitResponse(const rapidjson::Document& message) {
-    bool isSupported;
+    bool isSupported = false;
     if (!jsonUtils::retrieveValue(message, IS_SUPPORTED_TAG, &isSupported)) {
         ACSDK_ERROR(LX("processInitResponseFailed").d("reason", "isSupportedNotFound"));
         m_errorState = true;
@@ -1125,11 +1285,13 @@ void GUIClient::onAuthStateChange(AuthObserverInterface::State newState, AuthObs
 }
 
 void GUIClient::onCapabilitiesStateChange(
-    CapabilitiesObserverInterface::State newState,
-    CapabilitiesObserverInterface::Error newError,
+    alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::State newState,
+    alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::Error newError,
     const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& addedOrUpdatedEndpoints,
     const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointIdentifier>& deletedEndpoints) {
-    m_limitedInteraction = m_limitedInteraction || (newState == CapabilitiesObserverInterface::State::FATAL_ERROR);
+    m_limitedInteraction =
+        m_limitedInteraction ||
+        (newState == alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface::State::FATAL_ERROR);
 }
 
 GUIClient::ProxyFocusObserver::ProxyFocusObserver(
@@ -1270,6 +1432,30 @@ void GUIClient::initializeAllRenderers() {
     };
 
     m_aplClientBridge->initializeRenderer(RENDER_PLAYER_INFO_WINDOW_ID, {APLClient::Extensions::AudioPlayer::URI});
+}
+
+void GUIClient::reportInvalidWindowIdRuntimeError(const std::string& errorMessage, const std::string& aplToken) {
+    rapidjson::Document runtimeErrorPayloadJson(rapidjson::kObjectType);
+    auto& alloc = runtimeErrorPayloadJson.GetAllocator();
+    rapidjson::Value payload(rapidjson::kObjectType);
+    rapidjson::Value errors(rapidjson::kArrayType);
+    payload.AddMember(rapidjson::StringRef(PRESENTATION_TOKEN), aplToken, alloc);
+
+    rapidjson::Value error(rapidjson::kObjectType);
+    error.AddMember(rapidjson::StringRef(TYPE_KEY), INVALID_OPERATION, alloc);
+    error.AddMember(rapidjson::StringRef(REASON_KEY), INVALID_WINDOW_ID, alloc);
+    error.AddMember(rapidjson::StringRef(LIST_ID_KEY), "", alloc);
+    error.AddMember(rapidjson::StringRef(MESSAGE_KEY), errorMessage, alloc);
+
+    errors.PushBack(error, alloc);
+    payload.AddMember(rapidjson::StringRef(ERRORS_KEY), errors, alloc);
+
+    rapidjson::StringBuffer sb;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(sb);
+    payload.Accept(writer);
+
+    m_guiManager->handleRuntimeErrorEvent(aplToken, sb.GetString());
+    ACSDK_WARN(LX("reportInvalidWindowIdRuntimeError").d("reported runtime error", std::string(sb.GetString())));
 }
 
 }  // namespace gui

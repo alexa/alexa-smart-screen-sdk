@@ -65,6 +65,13 @@ public:
             alexaClientSDK::avsCommon::utils::mediaPlayer::emptySourceConfig()) override;
 
     alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface::SourceId setSource(
+        std::shared_ptr<alexaClientSDK::avsCommon::avs::attachment::AttachmentReader> attachmentReader,
+        std::chrono::milliseconds offsetAdjustment,
+        const alexaClientSDK::avsCommon::utils::AudioFormat* format = nullptr,
+        const alexaClientSDK::avsCommon::utils::mediaPlayer::SourceConfig& config =
+            alexaClientSDK::avsCommon::utils::mediaPlayer::emptySourceConfig()) override;
+
+    alexaClientSDK::avsCommon::utils::mediaPlayer::MediaPlayerInterface::SourceId setSource(
         std::shared_ptr<std::istream> stream,
         bool repeat,
         const alexaClientSDK::avsCommon::utils::mediaPlayer::SourceConfig& config =

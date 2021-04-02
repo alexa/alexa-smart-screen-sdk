@@ -42,6 +42,9 @@
 
 #include <AVSCommon/AVS/FocusState.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
+#ifdef ENABLE_COMMS
+#include <AVSCommon/SDKInterfaces/CallStateObserverInterface.h>
+#endif
 #include <AVSCommon/SDKInterfaces/Storage/MiscStorageInterface.h>
 #include <AVSCommon/Utils/RequiresShutdown.h>
 #include <AVSCommon/Utils/Timing/Timer.h>
@@ -150,6 +153,10 @@ public:
     bool releaseFocus(
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) override;
+#ifdef ENABLE_COMMS
+    void sendCallStateInfo(const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo&
+                               callStateInfo) override;
+#endif
     void sendMessage(smartScreenSDKInterfaces::MessageInterface& message) override;
     bool handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::NavigationEvent event) override;
     /// @}
@@ -291,6 +298,14 @@ private:
 
     /// Send viewport characteristic and GUI app config data in structured JSON format.
     void executeSendGuiConfiguration();
+
+    /**
+     * Handle SendCallStateInfo event.
+     */
+#ifdef ENABLE_COMMS
+    void executeSendCallStateInfo(
+        const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo& callStateInfo);
+#endif
 
     /**
      * Handle TapToTalk event.
@@ -457,10 +472,12 @@ private:
      * An internal function handling audio focus requests in the executor thread.
      * @param channelName The channel to be requested.
      * @param channelObserver the channelObserver to be notified.
+     * @param avsInterface AVS interface to report as owner of channel.
      */
     bool executeAcquireFocus(
         std::string channelName,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver);
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
+        std::string avsInterface);
 
     /**
      * An internal function handling release audio focus requests in the executor thread.
@@ -502,6 +519,38 @@ private:
      * This function also creates renderPlayerInfo with audioPlayer APL extension.     *
      */
     void initializeAllRenderers();
+
+    /**
+     * Handle accept call message
+     */
+    void executeHandleAcceptCall(rapidjson::Document& message);
+
+    /**
+     * Handle stop call message
+     */
+    void executeHandleStopCall(rapidjson::Document& message);
+
+    /**
+     * Handle enable local video message.
+     */
+    void executeHandleEnableLocalVideo(rapidjson::Document& message);
+
+    /**
+     * Handle disable local video message.
+     */
+    void executeHandleDisableLocalVideo(rapidjson::Document& message);
+
+    /**
+     * Handle send DTMF key message.
+     */
+    void executeHandleSendDtmf(rapidjson::Document& message);
+
+    /**
+     * Creates a runtime error payload for invalid windowId reported found in a directive
+     * @param errorMsg Error message to be sent with runtime error
+     * @param aplToken APL Token for directive with error
+     */
+    void reportInvalidWindowIdRuntimeError(const std::string& errorMsg, const std::string& aplToken);
 
     // The GUI manager implementation.
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIServerInterface> m_guiManager;
@@ -582,6 +631,9 @@ private:
 
     /// @c ConfigurationNode for GUI AppConfig
     alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode m_guiAppConfig;
+
+    /// List of all supported windowIds
+    std::set<std::string> m_reportedWindowIds;
 };
 
 }  // namespace gui

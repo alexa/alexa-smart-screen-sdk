@@ -36,6 +36,9 @@ const char MSG_TOKEN_TAG[] = "token";
 /// The state json key in the message.
 const char MSG_STATE_TAG[] = "state";
 
+/// String representation of empty json
+const std::string EMPTY_JSON("{}");
+
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 namespace messages {
@@ -144,7 +147,9 @@ public:
             rapidjson::CrtAllocator,
             rapidjson::kWriteNanAndInfFlag>
             writer(buffer);
-        mDocument.Accept(writer);
+        if (!mDocument.Accept(writer)) {
+            return EMPTY_JSON;
+        }
         return std::string(buffer.GetString(), buffer.GetSize());
     }
 

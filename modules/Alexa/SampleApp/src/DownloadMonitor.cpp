@@ -18,18 +18,19 @@
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
-DownloadMonitor::DownloadMonitor(APLClient::Telemetry::DownloadMetricsEmitterPtr metricsEmitter)
-    : m_metricsEmitter{metricsEmitter} {}
+DownloadMonitor::DownloadMonitor(APLClient::Telemetry::DownloadMetricsEmitterPtr metricsEmitter) :
+        m_metricsEmitter{metricsEmitter} {
+}
 
 void DownloadMonitor::onDownloadStarted() {
     m_metricsEmitter->onDownloadStarted();
 }
 
-void DownloadMonitor::onDownloadComplete()  {
+void DownloadMonitor::onDownloadComplete() {
     m_metricsEmitter->onDownloadComplete();
 }
 
-void DownloadMonitor::onDownloadFailed()  {
+void DownloadMonitor::onDownloadFailed() {
     m_metricsEmitter->onDownloadFailed();
 }
 
@@ -37,9 +38,9 @@ void DownloadMonitor::onCacheHit() {
     m_metricsEmitter->onCacheHit();
 }
 
-void DownloadMonitor::onBytesRead(uint64_t numberOfBytes)  {
+void DownloadMonitor::onBytesRead(uint64_t numberOfBytes) {
     m_metricsEmitter->onBytesRead(numberOfBytes);
 }
 
-} // namespace sampleApp
-} // namespace alexaSmartScreenSDK
+}  // namespace sampleApp
+}  // namespace alexaSmartScreenSDK

@@ -75,6 +75,7 @@ public:
     static std::unique_ptr<SampleApplication> create(
         const std::vector<std::string>& configFiles,
         const std::string& pathToInputFolder,
+        const std::string& configSchemaPath,
         const std::string& logLevel = "",
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics =
             nullptr);
@@ -158,6 +159,7 @@ private:
     bool initialize(
         const std::vector<std::string>& configFiles,
         const std::string& pathToInputFolder,
+        const std::string& configSchemaPath,
         const std::string& logLevel,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics);
 

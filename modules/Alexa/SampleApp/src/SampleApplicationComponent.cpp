@@ -15,7 +15,6 @@
 
 #include <acsdkCore/CoreComponent.h>
 #include <acsdkManufactory/ComponentAccumulator.h>
-#include <acsdkManufactory/ConstructorAdapter.h>
 #include <acsdkShared/SharedComponent.h>
 #include <ContextManager/ContextManager.h>
 #include <acsdkDefaultSampleApplicationOptions/DefaultSampleApplicationOptionsComponent.h>
@@ -66,6 +65,27 @@ getSampleApplicationOptionsComponent() {
         ;
 }
 
+/**
+ * Function that returns a factory to instantiate @c LocaleAssetsManagerInterface.
+ *
+ * @param requiresShutdownList - The vector of @c RequiresShutdown pointers to which the @c LocaleAssetsManager will be
+ * added.
+ * @return An std::function to instantiate @c LocaleAssetsManagerInterface.
+ */
+static std::function<std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>(
+    const std::shared_ptr<avsCommon::utils::configuration::ConfigurationNode>&)>
+getCreateLocaleAssetsManagerInterface(
+    std::vector<std::shared_ptr<avsCommon::utils::RequiresShutdown>>& requiresShutdownList) {
+    return
+        [&requiresShutdownList](const std::shared_ptr<avsCommon::utils::configuration::ConfigurationNode>& configNode) {
+            auto manager = sampleApp::LocaleAssetsManager::createLocaleAssetsManager(configNode);
+            if (manager) {
+                requiresShutdownList.push_back(manager);
+            }
+            return manager;
+        };
+}
+
 Component<
     std::shared_ptr<avsCommon::avs::initialization::AlexaClientSDKInit>,
     std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface>,
@@ -74,21 +94,23 @@ Component<
     std::shared_ptr<avsCommon::utils::DeviceInfo>,
     std::shared_ptr<registrationManager::CustomerDataManager>,
     std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>
-getComponent(std::unique_ptr<avsCommon::avs::initialization::InitializationParameters> initParams) {
+getComponent(
+    std::unique_ptr<avsCommon::avs::initialization::InitializationParameters> initParams,
+    std::vector<std::shared_ptr<avsCommon::utils::RequiresShutdown>>& requiresShutdownList) {
     return ComponentAccumulator<>()
 #ifdef ACSDK_ACS_UTILS
-        .addComponent(acsdkACSSampleApplicationOptions::getComponent())
+        .addComponent(acsdkSampleApplication::getSampleApplicationOptionsComponent())
 #else
         .addComponent(getSampleApplicationOptionsComponent())
 #endif
         .addPrimaryFactory(AlexaClientSDKInit::getCreateAlexaClientSDKInit(std::move(initParams)))
         .addRetainedFactory(avsCommon::utils::configuration::ConfigurationNode::createRoot)
         .addUniqueFactory(avsCommon::utils::libcurlUtils::HttpPost::createHttpPostInterface)
-        .addRetainedFactory(ConstructorAdapter<avsCommon::utils::timing::MultiTimer>::get())
-        .addRetainedFactory(sampleApp::LocaleAssetsManager::createLocaleAssetsManagerInterface)
+        .addRetainedFactory(avsCommon::utils::timing::MultiTimer::createMultiTimer)
+        .addRetainedFactory(getCreateLocaleAssetsManagerInterface(requiresShutdownList))
         .addRetainedFactory(contextManager::ContextManager::createContextManagerInterface)
         .addRetainedFactory(avsCommon::utils::DeviceInfo::createFromConfiguration)
-        .addRetainedFactory(ConstructorAdapter<registrationManager::CustomerDataManager>::get());
+        .addRetainedFactory(registrationManager::CustomerDataManager::createCustomerDataManager);
 }
 
 }  // namespace sampleApp

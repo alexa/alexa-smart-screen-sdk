@@ -39,22 +39,22 @@ public:
         /**
          * Called at the start of a download, when a resource is not found in the cache.
          */
-        virtual void onDownloadStarted() {};
+        virtual void onDownloadStarted(){};
 
         /**
          * Called when a resource was not found in the cache and has successfully been downloaded.
          */
-        virtual void onDownloadComplete() {};
+        virtual void onDownloadComplete(){};
 
         /**
          * Called when a resource was not found in the cache and the attempt to download it has failed.
          */
-        virtual void onDownloadFailed() {};
+        virtual void onDownloadFailed(){};
 
         /**
          * Called when a resource was found in the cache and downloading is not attempted.
          */
-        virtual void onCacheHit() {};
+        virtual void onCacheHit(){};
 
         /**
          * Called during the download of a resource. Observers should expect multiple calls
@@ -62,7 +62,7 @@ public:
          *
          * @param numberOfBytes The number of bytes that have been downloaded.
          */
-        virtual void onBytesRead(uint64_t numberOfBytes) {};
+        virtual void onBytesRead(uint64_t numberOfBytes){};
     };
 
     /**
@@ -112,7 +112,7 @@ public:
          * @param importTime Time when the item was inserted into cache
          * @param content The content of the item
          */
-        CachedContent(std::chrono::system_clock::time_point importTime, const std::string &content);
+        CachedContent(std::chrono::system_clock::time_point importTime, const std::string& content);
     };
 
 private:

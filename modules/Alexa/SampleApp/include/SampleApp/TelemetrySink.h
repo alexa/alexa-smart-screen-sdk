@@ -27,9 +27,7 @@ namespace sampleApp {
  */
 class TelemetrySink : public APLClient::Telemetry::AplMetricsSinkInterface {
 public:
-    TelemetrySink(
-        std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>
-            metricRecorder);
+    TelemetrySink(std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder);
     ~TelemetrySink() override = default;
 
     /**
@@ -38,8 +36,10 @@ public:
      * @param name The name of the timer to report
      * @param value The elapsed time recorded by the timer
      */
-    void reportTimer(const std::map<std::string, std::string> &metadata, const std::string& name,
-                     const std::chrono::nanoseconds& value) override;
+    void reportTimer(
+        const std::map<std::string, std::string>& metadata,
+        const std::string& name,
+        const std::chrono::nanoseconds& value) override;
 
     /**
      * Outputs a counter value through this instance's metrics recorder.
@@ -47,14 +47,14 @@ public:
      * @param name The name of the counter to report
      * @param value The recorded value of the counter
      */
-    void reportCounter(const std::map<std::string, std::string> &metadata, const std::string& name,
-                       uint64_t value) override;
+    void reportCounter(const std::map<std::string, std::string>& metadata, const std::string& name, uint64_t value)
+        override;
 
 private:
     std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> m_metricRecorder;
 };
 
-} // namespace sampleApp
-} // namespace alexaSmartScreenSDK
+}  // namespace sampleApp
+}  // namespace alexaSmartScreenSDK
 
-#endif // ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_TELEMETRYSINK_H_
+#endif  // ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_TELEMETRYSINK_H_

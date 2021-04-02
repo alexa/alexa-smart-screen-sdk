@@ -21,6 +21,7 @@
 #include <rapidjson/document.h>
 
 #include <AVSCommon/AVS/FocusState.h>
+#include <AVSCommon/SDKInterfaces/CallStateObserverInterface.h>
 #include <SmartScreenSDKInterfaces/AudioPlayerInfo.h>
 #include <Captions/CaptionFrame.h>
 
@@ -114,6 +115,42 @@ const char GUI_MSG_AUDIO_PLAYER_STATE_TAG[] = "audioPlayerState";
 /// The audioOffset json key in the message.
 const char GUI_MSG_AUDIO_OFFSET_TAG[] = "audioOffset";
 
+/// The message type for callStateChange.
+const std::string GUI_MSG_TYPE_CALL_STATE_CHANGE("callStateChange");
+
+/// The callState json key in the message.
+const std::string GUI_MSG_CALL_STATE_TAG("callState");
+
+/// The callType json key in the message.
+const std::string GUI_MSG_CALL_TYPE_TAG("callType");
+
+/// The previousSipUserAgentState json key in the message.
+const std::string GUI_MSG_PREVIOUS_SIP_USER_AGENT_STATE_TAG("previousSipUserAgentState");
+
+/// The currentSipUserAgentState json key in the message.
+const std::string GUI_MSG_CURRENT_SIP_USER_AGENT_STATE_TAG("currentSipUserAgentState");
+
+/// The displayName json key in the message.
+const std::string GUI_MSG_DISPLAY_NAME_TAG("displayName");
+
+/// The endpointLabel json key in the message.
+const std::string GUI_MSG_END_POINT_LABEL_TAG("endpointLabel");
+
+/// The inboundCalleeName json key in the message.
+const std::string GUI_MSG_INBOUND_CALLEE_NAME_TAG("inboundCalleeName");
+
+/// The callProviderType json key in the message.
+const std::string GUI_MSG_CALL_PROVIDER_TYPE_TAG("callProviderType");
+
+/// The inboundRingtoneUrl json key in the message.
+const std::string GUI_MSG_INBOUND_RINGTONE_URL_TAG("inboundRingtoneUrl");
+
+/// The outboundRingbackUrl json key in the message.
+const std::string GUI_MSG_OUTBOUND_RINGBACK_URL_TAG("outboundRingbackUrl");
+
+/// The isDropIn json key in the message.
+const std::string GUI_MSG_IS_DROP_IN_TAG("isDropIn");
+
 /**
  * The @c GUIClientMessage base class for @c Messages sent to GUI Client.
  */
@@ -179,6 +216,37 @@ public:
         setState(alexaState);
     }
 };
+
+#ifdef ENABLE_COMMS
+/**
+ * The @c CallStateChangeMessage contains information for communicating call state info to the GUI Client.
+ */
+class CallStateChangeMessage : public GUIClientMessage {
+public:
+    /**
+     * Constructor.
+     *
+     * @param callStateInfo The Comms client call state info.
+     */
+    CallStateChangeMessage(
+        const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo& callStateInfo) :
+            GUIClientMessage(GUI_MSG_TYPE_CALL_STATE_CHANGE) {
+        std::ostringstream oss;
+        oss << callStateInfo.callState;
+        addMember(GUI_MSG_CALL_STATE_TAG, oss.str());
+        addMember(GUI_MSG_CALL_TYPE_TAG, callStateInfo.callType);
+        addMember(GUI_MSG_PREVIOUS_SIP_USER_AGENT_STATE_TAG, callStateInfo.previousSipUserAgentState);
+        addMember(GUI_MSG_CURRENT_SIP_USER_AGENT_STATE_TAG, callStateInfo.currentSipUserAgentState);
+        addMember(GUI_MSG_DISPLAY_NAME_TAG, callStateInfo.displayName);
+        addMember(GUI_MSG_END_POINT_LABEL_TAG, callStateInfo.endpointLabel);
+        addMember(GUI_MSG_INBOUND_CALLEE_NAME_TAG, callStateInfo.inboundCalleeName);
+        addMember(GUI_MSG_CALL_PROVIDER_TYPE_TAG, callStateInfo.callProviderType);
+        addMember(GUI_MSG_INBOUND_RINGTONE_URL_TAG, callStateInfo.inboundRingtoneUrl);
+        addMember(GUI_MSG_OUTBOUND_RINGBACK_URL_TAG, callStateInfo.outboundRingbackUrl);
+        addMember(GUI_MSG_IS_DROP_IN_TAG, callStateInfo.isDropIn);
+    }
+};
+#endif
 
 /**
  * The @c GuiConfigurationMessage contains configuration data for configuring the windows and functionality of the GUI

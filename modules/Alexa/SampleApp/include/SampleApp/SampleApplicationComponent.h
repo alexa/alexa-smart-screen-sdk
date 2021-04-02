@@ -63,7 +63,9 @@ alexaClientSDK::acsdkManufactory::Component<
     std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo>,
     std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager>,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>>
-getComponent(std::unique_ptr<alexaClientSDK::avsCommon::avs::initialization::InitializationParameters> initParams);
+getComponent(
+    std::unique_ptr<alexaClientSDK::avsCommon::avs::initialization::InitializationParameters> initParams,
+    std::vector<std::shared_ptr<alexaClientSDK::avsCommon::utils::RequiresShutdown>>& requiresShutdownList);
 
 }  // namespace sampleApp
 }  // namespace alexaSmartScreenSDK

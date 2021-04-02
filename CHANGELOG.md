@@ -1,8 +1,24 @@
+### v2.6.0 released 04/01/2021:
+#### Enhancements
+* Upgraded dependency to Device SDK 1.23.0 [https://github.com/alexa/avs-device-sdk/tree/v1.23.0]
+* Added support for video calling with Alexa Communication. Customers who want to enable this feature should contact their Alexa representative. Video calling is currently only supported on Linux devices.
+* Added support for SmartScreenSDKConfig.json validation for DCMAKE_BUILD_TYPE=DEBUG mode with SampleApp runtime parameter '-S <path-to-ss-sdk-schema-file>'
+* Improved the SDK handling for rendering directives for invalid window id
+* Updated webpack version to 5.28.0 and refreshed the package-lock.json with new dependencies. Note that users upgrading
+  to this version will need to remove the existing node modules from `modules/GUI/js/node_modules` before the build.
+
+#### Bug fixes
+* Added support to handle document with incorrect windowId gracefully
+* Fixed issue with audio player still playing after user barge-in clears the screen during transitions
+* Fixed issues with Finish APL ExecuteCommand ending all ongoing activities
+* Fixed intermittent issue with Audio Player playing queued up speakItem for inactive window
+* Fixed issues related to uninitialized scalar, uncaught exceptions, big parameter pass-by-value and unchecked return values
+
 ### v2.5.0 released 02/01/2021:
 #### Enhancements
 * Upgraded dependency to Device SDK 1.22.0 [https://github.com/alexa/avs-device-sdk/tree/v1.22.0]
 * Added support for multiple concurrent APL clients
-* Added support for APL 1.5 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
+* Added support for APL 1.5 [https://aplspec.aka.corp.amazon.com/release-1.5/html/index.html#apl-specification-1-5]
 * Ported DISABLE_DUCKING cmake configuration from Alexa-device-sdk
 * Music playback now ducks instead of pauses when APL TTS is executed
 * Updated ini patch version to 1.3.6
@@ -30,7 +46,7 @@
  
 #### Enhancements
 * Upgraded dependency to Device SDK 1.20.1 [https://github.com/alexa/avs-device-sdk/tree/v1.20.1]
-* Support for APL 1.4 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-4.html]
+* Support for APL 1.4 [https://aplspec.aka.corp.amazon.com/release-1.4/html/index.html#apl-specification-1-4]
 * Added APL Telemetry Support
 * TV Overlay Portrait is no longer supported
 * Added support for APL Extensions [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html#apl-extensions-and-the-backstack]

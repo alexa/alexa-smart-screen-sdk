@@ -1,5 +1,16 @@
 /*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
  */
 
 import * as React from 'react';
@@ -119,6 +130,7 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
   protected windowInactiveTransition : string;
   protected windowActiveTransitionInMS : number;
   protected windowInactiveTransitionInMS : number;
+  protected audioPlayer : AVSAudioPlayer;
 
   constructor(props : IAPLRendererWindowProps) {
     super(props);
@@ -220,7 +232,8 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
   }
 
   protected createAudioPlayer(eventListener : IAudioEventListener) : AudioPlayer {
-    return new AVSAudioPlayer(this.props.focusManager, this.props.activityTracker, eventListener);
+    this.audioPlayer = new AVSAudioPlayer(this.props.focusManager, this.props.activityTracker, eventListener);
+    return this.audioPlayer;
   }
 
   protected createRenderer() {
@@ -284,10 +297,20 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
     }
   }
 
+  protected flushAudioPlayer() {
+    if (this.audioPlayer) {
+      this.audioPlayer.flush();
+    }
+  }
+
   protected async setInactive() {
       this.setState({
         windowState : APLRendererWindowState.INACTIVE
       });
+
+      // Flush audioPlayer for this window before destroying renderer
+      this.flushAudioPlayer();
+
       // Allow window to transition before destroying renderer
       await Timer.delay(this.windowInactiveTransitionInMS);
       // Make sure we didn't become active again before destroying

@@ -22,11 +22,13 @@
 #include <AVSCommon/Utils/LibcurlUtils/HTTPContentFetcherFactory.h>
 
 #include <acsdkAudioPlayer/AudioPlayerComponent.h>
+#include <acsdkBluetooth/BluetoothComponent.h>
 #include <acsdkExternalMediaPlayer/ExternalMediaPlayerComponent.h>
-#include <acsdkManufactory/ConstructorAdapter.h>
 #include <acsdkPostConnectOperationProviderRegistrar/PostConnectOperationProviderRegistrar.h>
 #include <acsdkShared/SharedComponent.h>
 #include <acsdkShutdownManagerInterfaces/ShutdownNotifierInterface.h>
+#include <acsdkSystemClockMonitor/SystemClockMonitor.h>
+#include <acsdkSystemClockMonitor/SystemClockNotifier.h>
 #include <AFML/FocusManagementComponent.h>
 #include <AVSCommon/SDKInterfaces/AudioFocusAnnotation.h>
 #include <AVSCommon/AVS/Attachment/AttachmentManager.h>
@@ -47,6 +49,7 @@
 #include <PlaybackController/PlaybackRouter.h>
 #include <SpeakerManager/SpeakerManagerComponent.h>
 #include <SynchronizeStateSender/SynchronizeStateSenderFactory.h>
+#include <SystemSoundPlayer/SystemSoundPlayer.h>
 #include <TemplateRuntime/RenderPlayerInfoCardsProviderRegistrar.h>
 
 #include "SmartScreenClient/DefaultClientComponent.h"
@@ -65,6 +68,7 @@ using namespace alexaClientSDK::acsdkManufactory;
 using namespace alexaClientSDK::acsdkPostConnectOperationProviderRegistrar;
 using namespace alexaClientSDK::acsdkPostConnectOperationProviderRegistrarInterfaces;
 using namespace alexaClientSDK::acsdkShutdownManagerInterfaces;
+using namespace alexaClientSDK::applicationUtilities;
 using namespace alexaClientSDK::avsCommon::avs::attachment;
 using namespace alexaClientSDK::avsCommon::utils;
 using namespace alexaClientSDK::avsCommon::utils::libcurlUtils;
@@ -172,17 +176,17 @@ getCreateApplicationAudioPipelineFactory(
 static std::function<std::shared_ptr<settings::storage::DeviceSettingStorageInterface>()>
 getCreateDeviceSettingStorageInterface(std::shared_ptr<settings::storage::DeviceSettingStorageInterface> storage) {
     return [storage]() -> std::shared_ptr<settings::storage::DeviceSettingStorageInterface> {
-      if (!storage) {
-          ACSDK_ERROR(LX("getCreateDeviceSettingStorageInterfaceFailed").d("isStorageNull", !storage));
-          return nullptr;
-      }
+        if (!storage) {
+            ACSDK_ERROR(LX("getCreateDeviceSettingStorageInterfaceFailed").d("isStorageNull", !storage));
+            return nullptr;
+        }
 
-      if (!storage->open()) {
-          ACSDK_ERROR(LX("getCreateDeviceSettingStorageInterfaceFailed").d("reason", "failed to open"));
-          return nullptr;
-      }
+        if (!storage->open()) {
+            ACSDK_ERROR(LX("getCreateDeviceSettingStorageInterfaceFailed").d("reason", "failed to open"));
+            return nullptr;
+        }
 
-      return storage;
+        return storage;
     };
 }
 
@@ -213,10 +217,23 @@ SmartScreenClientComponent getComponent(
     const std::shared_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface>& deviceSettingStorage,
     bool startAlertSchedulingOnInitialization,
     const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::AudioFactoryInterface>& audioFactory,
-    const std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface>& alertStorage) {
+    const std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface>& alertStorage,
+    const std::shared_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceManagerInterface>& bluetoothDeviceManager,
+    const std::shared_ptr<acsdkBluetoothInterfaces::BluetoothStorageInterface>& bluetoothStorage,
+    const std::shared_ptr<acsdkBluetoothInterfaces::BluetoothDeviceConnectionRulesProviderInterface>&
+        bluetoothConnectionRulesProvider) {
+    std::shared_ptr<avsCommon::utils::bluetooth::BluetoothEventBus> bluetoothEventBus;
+    if (bluetoothDeviceManager) {
+        bluetoothEventBus = bluetoothDeviceManager->getEventBus();
+    } else {
+        bluetoothEventBus = nullptr;
+    }
+
     return ComponentAccumulator<>()
         .addComponent(acsdkDeviceSettingsManager::getComponent())
         .addComponent(acsdkShared::getComponent())
+        .addRetainedFactory(acsdkSystemClockMonitor::SystemClockMonitor::createSystemClockMonitorInterface)
+        .addRetainedFactory(acsdkSystemClockMonitor::SystemClockNotifier::createSystemClockNotifierInterface)
         .addInstance(authDelegate)
         .addInstance(contextManager)
         .addInstance(localeAssetsManager)
@@ -240,11 +257,16 @@ SmartScreenClientComponent getComponent(
         .addInstance(systemTimeZone)
         .addInstance(audioFactory)
         .addInstance(alertStorage)
+        .addInstance(bluetoothConnectionRulesProvider)
+        .addInstance(bluetoothDeviceManager)
+        .addInstance(bluetoothEventBus)
+        .addInstance(bluetoothStorage)
         .addComponent(capabilityAgents::speakerManager::getComponent())
         .addComponent(captions::getComponent())
         .addRetainedFactory(HTTPContentFetcherFactory::createHTTPContentFetcherInterfaceFactoryInterface)
         .addRetainedFactory(AVSConnectionManager::createAVSConnectionManagerInterface)
         .addRetainedFactory(getCreateMessageRouter(messageRouterFactory))
+        .addRetainedFactory(systemSoundPlayer::SystemSoundPlayer::createSystemSoundPlayerInterface)
         .addRetainedFactory(AttachmentManager::createInProcessAttachmentManagerInterface)
         .addRetainedFactory(PostConnectOperationProviderRegistrar::createPostConnectOperationProviderRegistrarInterface)
         .addUniqueFactory(SQLiteCapabilitiesDelegateStorage::createCapabilitiesDelegateStorageInterface)
@@ -267,6 +289,7 @@ SmartScreenClientComponent getComponent(
                                 createRenderPlayerInfoCardsProviderRegistrarInterface)
         .addComponent(acsdkAlerts::getComponent(startAlertSchedulingOnInitialization))
         .addComponent(acsdkAudioPlayer::getBackwardsCompatibleComponent())
+        .addComponent(acsdkBluetooth::getComponent())
         .addComponent(acsdkDoNotDisturb::getComponent())
         .addRetainedFactory(certifiedSender::CertifiedSender::create)
         .addComponent(acsdkExternalMediaPlayer::getBackwardsCompatibleComponent(adapterCreationMap));

@@ -13,21 +13,23 @@
  * permissions and limitations under the License.
  */
 
-'use strict';
+// Stub implementation
 
-/**
- * Copy of AVSCommon/AVS/FocusState
- *
- * @enum
- * @exports
- */
-export enum FocusState {
-    /// Represents the highest focus a Channel can have.
-    FOREGROUND = 'FOREGROUND',
+import * as React from 'react';
+import './commsWindow.css';
 
-    /// Represents the intermediate level focus a Channel can have.
-    BACKGROUND = 'BACKGROUND',
+import {IClient} from '../lib/messages/client';
+import {ICallStateChangeMessage} from '../lib/messages/messages';
 
-    /// This focus is used to represent when a Channel is not being used or when an observer should stop.
-    NONE = 'NONE'
+export const RENDER_COMMS_WINDOW_ID = 'renderCommsWindow';
+
+interface ICommsWindowProps {
+        callStateInfo : ICallStateChangeMessage;
+        client : IClient;
+}
+
+export class CommsWindow extends React.Component<ICommsWindowProps> {
+    public render() : React.ReactNode {
+        return null;
+    }
 }

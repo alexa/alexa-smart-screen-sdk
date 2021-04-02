@@ -99,6 +99,12 @@ private:
 
     /// When COMMS is enabled, this will hold the CallManager.
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface> m_callManager;
+
+    /// When COMMS is enabled, this will hold the DialogUXStateAggregator
+    std::shared_ptr<alexaClientSDK::avsCommon::avs::DialogUXStateAggregator> m_dialogUXStateAggregator;
+
+    /// When GUI is enabled, this will hold the visual focus manager.
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface> m_visualFocusManager;
 };
 
 }  // namespace sampleApp

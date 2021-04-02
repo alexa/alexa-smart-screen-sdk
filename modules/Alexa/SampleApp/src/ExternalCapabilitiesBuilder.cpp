@@ -61,7 +61,8 @@ ExternalCapabilitiesBuilder::ExternalCapabilitiesBuilder(
 
 ExternalCapabilitiesBuilder& ExternalCapabilitiesBuilder::withVisualFocusManager(
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface> focusManager) {
-    // ExternalCapabilitiesBuilder doesn't need the focusManager to build any object.
+    ACSDK_DEBUG5(LX(__func__));
+    m_visualFocusManager = std::move(focusManager);
     return *this;
 }
 
@@ -92,7 +93,7 @@ ExternalCapabilitiesBuilder& ExternalCapabilitiesBuilder::withInternetConnection
 
 ExternalCapabilitiesBuilder& ExternalCapabilitiesBuilder::withDialogUXStateAggregator(
     std::shared_ptr<alexaClientSDK::avsCommon::avs::DialogUXStateAggregator> dialogUXStateAggregator) {
-    // ExternalCapabilitiesBuilder doesn't need the dialogUXStateAggregator to build any object.
+    m_dialogUXStateAggregator = std::move(dialogUXStateAggregator);
     return *this;
 }
 
@@ -138,15 +139,16 @@ ExternalCapabilitiesBuilder::buildCapabilities(
         return retValue;
     }
 
-    auto sipUserAgent = std::make_shared<capabilityAgents::callManager::SipUserAgent>();
+    auto sipUserAgent = std::make_shared<alexaClientSDK::capabilityAgents::callManager::SipUserAgent>();
     std::string avsGatewayURL = avsGatewayManager->getGatewayURL();
 
-    if (!capabilityAgents::callManager::CallManager::create(
+    if (!alexaClientSDK::capabilityAgents::callManager::CallManager::create(
             sipUserAgent,
             ringtoneMediaPlayer,
             messageSender,
             contextManager,
             audioFocusManager,
+            m_visualFocusManager,
             exceptionSender,
             audioFactory->communications(),
             avsGatewayURL,
@@ -156,14 +158,17 @@ ExternalCapabilitiesBuilder::buildCapabilities(
         return retValue;
     }
 
-    auto callManager = capabilityAgents::callManager::CallManager::getInstance();
+    auto callManager = alexaClientSDK::capabilityAgents::callManager::CallManager::getInstance();
 
     m_callManager = callManager;
 
-    const std::string commsVersion = capabilityAgents::callManager::CallManager::getCommsAdapterVersion();
-    std::shared_ptr<avsCommon::avs::ComponentConfiguration> commsConfig =
-        avsCommon::avs::ComponentConfiguration::createComponentConfiguration(COMMS_NAMESPACE, commsVersion);
+    const std::string commsVersion =
+        alexaClientSDK::capabilityAgents::callManager::CallManager::getCommsAdapterVersion();
+    std::shared_ptr<alexaClientSDK::avsCommon::avs::ComponentConfiguration> commsConfig =
+        alexaClientSDK::avsCommon::avs::ComponentConfiguration::createComponentConfiguration(
+            COMMS_NAMESPACE, commsVersion);
     softwareComponentReporter->addConfiguration(commsConfig);
+    m_dialogUXStateAggregator->addObserver(callManager);
     connectionManager->addConnectionStatusObserver(callManager);
     avsGatewayManager->addObserver(m_callManager);
 
@@ -177,13 +182,14 @@ ExternalCapabilitiesBuilder::buildCapabilities(
     requireShutdownObjects.push_back(m_callManager);
 
 #ifdef ENABLE_COMMS_AUDIO_PROXY
-    auto acquireAudioInputStream = [sharedDataStream]() -> std::shared_ptr<avsCommon::avs::AudioInputStream> {
+    auto acquireAudioInputStream =
+        [sharedDataStream]() -> std::shared_ptr<alexaClientSDK::avsCommon::avs::AudioInputStream> {
         return sharedDataStream;
     };
-    auto relinquishAudioInputStream = [](std::shared_ptr<avsCommon::avs::AudioInputStream> stream) {
+    auto relinquishAudioInputStream = [](std::shared_ptr<alexaClientSDK::avsCommon::avs::AudioInputStream> stream) {
         // Nothing to release
     };
-    auto callAudioDeviceProxy = capabilityAgents::callManager::CallAudioDeviceProxy::create(
+    auto callAudioDeviceProxy = alexaClientSDK::capabilityAgents::callManager::CallAudioDeviceProxy::create(
         commsMediaPlayer, commsSpeaker, acquireAudioInputStream, relinquishAudioInputStream);
     m_callManager->addObserver(callAudioDeviceProxy);
 #endif

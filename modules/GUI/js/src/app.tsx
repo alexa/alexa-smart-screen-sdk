@@ -1,5 +1,16 @@
 /*
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
  */
 
 import * as React from 'react';
@@ -10,6 +21,7 @@ import {NavigationEvent} from './lib/messages/NavigationEvent';
 import {Client, IClient, IClientConfig} from './lib/messages/client';
 import {
     AlexaState,
+    CallState,
     IActivityReportMessage,
     IAlexaStateChangedMessage,
     IAPLCoreMessage,
@@ -17,6 +29,7 @@ import {
     IAuthorizationChangeMessage,
     IBaseInboundMessage,
     IBaseOutboundMessage,
+    ICallStateChangeMessage,
     IClearDocumentMessage,
     IDeviceWindowStateMessage,
     IDoNotDisturbSettingChangedMessage,
@@ -37,6 +50,7 @@ import {
     OutboundMessageType
 } from './lib/messages/messages';
 import {PlayerInfoWindow, RENDER_PLAYER_INFO_WINDOW_ID} from './components/PlayerInfoWindow';
+import {CommsWindow} from './components/CommsWindow';
 import {resolveRenderTemplate} from './lib/displayCards/AVSDisplayCardHelpers';
 import {SDKLogTransport} from './lib/messages/sdkLogTransport';
 import {ILogger, LoggerFactory} from 'apl-client';
@@ -58,7 +72,7 @@ const PORT = 8933;
 const APL_MAX_VERSION = '1.5';
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.5';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.6';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
@@ -68,6 +82,7 @@ declare const USE_UWP_CLIENT : boolean;
 
 export interface IAppState {
     alexaState : AlexaState;
+    callStateInfo : ICallStateChangeMessage;
     targetWindowId : string;
     playerInfoMessage : IRenderPlayerInfoMessage;
     updateActiveAPLRendererWindow : boolean;
@@ -212,6 +227,16 @@ export class App extends React.Component<any, IAppState> {
         });
     }
 
+    protected handleCallStateChangeMessage(message : IBaseInboundMessage) {
+        const callStateChangeMessage : ICallStateChangeMessage = message as ICallStateChangeMessage;
+
+        this.setState((prevState, props) => {
+            return {
+                callStateInfo: callStateChangeMessage
+            };
+        });
+    }
+
     protected handleRequestAuthorization(requestAuthorizationMessage : IRequestAuthorizationMessage) {
         /**
          * Use to present CBL authorization.
@@ -322,6 +347,10 @@ export class App extends React.Component<any, IAppState> {
                 this.handleAlexaStateChangedMessage(message);
                 break;
             }
+             case 'callStateChange': {
+                this.handleCallStateChangeMessage(message);
+                break;
+            }
             case 'focusResponse': {
                 this.handleFocusResponse(message);
                 break;
@@ -395,9 +424,24 @@ export class App extends React.Component<any, IAppState> {
         }
         this.aplConnection = new WebsocketConnectionWrapper(this.client);
         SDKLogTransport.initialize(this.client);
+        const callStateMessage : ICallStateChangeMessage = {
+            type: undefined,
+            callState: CallState.NONE,
+            callType: undefined,
+            previousSipUserAgentState: undefined,
+            currentSipUserAgentState: undefined,
+            displayName: undefined,
+            endpointLabel: undefined,
+            inboundCalleeName: undefined,
+            callProviderType: undefined,
+            inboundRingtoneUrl: undefined,
+            outboundRingbackUrl: undefined,
+            isDropIn: false
+        };
 
         this.state = {
             alexaState : AlexaState.IDLE,
+            callStateInfo : callStateMessage,
             playerInfoMessage : undefined,
             updateActiveAPLRendererWindow : false,
             targetWindowId : undefined,
@@ -524,6 +568,12 @@ export class App extends React.Component<any, IAppState> {
             aplCoreMessageHandlerCallback={this.setAPLCoreMessageHandler.bind(this)}
           />;
 
+        // Comms Window
+        const commsWindow = <CommsWindow
+            callStateInfo = {this.state.callStateInfo}
+            client={this.client}
+            />;
+
         // Create APL Renderer Windows from GUI App Config
         const aplRendererWindows = this.deviceAppConfig.rendererWindowConfigs.map((window) => {
             return (
@@ -552,6 +602,7 @@ export class App extends React.Component<any, IAppState> {
                     deviceAppConfig={this.deviceAppConfig}
                 />
                 {playerInfo}
+                {commsWindow}
                 {aplRendererWindows}
                 <VoiceChrome
                     deviceAppConfig={this.deviceAppConfig}

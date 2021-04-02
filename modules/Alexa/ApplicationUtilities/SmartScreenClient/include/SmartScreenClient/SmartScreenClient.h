@@ -29,6 +29,7 @@
 #include <acsdkAlerts/Renderer/Renderer.h>
 #include <acsdkAlerts/Storage/AlertStorageInterface.h>
 #include <acsdkApplicationAudioPipelineFactoryInterfaces/ApplicationAudioPipelineFactoryInterface.h>
+#include <acsdkSystemClockMonitorInterfaces/SystemClockMonitorInterface.h>
 #include <Alexa/AlexaInterfaceCapabilityAgent.h>
 #include <Alexa/AlexaInterfaceMessageSender.h>
 #include <ApiGateway/ApiGatewayCapabilityAgent.h>
@@ -68,9 +69,9 @@
 #include <AVSCommon/Utils/MediaPlayer/MediaPlayerInterface.h>
 #include <AVSCommon/Utils/Metrics/MetricRecorderInterface.h>
 #include <AVSCommon/Utils/Optional.h>
-#include <AVSCommon/Utils/Timing/SystemClockMonitor.h>
 #include <acsdkBluetooth/Bluetooth.h>
-#include <acsdkBluetooth/BluetoothStorageInterface.h>
+#include <acsdkBluetoothInterfaces/BluetoothStorageInterface.h>
+#include <acsdkBluetoothInterfaces/BluetoothNotifierInterface.h>
 #include <acsdkNotifications/NotificationRenderer.h>
 #include <acsdkNotifications/NotificationsCapabilityAgent.h>
 #include <Captions/CaptionManagerInterface.h>
@@ -147,16 +148,18 @@ class SmartScreenClient
         , public alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface {
 public:
     using SmartScreenClientManufactory = alexaClientSDK::acsdkManufactory::Manufactory<
-        std::shared_ptr<alexaClientSDK::acsdkAlerts::AlertsCapabilityAgent>,
+        std::shared_ptr<alexaClientSDK::acsdkAlertsInterfaces::AlertsCapabilityAgentInterface>,
         std::shared_ptr<
             alexaClientSDK::acsdkApplicationAudioPipelineFactoryInterfaces::ApplicationAudioPipelineFactoryInterface>,
         std::shared_ptr<alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerInterface>,
+        std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothNotifierInterface>,
         std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerRuntimeSetupInterface>,
         std::shared_ptr<alexaClientSDK::acsdkExternalMediaPlayer::ExternalMediaPlayer>,  /// Applications should not use
                                                                                          /// this export.
         std::shared_ptr<alexaClientSDK::acsdkExternalMediaPlayerInterfaces::ExternalMediaPlayerInterface>,
         std::shared_ptr<alexaClientSDK::acsdkShutdownManagerInterfaces::ShutdownManagerInterface>,
         std::shared_ptr<alexaClientSDK::acsdkStartupManagerInterfaces::StartupManagerInterface>,
+        std::shared_ptr<alexaClientSDK::acsdkSystemClockMonitorInterfaces::SystemClockMonitorInterface>,
         std::shared_ptr<alexaClientSDK::afml::interruptModel::InterruptModel>,
         std::shared_ptr<alexaClientSDK::avsCommon::avs::attachment::AttachmentManagerInterface>,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AuthDelegateInterface>,
@@ -177,6 +180,7 @@ public:
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PowerResourceManagerInterface>,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::RenderPlayerInfoCardsProviderRegistrarInterface>,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerManagerInterface>,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SystemSoundPlayerInterface>,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SystemTimeZoneInterface>,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::AudioFactoryInterface>,
         alexaClientSDK::acsdkManufactory::Annotated<
@@ -186,7 +190,6 @@ public:
         std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo>,
         std::shared_ptr<alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode>,
         std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>,
-        std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::SystemClockMonitor>,
         std::shared_ptr<alexaClientSDK::capabilityAgents::alexa::AlexaInterfaceMessageSender>,
         std::shared_ptr<alexaClientSDK::capabilityAgents::doNotDisturb::DoNotDisturbCapabilityAgent>,
         std::shared_ptr<alexaClientSDK::captions::CaptionManagerInterface>,
@@ -268,7 +271,7 @@ public:
 #endif
         std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsStorageInterface>
             notificationsStorage,
-        std::shared_ptr<alexaClientSDK::acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
+        std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface> bluetoothStorage,
         std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
             alexaDialogStateObservers,
         std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ConnectionStatusObserverInterface>>
@@ -421,7 +424,7 @@ AudioInputProcessor.
         std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsStorageInterface>
             notificationsStorage,
         std::unique_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
-        std::shared_ptr<alexaClientSDK::acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
+        std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface> bluetoothStorage,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
         std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
             alexaDialogStateObservers,
@@ -511,6 +514,11 @@ AudioInputProcessor.
      * Clear any rendering card on screen and sends @c TemplateDismissed event to AVS.
      */
     void clearCard();
+
+    /**
+     * Clear displaying APL card on screen.
+     */
+    void clearAPLCard();
 
     /**
      * Stops the foreground audio activity if there is one. This acts as a "stop" button that can be used to stop an
@@ -1027,6 +1035,16 @@ AudioInputProcessor.
     void stopCommsCall();
 
     /**
+     * Enables local video during a call.
+     */
+    void enableLocalVideo();
+
+    /**
+     * Disables local video during a call.
+     */
+    void disableLocalVideo();
+
+    /**
      * Sends an user event.
      * @param payload The input user event.
      */
@@ -1087,8 +1105,11 @@ AudioInputProcessor.
 
     /**
      * Clear all execute commands.
+     * @param token The token. This should be passed in if we are clearing execute commands due to APL-specific trigger
+     * (eg. Finish command). This should be left empty if we are clearing due to global triggers (eg. back navigation)
+     * @param markAsFailed mark cleared command as failed.
      */
-    void clearAllExecuteCommands();
+    void clearActiveExecuteCommandsDirective(const std::string& token = std::string(), const bool markAsFailed = true);
 
     /**
      * Set device window state.
@@ -1237,7 +1258,7 @@ private:
 #endif
         std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsStorageInterface>
             notificationsStorage,
-        std::shared_ptr<alexaClientSDK::acsdkBluetooth::BluetoothStorageInterface> bluetoothStorage,
+        std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface> bluetoothStorage,
         std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
             alexaDialogStateObservers,
         std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ConnectionStatusObserverInterface>>
@@ -1324,10 +1345,10 @@ private:
         m_apiGatewayCapabilityAgent;
 
     /// The alerts capability agent.
-    std::shared_ptr<alexaClientSDK::acsdkAlerts::AlertsCapabilityAgent> m_alertsCapabilityAgent;
+    std::shared_ptr<alexaClientSDK::acsdkAlertsInterfaces::AlertsCapabilityAgentInterface> m_alertsCapabilityAgent;
 
-    /// The bluetooth capability agent.
-    std::shared_ptr<alexaClientSDK::acsdkBluetooth::Bluetooth> m_bluetooth;
+    /// The bluetooth notifier.
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothNotifierInterface> m_bluetoothNotifier;
 
     /// The interaction model capability agent.
     std::shared_ptr<alexaClientSDK::capabilityAgents::interactionModel::InteractionModelCapabilityAgent>
@@ -1433,7 +1454,8 @@ private:
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> m_diagnostics;
 
     /// The system clock monitor.
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::SystemClockMonitor> m_systemClockMonitor;
+    std::shared_ptr<alexaClientSDK::acsdkSystemClockMonitorInterfaces::SystemClockMonitorInterface>
+        m_systemClockMonitor;
 
     /// The list of objects to be shutdown. Shutdown will occur in the reverse order of occurrence.
     std::list<std::shared_ptr<alexaClientSDK::avsCommon::utils::RequiresShutdown>> m_shutdownObjects;
@@ -1442,7 +1464,7 @@ private:
     std::shared_ptr<ConnectionRetryTrigger> m_connectionRetryTrigger;
 
     /// Device Timezone Offset in milliseconds.
-    std::chrono::milliseconds m_deviceTimeZoneOffset;
+    std::chrono::milliseconds m_deviceTimeZoneOffset{};
 
     /// A set of SoftwareInfoSenderObservers.
     std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SoftwareInfoSenderObserverInterface>>

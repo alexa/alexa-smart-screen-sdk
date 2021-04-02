@@ -27,8 +27,7 @@ namespace sssdkCommon {
 
 using namespace alexaClientSDK;
 
-class NullEqualizer
-    : public acsdkEqualizerInterfaces::EqualizerInterface {
+class NullEqualizer : public acsdkEqualizerInterfaces::EqualizerInterface {
 public:
     NullEqualizer();
 

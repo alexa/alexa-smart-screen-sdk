@@ -208,6 +208,36 @@ This message informs the client of any changes to the DoNotDisturb setting
 }
 ```
 
+## CallStateChange
+
+This message is sent to the client to provide comms call state information.
+
+```javascript
+enum CallState {
+    UNKNOWN = 'UNKNOWN',
+    CONNECTING = 'CONNECTING',
+    INBOUND_RINGING = 'INBOUND_RINGING',
+    CALL_CONNECTED = 'CALL_CONNECTED',
+    CALL_DISCONNECTED = 'CALL_DISCONNECTED',
+    NONE = 'NONE'
+}
+
+{
+  type: 'callStateChange',
+  state: CallState,
+  callType : string,
+  previousSipUserAgentState : string,
+  currentSipUserAgentState : string,
+  displayName : string,
+  endpointLabel : string,
+  inboundCalleeName : string,
+  callProviderType : string,
+  inboundRingtoneUrl : string,
+  outboundRingbackUrl : string,
+  isDropIn : boolean
+}
+```
+
 # Client -> Server (Outbound)
 
 ## initResponse
@@ -377,12 +407,12 @@ This message is sent to the SDK to toggle the on/off for displaying captions
 }
 ```
 
-## toggleDoNotDisturbEvent
+## toggleDoNotDisturb
 
 This message is sent to the SDK to toggle the on/off for the DoNotDisturb Setting
 ```javascript
 {
-    type: 'toggleDoNotDisturbEvent'
+    type: 'toggleDoNotDisturb'
 }
 ```
 
@@ -403,5 +433,16 @@ type LogLevel =
     level : LogLevel,
     component : string,
     message : string
+}
+```
+
+## SendDtmfMessage
+
+This message is sent to the SDK from the client in support of comms and contains a DTMF (Dual Tone Multi-Frequency) key to signal to the peer.
+
+```javascript
+{
+    type: 'sendDtmf',
+    dtmfTone : string
 }
 ```

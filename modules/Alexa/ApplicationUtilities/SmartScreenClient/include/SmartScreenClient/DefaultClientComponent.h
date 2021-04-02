@@ -20,14 +20,18 @@
 
 #include <ACL/Transport/MessageRouterFactoryInterface.h>
 #include <acsdkAlerts/Storage/AlertStorageInterface.h>
-#include <acsdkAlerts/AlertsCapabilityAgent.h>
+#include <acsdkAlertsInterfaces/AlertsCapabilityAgentInterface.h>
 #include <acsdkAudioPlayerInterfaces/AudioPlayerInterface.h>
 #include <acsdkApplicationAudioPipelineFactoryInterfaces/ApplicationAudioPipelineFactoryInterface.h>
+#include <acsdkBluetoothInterfaces/BluetoothDeviceConnectionRulesProviderInterface.h>
+#include <acsdkBluetoothInterfaces/BluetoothNotifierInterface.h>
+#include <acsdkBluetoothInterfaces/BluetoothStorageInterface.h>
 #include <acsdkDoNotDisturb/DoNotDisturbCapabilityAgent.h>
 #include <acsdkExternalMediaPlayer/ExternalMediaPlayer.h>
 #include <acsdkManufactory/Component.h>
 #include <acsdkShutdownManagerInterfaces/ShutdownManagerInterface.h>
 #include <acsdkStartupManagerInterfaces/StartupManagerInterface.h>
+#include <acsdkSystemClockMonitorInterfaces/SystemClockMonitorInterface.h>
 #include <AVSCommon/SDKInterfaces/AudioFocusAnnotation.h>
 #include <Alexa/AlexaInterfaceMessageSender.h>
 #include <AVSCommon/SDKInterfaces/AuthDelegateInterface.h>
@@ -44,12 +48,12 @@
 #include <AVSCommon/SDKInterfaces/LocaleAssetsManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/PowerResourceManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/RenderPlayerInfoCardsProviderRegistrarInterface.h>
+#include <AVSCommon/SDKInterfaces/Bluetooth/BluetoothDeviceManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/Endpoints/EndpointBuilderInterface.h>
 #include <AVSCommon/SDKInterfaces/Storage/MiscStorageInterface.h>
 #include <AVSCommon/SDKInterfaces/SystemTimeZoneInterface.h>
 #include <AVSCommon/Utils/Configuration/ConfigurationNode.h>
 #include <AVSCommon/Utils/DeviceInfo.h>
-#include <AVSCommon/Utils/Timing/SystemClockMonitor.h>
 #include <Captions/CaptionManagerInterface.h>
 #include <CertifiedSender/CertifiedSender.h>
 #include <CertifiedSender/MessageStorageInterface.h>
@@ -68,11 +72,14 @@ namespace smartScreenClient {
  * Definition of a Manufactory component for the Smart Screen Client.
  */
 using SmartScreenClientComponent = alexaClientSDK::acsdkManufactory::Component<
-    std::shared_ptr<alexaClientSDK::acsdkAlerts::AlertsCapabilityAgent>,
-    std::shared_ptr<alexaClientSDK::acsdkApplicationAudioPipelineFactoryInterfaces::ApplicationAudioPipelineFactoryInterface>,
+    std::shared_ptr<alexaClientSDK::acsdkAlertsInterfaces::AlertsCapabilityAgentInterface>,
+    std::shared_ptr<
+        alexaClientSDK::acsdkApplicationAudioPipelineFactoryInterfaces::ApplicationAudioPipelineFactoryInterface>,
     std::shared_ptr<alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerInterface>,
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothNotifierInterface>,
     std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerRuntimeSetupInterface>,
-    std::shared_ptr<alexaClientSDK::acsdkExternalMediaPlayer::ExternalMediaPlayer>,  /// Applications should not use this export.
+    std::shared_ptr<alexaClientSDK::acsdkExternalMediaPlayer::ExternalMediaPlayer>,  /// Applications should not use
+                                                                                     /// this export.
     std::shared_ptr<alexaClientSDK::acsdkExternalMediaPlayerInterfaces::ExternalMediaPlayerInterface>,
     std::shared_ptr<alexaClientSDK::acsdkShutdownManagerInterfaces::ShutdownManagerInterface>,
     std::shared_ptr<alexaClientSDK::acsdkStartupManagerInterfaces::StartupManagerInterface>,
@@ -96,16 +103,17 @@ using SmartScreenClientComponent = alexaClientSDK::acsdkManufactory::Component<
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PowerResourceManagerInterface>,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::RenderPlayerInfoCardsProviderRegistrarInterface>,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerManagerInterface>,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SystemSoundPlayerInterface>,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SystemTimeZoneInterface>,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::AudioFactoryInterface>,
-        alexaClientSDK::acsdkManufactory::Annotated<
-            alexaClientSDK::avsCommon::sdkInterfaces::endpoints::DefaultEndpointAnnotation,
-            alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointBuilderInterface>,
+    alexaClientSDK::acsdkManufactory::Annotated<
+        alexaClientSDK::avsCommon::sdkInterfaces::endpoints::DefaultEndpointAnnotation,
+        alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointBuilderInterface>,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo>,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode>,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>,
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::SystemClockMonitor>,
+    std::shared_ptr<alexaClientSDK::acsdkSystemClockMonitorInterfaces::SystemClockMonitorInterface>,
     std::shared_ptr<alexaClientSDK::capabilityAgents::alexa::AlexaInterfaceMessageSender>,
     std::shared_ptr<alexaClientSDK::capabilityAgents::doNotDisturb::DoNotDisturbCapabilityAgent>,
     std::shared_ptr<alexaClientSDK::captions::CaptionManagerInterface>,
@@ -152,7 +160,12 @@ SmartScreenClientComponent getComponent(
     const std::shared_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface>& deviceSettingStorage,
     bool startAlertSchedulingOnInitialization,
     const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::audio::AudioFactoryInterface>& audioFactory,
-    const std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface>& alertStorage);
+    const std::shared_ptr<alexaClientSDK::acsdkAlerts::storage::AlertStorageInterface>& alertStorage,
+    const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceManagerInterface>&
+        bluetoothDeviceManager,
+    const std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface>& bluetoothStorage,
+    const std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothDeviceConnectionRulesProviderInterface>&
+        bluetoothConnectionRulesProvider);
 
 }  // namespace smartScreenClient
 }  // namespace alexaSmartScreenSDK
