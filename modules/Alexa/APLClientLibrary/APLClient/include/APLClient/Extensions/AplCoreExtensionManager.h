@@ -17,7 +17,6 @@
 #define ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_APL_EXTENSIONS_APLCOREEXTENSIONMANAGER_H
 
 #include <map>
-// TODO: Tidy up core to prevent this (ELON-4186)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreorder"
 #pragma push_macro("DEBUG")

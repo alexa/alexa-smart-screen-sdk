@@ -1,3 +1,19 @@
+### v2.7.0 released 06/01/2021:
+#### Enhancements
+* Upgraded dependency to Device SDK 1.24.0 [https://github.com/alexa/avs-device-sdk/tree/v1.24.0]
+* Added support for APL 1.6 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
+* Added support for Alexa.Presentation.APL 1.3 [https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/presentation-apl.html#version-changes]
+* Added support for timeoutType from Alexa.Presentation.APL RenderDocument directives [https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/presentation-apl.html#renderdocument]
+* Moved metric payload handling logic into APLClientLibrary
+* Removed user-specified schema path for SmartScreenSDKConfig.json validation in favor of internal schema file
+* Hardened AlexaPresentation CA logic to align with the existing limitation of only being able to support one active APL directive document at a time
+* Upgraded Node version requirement to 14.0, added Node version check
+* Added warning message when building in DEBUG mode
+
+#### Bug fixes
+* Fixed issue that RenderPlayerInfo card does not get rendered until the previously displayed APL card times out.
+* Fixed issue that AlexaPresentation CA sends incorrect IPC messages to GUI App, causing GUI App to maintain an incorrect window state.
+
 ### v2.6.0 released 04/01/2021:
 #### Enhancements
 * Upgraded dependency to Device SDK 1.23.0 [https://github.com/alexa/avs-device-sdk/tree/v1.23.0]
@@ -18,7 +34,7 @@
 #### Enhancements
 * Upgraded dependency to Device SDK 1.22.0 [https://github.com/alexa/avs-device-sdk/tree/v1.22.0]
 * Added support for multiple concurrent APL clients
-* Added support for APL 1.5 [https://aplspec.aka.corp.amazon.com/release-1.5/html/index.html#apl-specification-1-5]
+* Added support for APL 1.5 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
 * Ported DISABLE_DUCKING cmake configuration from Alexa-device-sdk
 * Music playback now ducks instead of pauses when APL TTS is executed
 * Updated ini patch version to 1.3.6
@@ -46,7 +62,7 @@
  
 #### Enhancements
 * Upgraded dependency to Device SDK 1.20.1 [https://github.com/alexa/avs-device-sdk/tree/v1.20.1]
-* Support for APL 1.4 [https://aplspec.aka.corp.amazon.com/release-1.4/html/index.html#apl-specification-1-4]
+* Support for APL 1.4 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-4.html]
 * Added APL Telemetry Support
 * TV Overlay Portrait is no longer supported
 * Added support for APL Extensions [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html#apl-extensions-and-the-backstack]

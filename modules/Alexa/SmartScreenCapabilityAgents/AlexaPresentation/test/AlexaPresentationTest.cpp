@@ -31,6 +31,8 @@
 #include <AVSCommon/Utils/JSON/JSONUtils.h>
 #include <AVSCommon/Utils/Logger/Logger.h>
 #include <AVSCommon/Utils/Memory/Memory.h>
+#include <AVSCommon/Utils/Timing/Timer.h>
+#include <AVSCommon/Utils/Timing/TimerDelegateFactory.h>
 
 #include <SmartScreenSDKInterfaces/ActivityEvent.h>
 #include <SmartScreenSDKInterfaces/AlexaPresentationObserverInterface.h>
@@ -56,6 +58,9 @@ using JSONStream = std::vector<std::shared_ptr<std::istream>>;
 
 /// Timeout when waiting for futures to be set.
 static std::chrono::milliseconds TIMEOUT(1000);
+
+/// Timeout of TRANSIENT + 1 second
+static std::chrono::milliseconds PAYLOAD_TIMEOUT(11000);
 
 /// The second namespace registered for this capability agent.
 static const std::string NAMESPACE1{"Alexa.Presentation"};
@@ -146,10 +151,20 @@ static const std::string MESSAGE_PAYLOAD_KEY = "payload";
 
 // clang-format off
 
+const std::string makeDocumentAplPayload(const std::string& token, const std::string& timeoutType) {
+    return "{"
+             "\"presentationToken\":\"" + token + "\","
+             "\"windowId\":\"WINDOW_ID\","
+             "\"timeoutType\":\"" + timeoutType + "\","
+             "\"document\":\"{}\""
+             "}";
+}
+
 /// A RenderDocument directive with APL payload.
 static const std::string DOCUMENT_APL_PAYLOAD = "{"
                                                 "\"presentationToken\":\"APL_TOKEN\","
                                                 "\"windowId\":\"WINDOW_ID\","
+                                                "\"timeoutType\":\"TRANSIENT\","
                                                 "\"document\":\"{}\""
                                                 "}";
 
@@ -157,8 +172,24 @@ static const std::string DOCUMENT_APL_PAYLOAD = "{"
 static const std::string DOCUMENT_APL_PAYLOAD_2 = "{"
                                                   "\"presentationToken\":\"APL_TOKEN_2\","
                                                   "\"windowId\":\"WINDOW_ID\","
+                                                  "\"timeoutType\":\"TRANSIENT\","
                                                   "\"document\":\"{}\""
                                                   "}";
+
+static const std::string DOCUMENT_APL_PAYLOAD_MISSING_TIMEOUTTYPE =
+                                                "{"
+                                                "\"presentationToken\":\"APL_TOKEN\","
+                                                "\"windowId\":\"WINDOW_ID\","
+                                                "\"document\":\"{}\""
+                                                "}";
+
+static const std::string DOCUMENT_APL_PAYLOAD_INVALID_TIMEOUTTYPE =
+                                                "{"
+                                                "\"presentationToken\":\"APL_TOKEN\","
+                                                "\"windowId\":\"WINDOW_ID\","
+                                                "\"timeoutType\":\"SNAKES\","
+                                                "\"document\":\"{}\""
+                                                "}";
 
 /// A malformed RenderDocument directive with APL payload without presentationToken.
 static const std::string DOCUMENT_APL_PAYLOAD_MALFORMED = "{"
@@ -189,7 +220,6 @@ static const std::string EXECUTE_COMMAND_PAYLOAD = "{"
                                                    "}";
 
 static const std::string SETTINGS_CONFIG = R"({"alexaPresentationCapabilityAgent":{
-                                                    "displayDocumentInteractionIdleTimeout":500,
                                                     "minStateReportIntervalMs": 250,
                                                     "stateReportCheckIntervalMs": 300
                                                 }})";
@@ -207,6 +237,83 @@ static std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface> metri
 
 // clang-format on
 
+/**
+ * A timer that enables jumping forward to prevent real-time waiting
+ */
+class WarpTimer : public avsCommon::sdkInterfaces::timing::TimerDelegateInterface {
+public:
+    /// @name TimerDelegateInterface Functions
+    /// @{
+    void start(
+        std::chrono::nanoseconds delay,
+        std::chrono::nanoseconds period,
+        PeriodType periodType,
+        size_t maxCount,
+        std::function<void()> task) override {
+        m_task = task;
+        m_delay = delay;
+    }
+    void stop() override {
+        m_active = false;
+    }
+    bool activate() override {
+        assert(!m_active);
+        m_active = true;
+        return m_active;
+    }
+    bool isActive() const override {
+        return m_active;
+    }
+    /// @}
+
+    bool warpForward(std::chrono::nanoseconds step) {
+        bool dispatched = (step >= m_delay);
+        if (dispatched) {
+            m_task();
+        }
+
+        return dispatched;
+    }
+
+    std::chrono::nanoseconds getDelay() {
+        return m_delay;
+    }
+
+protected:
+    std::function<void()> m_task;
+    std::chrono::nanoseconds m_delay;
+    bool m_active{false};
+};
+
+/**
+ * MockTimerFactory to return a single instance of WarpTimer
+ */
+class MockTimerFactory : public avsCommon::sdkInterfaces::timing::TimerDelegateFactoryInterface {
+public:
+    /// @name TimerDelegateFactoryInterface Functions
+    /// @{
+    bool supportsLowPowerMode() override {
+        return true;
+    }
+    std::unique_ptr<avsCommon::sdkInterfaces::timing::TimerDelegateInterface> getTimerDelegate() override {
+        if (m_timer) {
+            assert(false);  // does not support multiple instances
+        }
+        m_timer = new WarpTimer();
+        std::unique_ptr<WarpTimer> ptr{m_timer};
+
+        return ptr;
+    }
+    /// @}
+
+    WarpTimer* getTimer() {
+        return m_timer;
+    }
+
+protected:
+    WarpTimer* m_timer{nullptr};
+};
+
 /// Mock of AlexaPresentationObserverInterface for testing.
 class MockGui : public smartScreenSDKInterfaces::AlexaPresentationObserverInterface {
 public:
@@ -217,9 +324,15 @@ public:
     MOCK_METHOD3(
         dataSourceUpdate,
         void(const std::string& sourceType, const std::string& jsonPayload, const std::string& token));
-    MOCK_METHOD1(clearDocument, void(const std::string& token));
+    MOCK_METHOD2(clearDocument, void(const std::string& token, const bool focusCleared));
     MOCK_METHOD1(interruptCommandSequence, void(const std::string& token));
-    MOCK_METHOD2(onPresentationSessionChanged, void(const std::string& id, const std::string& skillId));
+    MOCK_METHOD4(
+        onPresentationSessionChanged,
+        void(
+            const std::string& id,
+            const std::string& skillId,
+            const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
+            const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions));
 };
 
 /// Mock of VisualStateProviderInterface for testing.
@@ -286,6 +399,8 @@ protected:
     /// A pointer to an instance of the AlexaPresentation that will be instantiated per test.
     std::shared_ptr<AlexaPresentation> m_AlexaPresentation;
 
+    std::shared_ptr<MockTimerFactory> m_timerFactory;
+
     /// The mock @c MessageSenderInterface.
     std::shared_ptr<StrictMock<smartScreenSDKInterfaces::test::MockMessageSender>> m_mockMessageSender;
 
@@ -319,13 +434,16 @@ void AlexaPresentationTest::SetUp() {
 
     EXPECT_CALL(*m_mockContextManager, setStateProvider(_, _)).Times(Exactly(1));
 
+    m_timerFactory = std::make_shared<MockTimerFactory>();
+
     m_AlexaPresentation = AlexaPresentation::create(
         m_mockFocusManager,
         m_mockExceptionSender,
         metricRecorder,
         m_mockMessageSender,
         m_mockContextManager,
-        m_mockVisualStateProvider);
+        m_mockVisualStateProvider,
+        m_timerFactory);
 
     m_executor = std::make_shared<alexaClientSDK::avsCommon::utils::threading::Executor>();
     m_AlexaPresentation->setExecutor(m_executor);
@@ -355,56 +473,6 @@ void AlexaPresentationTest::TearDown() {
 }
 
 /**
- * Tests creating the AlexaPresentation with a null contextManager.
- */
-TEST_F(AlexaPresentationTest, testNullContextManagerInterface) {
-    auto alexaPresentation = AlexaPresentation::create(
-        m_mockFocusManager, m_mockExceptionSender, metricRecorder, m_mockMessageSender, nullptr);
-    ASSERT_EQ(alexaPresentation, nullptr);
-}
-
-/**
- * Tests creating the AlexaPresentation with a null focusManagerInterface.
- */
-TEST_F(AlexaPresentationTest, testNullFocusManagerInterface) {
-    auto alexaPresentation = AlexaPresentation::create(
-        nullptr, m_mockExceptionSender, metricRecorder, m_mockMessageSender, m_mockContextManager);
-    ASSERT_EQ(alexaPresentation, nullptr);
-}
-
-/**
- * Tests creating the AlexaPresentation with a null exceptionSender.
- */
-TEST_F(AlexaPresentationTest, testNullExceptionSender) {
-    auto alexaPresentation = AlexaPresentation::create(
-        m_mockFocusManager, nullptr, metricRecorder, m_mockMessageSender, m_mockContextManager);
-    ASSERT_EQ(alexaPresentation, nullptr);
-}
-
-TEST_F(AlexaPresentationTest, testNullMessageSender) {
-    auto alexaPresentation = AlexaPresentation::create(
-        m_mockFocusManager, m_mockExceptionSender, metricRecorder, nullptr, m_mockContextManager);
-    ASSERT_EQ(alexaPresentation, nullptr);
-}
-
-/**
- * Tests unknown Directive. Expect that the sendExceptionEncountered and setFailed will be called.
- */
-TEST_F(AlexaPresentationTest, testUnknownDirective) {
-    // Create Directive.
-    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
-    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(NAMESPACE1, UNKNOWN_DIRECTIVE, MESSAGE_ID);
-    std::shared_ptr<AVSDirective> directive = AVSDirective::create("", avsMessageHeader, "", attachmentManager, "");
-
-    EXPECT_CALL(*m_mockExceptionSender, sendExceptionEncountered(_, _, _)).Times(Exactly(1));
-    EXPECT_CALL(*m_mockDirectiveHandlerResult, setFailed(_)).Times(Exactly(1));
-
-    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
-    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
-    m_executor->waitForSubmittedTasks();
-}
-
-/**
  * Verify the request sent to AVS is as expected.
  */
 static void verifySendMessage(
@@ -431,6 +499,256 @@ static void verifySendMessage(
     EXPECT_EQ(request->attachmentReadersCount(), 0);
 
     conditionVariable.notify_all();
+}
+
+/**
+ * Tests timeout calculation
+ */
+TEST_F(AlexaPresentationTest, testTimeoutShort) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    auto aplDocument = makeDocumentAplPayload("APL_TOKEN", "SHORT");
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, aplDocument, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(aplDocument, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->processRenderDocumentResult("APL_TOKEN", true, "");
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->onDialogUXStateChanged(
+        avsCommon::sdkInterfaces::DialogUXStateObserverInterface::DialogUXState::IDLE);
+    m_executor->waitForSubmittedTasks();
+
+    ASSERT_EQ(m_timerFactory->getTimer()->getDelay(), std::chrono::seconds(30));
+    ASSERT_TRUE(m_timerFactory->getTimer()->isActive());
+}
+
+TEST_F(AlexaPresentationTest, testTimeoutTransient) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    auto aplDocument = makeDocumentAplPayload("APL_TOKEN", "TRANSIENT");
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, aplDocument, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(aplDocument, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->processRenderDocumentResult("APL_TOKEN", true, "");
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->onDialogUXStateChanged(
+        avsCommon::sdkInterfaces::DialogUXStateObserverInterface::DialogUXState::IDLE);
+    m_executor->waitForSubmittedTasks();
+
+    ASSERT_EQ(m_timerFactory->getTimer()->getDelay(), std::chrono::seconds(10));
+    ASSERT_TRUE(m_timerFactory->getTimer()->isActive());
+}
+
+TEST_F(AlexaPresentationTest, testTimeoutLong) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    auto aplDocument = makeDocumentAplPayload("APL_TOKEN", "LONG");
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, aplDocument, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(aplDocument, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->processRenderDocumentResult("APL_TOKEN", true, "");
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->onDialogUXStateChanged(
+        avsCommon::sdkInterfaces::DialogUXStateObserverInterface::DialogUXState::IDLE);
+    m_executor->waitForSubmittedTasks();
+
+    ASSERT_FALSE(m_timerFactory->getTimer()->isActive());
+}
+
+/**
+ * Test timeout override from document
+ */
+TEST_F(AlexaPresentationTest, testDocumentTimeoutOverride) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    auto aplDocument = makeDocumentAplPayload("APL_TOKEN", "TRANSIENT");
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, aplDocument, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(aplDocument, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->processRenderDocumentResult("APL_TOKEN", true, "");
+    m_executor->waitForSubmittedTasks();
+
+    // call this before onDialogUXState (since that's when the timer is scheduled)
+    m_AlexaPresentation->setDocumentIdleTimeout(std::chrono::milliseconds(42));
+    m_AlexaPresentation->onDialogUXStateChanged(
+        avsCommon::sdkInterfaces::DialogUXStateObserverInterface::DialogUXState::IDLE);
+    m_executor->waitForSubmittedTasks();
+
+    ASSERT_EQ(m_timerFactory->getTimer()->getDelay(), std::chrono::milliseconds(42));
+    ASSERT_TRUE(m_timerFactory->getTimer()->isActive());
+}
+
+/**
+ * Test that if given -1 (invalid_timeut) - we don't override the existing timeout
+ */
+TEST_F(AlexaPresentationTest, testDocumentTimeoutOverride_Bypass) {
+    std::unique_lock<std::mutex> exitLock(m_mutex);
+    avsCommon::utils::logger::getConsoleLogger()->setLevel(avsCommon::utils::logger::Level::DEBUG9);
+
+    auto aplDocument = makeDocumentAplPayload("APL_TOKEN", "TRANSIENT");
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, aplDocument, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, renderDocument(aplDocument, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+
+    m_AlexaPresentation->processRenderDocumentResult("APL_TOKEN", true, "");
+    m_executor->waitForSubmittedTasks();
+
+    // call this before onDialogUXState (since that's when the timer is scheduled)
+    m_AlexaPresentation->setDocumentIdleTimeout(std::chrono::milliseconds(-1));
+    m_AlexaPresentation->onDialogUXStateChanged(
+        avsCommon::sdkInterfaces::DialogUXStateObserverInterface::DialogUXState::IDLE);
+    m_executor->waitForSubmittedTasks();
+
+    ASSERT_EQ(m_timerFactory->getTimer()->getDelay(), std::chrono::seconds(10));
+    ASSERT_TRUE(m_timerFactory->getTimer()->isActive());
+}
+
+/**
+ * Tests creating the AlexaPresentation with a null contextManager.
+ */
+TEST_F(AlexaPresentationTest, testNullContextManagerInterface) {
+    auto alexaPresentation = AlexaPresentation::create(
+        m_mockFocusManager, m_mockExceptionSender, metricRecorder, m_mockMessageSender, nullptr);
+    ASSERT_EQ(alexaPresentation, nullptr);
+}
+
+/**
+ * Tests creating the AlexaPresentation with a null focusManagerInterface.
+ */
+TEST_F(AlexaPresentationTest, testNullFocusManagerInterface) {
+    auto alexaPresentation = AlexaPresentation::create(
+        nullptr, m_mockExceptionSender, metricRecorder, m_mockMessageSender, m_mockContextManager);
+    ASSERT_EQ(alexaPresentation, nullptr);
+}
+
+/**
+ * Tests creating the AlexaPresentation with a null exceptionSender.
+ */
+TEST_F(AlexaPresentationTest, testNullExceptionSender) {
+    auto alexaPresentation = AlexaPresentation::create(
+        m_mockFocusManager, nullptr, metricRecorder, m_mockMessageSender, m_mockContextManager);
+    ASSERT_EQ(alexaPresentation, nullptr);
+}
+
+/**
+ * Tests creating the AlexaPresentation with a null messageSender.
+ */
+TEST_F(AlexaPresentationTest, testNullMessageSender) {
+    auto alexaPresentation = AlexaPresentation::create(
+        m_mockFocusManager, m_mockExceptionSender, metricRecorder, nullptr, m_mockContextManager);
+    ASSERT_EQ(alexaPresentation, nullptr);
+}
+
+/**
+ * Tests unknown Directive. Expect that the sendExceptionEncountered and setFailed will be called.
+ */
+TEST_F(AlexaPresentationTest, testUnknownDirective) {
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(NAMESPACE1, UNKNOWN_DIRECTIVE, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive = AVSDirective::create("", avsMessageHeader, "", attachmentManager, "");
+
+    EXPECT_CALL(*m_mockExceptionSender, sendExceptionEncountered(_, _, _)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setFailed(_)).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+    m_executor->waitForSubmittedTasks();
+}
+
+/**
+ * Tests when a RenderDocument Directive doesn't contain timeoutType.
+ *  Expect that sendExceptionEncountered and setFailed will be called.
+ */
+TEST_F(AlexaPresentationTest, testMissingTimeoutTypeRenderDocumentDirective) {
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD_MISSING_TIMEOUTTYPE, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockExceptionSender, sendExceptionEncountered(_, _, _)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setFailed(_)).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+
+    m_executor->waitForSubmittedTasks();
+}
+
+/**
+ * Tests when a RenderDocument Directive contains an invalid timeoutType.
+ *  Expect that sendExceptionEncountered and setFailed will be called.
+ */
+TEST_F(AlexaPresentationTest, testInvalidTimeoutTypeRenderDocumentDirective) {
+    // Create Directive.
+    auto attachmentManager = std::make_shared<StrictMock<smartScreenSDKInterfaces::test::MockAttachmentManager>>();
+    auto avsMessageHeader = std::make_shared<AVSMessageHeader>(DOCUMENT.nameSpace, DOCUMENT.name, MESSAGE_ID);
+    std::shared_ptr<AVSDirective> directive =
+        AVSDirective::create("", avsMessageHeader, DOCUMENT_APL_PAYLOAD_INVALID_TIMEOUTTYPE, attachmentManager, "");
+
+    EXPECT_CALL(*m_mockExceptionSender, sendExceptionEncountered(_, _, _)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockDirectiveHandlerResult, setFailed(_)).Times(Exactly(1));
+
+    m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
+    m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
+
+    m_executor->waitForSubmittedTasks();
 }
 
 /**
@@ -616,7 +934,7 @@ TEST_F(AlexaPresentationTest, testAPLClearCard) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
 
-    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(1);
+    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(1);
 
     // Expect a call to getContext as part of sending APL_DISMISSED event.
     EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
@@ -685,7 +1003,7 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
         .Times(Exactly(1))
         .WillRepeatedly(InvokeWithoutArgs([this] { m_AlexaPresentation->recordRenderComplete(); }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(Exactly(1));
     EXPECT_CALL(*m_mockVisualStateProvider, provideState(_, _));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
@@ -721,8 +1039,10 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
     m_AlexaPresentation->onDialogUXStateChanged(
         avsCommon::sdkInterfaces::DialogUXStateObserverInterface::DialogUXState::IDLE);
     m_executor->waitForSubmittedTasks();
+
     // wait for getContext
     m_contextTrigger.wait_for(exitLock, TIMEOUT);
+    m_timerFactory->getTimer()->warpForward(PAYLOAD_TIMEOUT);
     m_AlexaPresentation->onContextAvailable("");
 
     std::unique_lock<std::mutex> lk(m);
@@ -739,7 +1059,7 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD_2, "APL_TOKEN_2", WINDOW_ID)).Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(Exactly(1));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
@@ -771,6 +1091,7 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
 
     // wait for getContext
     m_contextTrigger.wait_for(exitLock, TIMEOUT);
+    m_timerFactory->getTimer()->warpForward(PAYLOAD_TIMEOUT);
 }
 
 /**
@@ -788,7 +1109,7 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsGUIActive) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(0);
+    EXPECT_CALL(*m_mockGui, clearDocument(_, _)).Times(0);
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
     m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
@@ -820,7 +1141,7 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsGUIInactive) {
         .Times(Exactly(1))
         .WillRepeatedly(InvokeWithoutArgs([this] { m_AlexaPresentation->recordRenderComplete(); }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(1);
+    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(1);
     EXPECT_CALL(*m_mockVisualStateProvider, provideState(_, _));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
@@ -859,6 +1180,7 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsGUIInactive) {
 
     // wait for getContext
     m_contextTrigger.wait_for(exitLock, TIMEOUT);
+    m_timerFactory->getTimer()->warpForward(PAYLOAD_TIMEOUT);
     m_AlexaPresentation->onContextAvailable("");
 
     std::unique_lock<std::mutex> lk(m);
@@ -880,7 +1202,7 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsDialogUXWhenGUIInactive) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(0);
+    EXPECT_CALL(*m_mockGui, clearDocument(_, _)).Times(0);
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
     m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
@@ -969,7 +1291,7 @@ TEST_F(AlexaPresentationTest, testAPLFollowedByAPL) {
     m_executor->waitForSubmittedTasks();
 
     // clearDocument() is going to be called for the 2nd APL card because it's cleared by timeout.
-    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(Exactly(1));
     // Expect a call to getContext.
     EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
         .WillOnce(Invoke([this](
@@ -989,6 +1311,7 @@ TEST_F(AlexaPresentationTest, testAPLFollowedByAPL) {
 
     // wait for getContext
     m_contextTrigger.wait_for(exitLock, TIMEOUT);
+    m_timerFactory->getTimer()->warpForward(PAYLOAD_TIMEOUT);
     m_AlexaPresentation->onContextAvailable("");
 
     conditionVariable.wait_for(lk, TIMEOUT);

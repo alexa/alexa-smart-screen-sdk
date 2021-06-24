@@ -53,6 +53,7 @@ AplClientBridge::AplClientBridge(
     std::shared_ptr<CachingDownloadManager> contentDownloadManager,
     std::shared_ptr<smartScreenSDKInterfaces::GUIClientInterface> guiClient,
     AplClientBridgeParameter parameters) :
+        RequiresShutdown{"AplClientBridge"},
         m_contentDownloadManager{contentDownloadManager},
         m_guiClient{guiClient},
         m_renderQueued{false},
@@ -501,14 +502,12 @@ void AplClientBridge::handleRenderingEvent(const std::string& token, APLClient::
     });
 }
 
-void AplClientBridge::handleDisplayMetrics(
-    const std::string& windowId,
-    const std::vector<APLClient::DisplayMetric>& metrics) {
+void AplClientBridge::handleDisplayMetrics(const std::string& windowId, const std::string& jsonPayload) {
     ACSDK_DEBUG9(LX(__func__));
-    m_executor.submit([this, windowId, metrics] {
+    m_executor.submit([this, windowId, jsonPayload] {
         auto aplClientRenderer = getAplClientRendererFromWindowId(windowId);
         if (aplClientRenderer) {
-            aplClientRenderer->onMetricsReported(metrics);
+            aplClientRenderer->onMetricsReported(jsonPayload);
         }
     });
 }
@@ -570,6 +569,11 @@ void AplClientBridge::onAudioPlayerLyricDataFlushed(
     long durationInMilliseconds,
     const std::string& lyricData) {
     ACSDK_DEBUG3(LX(__func__));
+}
+
+void AplClientBridge::doShutdown() {
+    m_updateTimer.stop();
+    m_executor.shutdown();
 }
 
 }  // namespace sampleApp

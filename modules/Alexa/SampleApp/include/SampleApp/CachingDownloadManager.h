@@ -24,7 +24,6 @@
 #include <AVSCommon/SDKInterfaces/Storage/MiscStorageInterface.h>
 
 #include <RegistrationManager/CustomerDataHandler.h>
-#include <RegistrationManager/CustomerDataManager.h>
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -79,7 +78,7 @@ public:
         unsigned long cachePeriodInSeconds,
         unsigned long maxCacheSize,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
-        const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager);
+        const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> customerDataManager);
 
     /**
      * Method that should be called when requesting content

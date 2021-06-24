@@ -38,6 +38,11 @@ if (buildTypeFound EQUAL -1)
     message(FATAL_ERROR "Unknown build type ${buildType}. Please select from DEBUG, RELEASE, or MINSIZEREL. Quitting!")
 else()
     message("Creating the build directory for the ${PROJECT_NAME} with build type: ${buildType}")
+
+    # Print warning when building the SDK in DEBUG mode.
+    if (buildType STREQUAL "DEBUG")
+	    message(WARNING "WARNING! THIS DEVICE HAS BEEN COMPILED IN DEBUG MODE.\n\nRELEASING A PRODUCTION DEVICE IN DEBUG MODE MAY IMPACT DEVICE PERFORMANCE, DOES NOT COMPLY WITH THE AVS SECURITY REQUIREMENTS, AND COULD RESULT IN SUSPENSION OR TERMINATION OF THE ALEXA SERVICE ON YOUR DEVICES.\n\n")
+    endif()
 endif()
 
 # Set up the compiler flags.

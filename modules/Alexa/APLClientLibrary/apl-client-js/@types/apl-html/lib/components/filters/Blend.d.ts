@@ -1,3 +1,7 @@
+/**
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { Filter } from '../../utils/FilterUtils';
 import { BlendMode } from '../../enums/BlendMode';
 import { IBaseFilter, IImageFilterElement } from './ImageFilter';

@@ -25,9 +25,6 @@ namespace AudioPlayer {
 
 /**
  * An APL Extension designed for control of an @c AudioPlayer playing an Alarm from an APL document.
- *
- * TODO : Add link to public spec when available -
- * https://aplspec.aka.corp.amazon.com/apl-extensions-release/html/extensions/musicalarm/musicalarm_extension_10.html
  */
 class AplAudioPlayerAlarmsExtension
         : public AplCoreExtensionInterface

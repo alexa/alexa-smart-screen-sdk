@@ -69,7 +69,6 @@
 #include "SampleApp/SampleApplicationReturnCodes.h"
 
 #include <RegistrationManager/CustomerDataHandler.h>
-#include <RegistrationManager/CustomerDataManager.h>
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
@@ -107,7 +106,7 @@ public:
     static std::shared_ptr<GUIClient> create(
         std::shared_ptr<MessagingServerInterface> serverImplementation,
         const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
-        const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager);
+        const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> customerDataManager);
 
     // @name TemplateRuntimeObserverInterface Functions
     /// @{
@@ -126,11 +125,15 @@ public:
     /// @{
     void interruptCommandSequence(const std::string& token) override;
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
-    void clearDocument(const std::string& token) override;
+    void clearDocument(const std::string& token, const bool focusCleared) override;
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
     void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
         override;
-    void onPresentationSessionChanged(const std::string& id, const std::string& skillId) override;
+    void onPresentationSessionChanged(
+        const std::string& id,
+        const std::string& skillId,
+        const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
+        const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions) override;
     void onRenderDirectiveReceived(const std::string& token, const std::chrono::steady_clock::time_point& receiveTime)
         override;
     void onRenderingAborted(const std::string& token) override;
@@ -199,7 +202,7 @@ public:
         override;
     /// }
 
-    /// @name CustomerDataHandler Function
+    /// @name CustomerDataHandlerInterface Function
     /// @{
     void clearData() override;
     /// @}
@@ -285,7 +288,7 @@ private:
         std::shared_ptr<MessagingServerInterface> serverImplementation,
         const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
         const std::string& APLMaxVersion,
-        const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager);
+        const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> customerDataManager);
 
     /// Server worker thread.
     void serverThread();

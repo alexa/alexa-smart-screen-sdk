@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import { ImageAlign } from '../enums/ImageAlign';
 import { ImageScale } from '../enums/ImageScale';
@@ -35,7 +36,6 @@ export interface IImageProperties extends IComponentProperties {
 }
 /**
  * @ignore
- * TODO: Figure out why two Images constructed with only one Image in APL document
  */
 export declare class Image extends Component<IImageProperties> {
     private imgPlaceHolder;

@@ -19,7 +19,6 @@
 #include <string>
 #include <unordered_set>
 #include <future>
-// TODO: Tidy up core to prevent this (ARC-917)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreorder"
 #pragma push_macro("DEBUG")
@@ -227,10 +226,22 @@ private:
     void sendScreenLockMessage(bool screenLock);
 
     /**
+     * Sends supportsResizing state to the client
+     * @param screenLock
+     */
+    void sendSupportsResizingMessage(bool supportsResizing);
+
+    /**
      * Handles the build message received from the view host, builds the component hierarchy.
      * @param message
      */
     void handleBuild(const rapidjson::Value& message);
+
+    /**
+     * Handles the configuration change message from the view host and send to Core.
+     * @param message
+     */
+    void handleConfigurationChange(const rapidjson::Value& message);
 
     /**
      * Handle an update message from the view host of the form:
@@ -278,6 +289,36 @@ private:
     void handleHandleKeyboard(const rapidjson::Value& payload);
 
     /**
+     * Handle the setFocus message received from the viewhost
+     * @param payload
+     */
+    void setFocus(const rapidjson::Value& payload);
+
+    /**
+     * Handle the getFocusableAreas message received from the viewhost
+     * @param payload
+     */
+    void getFocusableAreas(const rapidjson::Value& payload);
+
+    /**
+     * Handle the getFocused message received from the viewhost
+     * @param payload
+     */
+    void getFocused(const rapidjson::Value& payload);
+
+    /**
+     * Handle the getDisplayedChildCount message received from the viewhost
+     * @param payload
+     */
+    void handleGetDisplayedChildCount(const rapidjson::Value& payload);
+
+    /**
+     * Handle the getDisplayedChildId message received from the viewhost
+     * @param payload
+     */
+    void handleGetDisplayedChildId(const rapidjson::Value& payload);
+
+    /**
      * Handle the updateCursorPosition message received from the viewhost
      * @param payload
      */
@@ -304,10 +345,22 @@ private:
     void handleScreenLock();
 
     /**
-     * Handle the isCharacterValid message received from viewhost
+     * Handle the isCharacterValid message received from ViewHost.
      * @param payload
      */
     void handleIsCharacterValid(const rapidjson::Value& payload);
+
+    /**
+     * Handle the reInflate message received from ViewHost.
+     * @param payload
+     */
+    void handleReInflate(const rapidjson::Value& payload);
+
+    /**
+     * Handle the reHierarchy message received from ViewHost.
+     * @param payload
+     */
+    void handleReHierarchy(const rapidjson::Value& payload);
 
     /**
      * Execute the event.
@@ -424,6 +477,13 @@ private:
      */
     void serializeJSONValueToString(const rapidjson::Value& documentNode, std::string* value);
 
+    /**
+     * Update the latest configurationChange which is maintained at device runtime.
+     *
+     * @param configurationChange the new reported configurationChange.
+     */
+    void updateConfigurationChange(const apl::ConfigurationChange& configurationChange);
+
     AplConfigurationPtr m_aplConfiguration;
 
     /// View host message type to handler map
@@ -448,6 +508,9 @@ private:
      * Scaling calculation object.
      */
     AplCoreMetricsPtr m_AplCoreMetrics;
+
+    /// Pointer to the latest configuration change object.
+    apl::ConfigurationChange m_ConfigurationChange = apl::ConfigurationChange();
 
     /// Pointer to the APL Root Context
     apl::RootContextPtr m_Root;

@@ -25,13 +25,13 @@ namespace utils {
 /// NOTE: To make changes to this file you *MUST* do so via SmartScreenSDKVersion.h.in.
 namespace smartScreenSDKVersion{
     inline static std::string getCurrentVersion(){
-        return "2.6";
+        return "2.7";
     }
     inline static int getMajorVersion(){
         return 2;
     }
     inline static int getMinorVersion(){
-        return 6;
+        return 7;
     }
 }  // namespace smartScreenSDKVersion
 }  // namespace utils

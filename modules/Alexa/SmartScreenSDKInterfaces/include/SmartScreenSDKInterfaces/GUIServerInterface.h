@@ -21,7 +21,6 @@
 #include <AVSCommon/SDKInterfaces/CallManagerInterface.h>
 
 #include <APLClient/AplRenderingEvent.h>
-#include <APLClient/DisplayMetric.h>
 #include "ActivityEvent.h"
 #include "NavigationEvent.h"
 
@@ -209,20 +208,6 @@ public:
      * Handle render complete event received in a message.
      */
     virtual void handleRenderComplete() = 0;
-
-    /**
-     * Handle display metrics event received in a message.
-     *
-     * @param dropFrameCount Count of the frames dropped
-     */
-    virtual void handleDisplayMetrics(uint64_t dropFrameCount) = 0;
-
-    /**
-     * Handle display metrics event received in a message.
-     *
-     * @param metrics the recorded metrics
-     */
-    virtual void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric>& metrics) = 0;
 
     /**
      * Handle APL context inflate started event.

@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import APLRenderer, { IAPLOptions } from "./@types/apl-html/lib/index";
 import { APLClient } from "./APLClient";

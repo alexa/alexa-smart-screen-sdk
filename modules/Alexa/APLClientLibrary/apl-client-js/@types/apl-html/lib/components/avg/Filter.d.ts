@@ -1,3 +1,7 @@
+/**
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { ILogger } from '../../logging/ILogger';
 import { GraphicFilterType } from '../../enums/GraphicFilterType';
 export interface IAVGFilterElement {

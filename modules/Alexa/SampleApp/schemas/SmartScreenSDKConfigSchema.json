@@ -3,6 +3,7 @@
   "type": "object",
   "definitions": {
     "sampleApp": {
+      "type": "object",
       "properties": {
         "websocketInterface": {
           "type": "string"
@@ -48,18 +49,31 @@
                 },
                 "theme": {
                   "type": "string",
-                  "enum": ["light", "dark"]
+                  "enum": [
+                    "light",
+                    "dark"
+                  ]
                 },
                 "allowOpenUrl": {
                   "type": "boolean"
                 },
                 "animationQuality": {
                   "type": "string",
-                  "enum": ["none", "slow", "normal"]
+                  "enum": [
+                    "none",
+                    "slow",
+                    "normal"
+                  ]
                 },
                 "windowPosition": {
                   "type": "string",
-                  "enum": ["center", "right", "left", "top", "bottom"]
+                  "enum": [
+                    "center",
+                    "right",
+                    "left",
+                    "top",
+                    "bottom"
+                  ]
                 },
                 "token": {
                   "type": "string"
@@ -71,12 +85,12 @@
                   }
                 }
               },
-              "required": ["id", "templateId", "sizeConfigurationId", "interactionMode"]
-            },
-            "random": {
-              "patternProperties": {
-                "^+$": { "type": "number"
-                }
+              "required": [
+                "id",
+                "templateId",
+                "sizeConfigurationId",
+                "interactionMode"
+              ]
             },
             "deviceKeys": {
               "type": "object",
@@ -94,11 +108,21 @@
                       "type": "string"
                     }
                   },
-                  "required": ["code", "keyCode", "key"]
+                  "required": [
+                    "code",
+                    "keyCode",
+                    "key"
+                  ]
                 }
               },
               "additionalProperties": false,
-              "required": ["talkKey", "backKey", "exitKey", "toggleCaptionsKey", "toggleDoNotDisturbKey"]
+              "required": [
+                "talkKey",
+                "backKey",
+                "exitKey",
+                "toggleCaptionsKey",
+                "toggleDoNotDisturbKey"
+              ]
             }
           },
           "properties": {
@@ -107,7 +131,13 @@
             },
             "mode": {
               "type": "string",
-              "enum": [ "AUTO", "HUB", "MOBILE", "PC", "TV"]
+              "enum": [
+                "AUTO",
+                "HUB",
+                "MOBILE",
+                "PC",
+                "TV"
+              ]
             },
             "emulateDisplayDimensions": {
               "type": "boolean"
@@ -117,7 +147,11 @@
             },
             "audioInputInitiator": {
               "type": "string",
-              "enum": ["PRESS_AND_HOLD", "TAP", "WAKEWORD"]
+              "enum": [
+                "PRESS_AND_HOLD",
+                "TAP",
+                "WAKEWORD"
+              ]
             },
             "defaultWindowId": {
               "type": "string"
@@ -128,9 +162,15 @@
                 "$ref": "#/definitions/gui/properties/appConfig/definitions/window"
               }
             },
-            "deviceKeys": { "$ref": "#/definitions/gui/properties/appConfig/definitions/deviceKeys"}
+            "deviceKeys": {
+              "$ref": "#/definitions/gui/properties/appConfig/definitions/deviceKeys"
+            }
           },
-          "required": ["defaultWindowId", "windows", "deviceKeys"]
+          "required": [
+            "defaultWindowId",
+            "windows",
+            "deviceKeys"
+          ]
         },
         "visualCharacteristics": {
           "type": "array",
@@ -175,7 +215,7 @@
                   ]
                 },
                 "value": {
-                  "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/value_int"
+                  "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/value_int"
                 }
               },
               "required": [
@@ -210,10 +250,13 @@
                     "codecs": {
                       "type": "array",
                       "items": {
-                        "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.presentation.apl.video.configurations/definitions/codecs_item"
+                        "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.presentation.apl.video.configurations/definitions/codecs_item"
                       }
                     }
-                  }
+                  },
+                  "required": [
+                    "codecs"
+                  ]
                 }
               },
               "required": [
@@ -261,13 +304,13 @@
                     "type": "object",
                     "properties": {
                       "uiMode": {
-                        "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.interactionmode.configurations/definitions/uiMode"
+                        "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.interactionmode.configurations/definitions/uiMode"
                       },
                       "id": {
                         "type": "string"
                       },
                       "interactionDistance": {
-                        "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.interactionmode.configurations/definitions/interactionDistance"
+                        "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.interactionmode.configurations/definitions/interactionDistance"
                       },
                       "touch": {
                         "type": "string",
@@ -341,7 +384,7 @@
                       ]
                     },
                     "value": {
-                      "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/value_int"
+                      "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/value_int"
                     }
                   }
                 },
@@ -356,7 +399,7 @@
                       ]
                     },
                     "value": {
-                      "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/value_dec"
+                      "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/value_dec"
                     }
                   },
                   "required": [
@@ -380,7 +423,7 @@
                       "items": {
                         "type": "string",
                         "enum": [
-                          "SUPPORTED",
+                          "SINGLE",
                           "UNSUPPORTED"
                         ]
                       }
@@ -396,16 +439,16 @@
                       "type": "object",
                       "properties": {
                         "resolution": {
-                          "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/resolution"
+                          "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/resolution"
                         },
                         "pixelDensity": {
-                          "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.display.configurations/definitions/pixelDensity"
+                          "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.display.configurations/definitions/pixelDensity"
                         },
                         "densityIndependentResolution": {
-                          "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.display.configurations/definitions/densityIndependentResolution"
+                          "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.display.configurations/definitions/densityIndependentResolution"
                         },
                         "physicalSize": {
-                          "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.display.configurations/definitions/physicalSize"
+                          "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.display.configurations/definitions/physicalSize"
                         }
                       },
                       "required": [
@@ -437,7 +480,7 @@
                       ]
                     },
                     "value": {
-                      "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/resolution"
+                      "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/resolution"
                     }
                   },
                   "required": [
@@ -453,10 +496,10 @@
                       ]
                     },
                     "maximum": {
-                      "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/resolution"
+                      "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/resolution"
                     },
                     "minimum": {
-                      "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/resolution"
+                      "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/resolution"
                     }
                   },
                   "required": [
@@ -490,10 +533,10 @@
                               },
                               "oneOf": [
                                 {
-                                  "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.display.window.configurations/definitions/discrete"
+                                  "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.display.window.configurations/definitions/discrete"
                                 },
                                 {
-                                  "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.display.window.configurations/definitions/continuous"
+                                  "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.display.window.configurations/definitions/continuous"
                                 }
                               ],
                               "required": [
@@ -532,10 +575,10 @@
             "type": "object",
             "properties": {
               "type": {
-                "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/type"
+                "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/type"
               },
               "version": {
-                "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/version"
+                "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/version"
               }
             },
             "oneOf": [
@@ -548,7 +591,7 @@
                     ]
                   },
                   "configurations": {
-                    "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.presentation.apl.video.configurations"
+                    "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.presentation.apl.video.configurations"
                   }
                 }
               },
@@ -561,7 +604,7 @@
                     ]
                   },
                   "configurations": {
-                    "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.interactionmode.configurations"
+                    "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.interactionmode.configurations"
                   }
                 }
               },
@@ -574,7 +617,7 @@
                     ]
                   },
                   "configurations": {
-                    "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.display.configurations"
+                    "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.display.configurations"
                   }
                 }
               },
@@ -587,7 +630,7 @@
                     ]
                   },
                   "configurations": {
-                    "$ref": "#/properties/gui/properties/visualCharacteristics/definitions/alexa.display.window.configurations"
+                    "$ref": "#/definitions/gui/properties/visualCharacteristics/definitions/alexa.display.window.configurations"
                   }
                 }
               }
@@ -601,7 +644,8 @@
           }
         }
       },
-      "required": ["appConfig",
+      "required": [
+        "appConfig",
         "visualCharacteristics"
       ]
     }

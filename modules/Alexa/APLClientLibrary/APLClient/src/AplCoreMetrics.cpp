@@ -28,11 +28,15 @@ float AplCoreMetrics::toCore(float value) const {
 }
 
 float AplCoreMetrics::getViewhostWidth() const {
-    return toViewhost(getWidth());
+    return toViewhost(getMetrics().getWidth());
 }
 
 float AplCoreMetrics::getViewhostHeight() const {
-    return toViewhost(getHeight());
+    return toViewhost(getMetrics().getHeight());
+}
+
+float AplCoreMetrics::toCorePixel(float value) {
+    return value * getScaleToCore();
 }
 
 }  // namespace APLClient

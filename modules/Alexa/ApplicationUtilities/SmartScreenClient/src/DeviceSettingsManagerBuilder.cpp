@@ -70,7 +70,7 @@ DeviceSettingsManagerBuilder::DeviceSettingsManagerBuilder(
     std::shared_ptr<storage::DeviceSettingStorageInterface> settingStorage,
     std::shared_ptr<avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
     std::shared_ptr<avsCommon::sdkInterfaces::AVSConnectionManagerInterface> connectionManager,
-    std::shared_ptr<registrationManager::CustomerDataManager> dataManager) :
+    std::shared_ptr<registrationManager::CustomerDataManagerInterface> dataManager) :
         m_settingStorage{settingStorage},
         m_messageSender{messageSender},
         m_connectionManager{connectionManager},
@@ -213,7 +213,8 @@ DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withSynchronizedSett
     const ValueType<index>& defaultValue,
     std::function<bool(const ValueType<index>&)> applyFn) {
     auto eventSender = SettingEventSender::create(metadata, m_connectionManager);
-    auto protocol = ProtocolT::create(metadata, std::move(eventSender), m_settingStorage, m_connectionManager);
+    auto protocol =
+        ProtocolT::create(metadata, std::move(eventSender), m_settingStorage, m_connectionManager, m_metricRecorder);
     auto setting = Setting<ValueType<index>>::create(defaultValue, std::move(protocol), applyFn);
 
     if (!setting) {

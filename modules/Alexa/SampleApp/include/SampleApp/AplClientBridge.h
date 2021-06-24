@@ -50,12 +50,18 @@ class AplClientBridge
         , public alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface
         , public APLClient::Extensions::Backstack::AplBackstackExtensionObserverInterface
         , public APLClient::Extensions::AudioPlayer::AplAudioPlayerExtensionObserverInterface
+        , public alexaClientSDK::avsCommon::utils::RequiresShutdown
         , public std::enable_shared_from_this<AplClientBridge> {
 public:
     static std::shared_ptr<AplClientBridge> create(
         std::shared_ptr<CachingDownloadManager> contentDownloadManager,
         std::shared_ptr<smartScreenSDKInterfaces::GUIClientInterface> guiClient,
         AplClientBridgeParameter parameters);
+
+    /// @name RequiresShutdown Functions
+    /// @{
+    void doShutdown() override;
+    /// @}
 
     /// @name AplOptionsInterface Functions
     /// {
@@ -179,7 +185,7 @@ public:
 
     void handleRenderingEvent(const std::string& token, APLClient::AplRenderingEvent event);
 
-    void handleDisplayMetrics(const std::string& windowId, const std::vector<APLClient::DisplayMetric>& metrics);
+    void handleDisplayMetrics(const std::string& windowId, const std::string& jsonPayload);
 
     void onRenderDirectiveReceived(const std::string& token, const std::chrono::steady_clock::time_point& receiveTime);
 

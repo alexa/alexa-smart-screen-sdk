@@ -180,11 +180,11 @@ void AplBackstackExtension::onExtensionEvent(
         } else if (COMMAND_CLEAR_NAME == name) {
             m_backstack.clear();
         } else {
-            logMessage(apl::LogLevel::ERROR, TAG, __func__, "Invalid Command: " + eventDebugString);
+            logMessage(apl::LogLevel::kError, TAG, __func__, "Invalid Command: " + eventDebugString);
             succeeded = false;
         }
     } else {
-        logMessage(apl::LogLevel::ERROR, TAG, __func__, "No Event Observer: " + eventDebugString);
+        logMessage(apl::LogLevel::kError, TAG, __func__, "No Event Observer: " + eventDebugString);
         succeeded = false;
     }
 

@@ -1,3 +1,7 @@
+/**
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { Component } from './components/Component';
 import { MeasureMode } from './components/text/MeasureMode';
 import { AnimationQuality } from './enums/AnimationQuality';
@@ -14,6 +18,10 @@ export declare type DeviceMode = 'AUTO' | 'HUB' | 'MOBILE' | 'PC' | 'TV';
  * Device viewport shape
  */
 export declare type ViewportShape = 'ROUND' | 'RECTANGLE';
+/**
+ * Device screen mode
+ */
+export declare type ScreenMode = 'normal' | 'high-contrast';
 /**
  * Physical charcteristics of the viewport
  */
@@ -43,6 +51,27 @@ export interface IEnvironment {
     disallowVideo?: boolean;
     /** Level of animation quality. Defaults to `AnimationQuality.kAnimationQualityNormal` */
     animationQuality?: AnimationQuality;
+}
+/**
+ * Configuration Change options.
+ *
+ * Dynamic changes to the renderer viewport or envrionment.
+ */
+export interface IConfigurationChangeOptions {
+    /** Viewport Width in pixels */
+    width?: number;
+    /** Viewport Height in pixels */
+    height?: number;
+    /** APL theme. Usually 'light' or 'dark' */
+    docTheme?: string;
+    /** Device mode. If no provided "HUB" is used. */
+    mode?: DeviceMode;
+    /** Relative size of fonts to display as specified by the OS accessibility settings */
+    fontScale?: number;
+    /** The accessibility settings for how colors should be displayed. */
+    screenMode?: ScreenMode;
+    /** Indicates if a screen reader has been enabled for the user. */
+    screenReader?: boolean;
 }
 /**
  * Developer tool options can be used to inject additional data into the DOM
@@ -126,6 +155,8 @@ export interface IAPLOptions {
     onDataSourceFetchRequest?: (event: IDataSourceFetchRequest) => void;
     /** Callback for pending errors from APLCore Library */
     onRunTimeError?: (pendingErrors: object[]) => void;
+    /** Callback for ignoring resize config change */
+    onResizingIgnored?: (ignoredWidth: number, ignoredHeight: number) => void;
     /**
      * Callback when a AVG source needs to be retreived by the consumer
      * If this is not provided, this viewhost will use the fetch API to
@@ -162,6 +193,11 @@ export default abstract class APLRenderer<Options = {
     top: Component;
     /** A reference to the APL extension manager */
     extensionManager: IExtensionManager;
+    /** Configuration Change handler */
+    protected handleConfigurationChange: (configurationChangeOption: IConfigurationChangeOptions) => void;
+    /** Document set flag for allowing config change driven resizing */
+    protected supportsResizing: boolean;
+    private configChangeThrottle;
     private isEdge;
     readonly options: Options;
     audioPlayer: AudioPlayerWrapper;
@@ -172,6 +208,22 @@ export default abstract class APLRenderer<Options = {
      */
     protected constructor(mOptions: IAPLOptions);
     init(metricRecorder?: (m: APL.DisplayMetric) => void): void;
+    /**
+     * Sets the renderer view size in pixels
+     * @param width width in pixels
+     * @param height height in pixels
+     */
+    setViewSize(width: number, height: number): void;
+    /**
+     * Sets if the renderer supports resizing as defined by the APL document settings
+     * @param supportsResizing - True if the document supports resizing.  Defaults to false.
+     */
+    setSupportsResizing(supportsResizing: boolean): void;
+    /**
+     * Process Configuration Change. ViewHost will resize/reinflate upon configuration change if supported.
+     * @param configurationChangeOptions The configuration change options to provide to core.
+     */
+    onConfigurationChange(configurationChangeOptions: IConfigurationChangeOptions): void;
     getComponentCount(): number;
     private setBackground(docTheme);
     /**
@@ -179,6 +231,7 @@ export default abstract class APLRenderer<Options = {
      */
     getDeveloperToolOptions(): IDeveloperToolOptions | undefined;
     onRunTimeError(pendingErrors: object[]): void;
+    onResizingIgnored(ignoredWidth: number, ignoredHeight: number): void;
     /**
      * Called by core when a text measure is required
      * @param component The component to measure
@@ -200,6 +253,10 @@ export default abstract class APLRenderer<Options = {
      * @ignore
      */
     onBaseline(component: APL.Component, width: number, height: number): number;
+    /**
+     * Rerender the same template with current content, config and context.
+     */
+    reRenderComponents(): void;
     /**
      * Cleans up this instance
      */
@@ -253,6 +310,10 @@ export default abstract class APLRenderer<Options = {
      * @returns virtual component.
      */
     updateComponent(component: Component, componentData: string): Component | undefined;
+    /**
+     * Destroy current rendering component from top.
+     */
+    destroyRenderingComponents(): void;
     private getScreenCoords;
     private getLeavingCoords;
     private getTransformScale;
@@ -273,4 +334,8 @@ export default abstract class APLRenderer<Options = {
     private getKeyboardCodeInEdge;
     private passKeyboardEventToCore;
     private isDPadKey;
+    private renderComponents();
+    private removeRenderingComponents();
+    private focusTopLeft();
+    private passWindowEventsToCore;
 }

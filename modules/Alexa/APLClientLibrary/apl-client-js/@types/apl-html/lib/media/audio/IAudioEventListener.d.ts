@@ -1,3 +1,7 @@
+/**
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 import { IBaseMarker } from '../audio/SpeechMarks';
 /**
  * A callback interface to the initiator of audio requests

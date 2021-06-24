@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import EventEmitter = require("./../../../eventemitter3/index");
 import APLRenderer from '../APLRenderer';
@@ -8,7 +9,6 @@ import { UpdateType } from '../enums/UpdateType';
 import { ILogger } from '../logging/ILogger';
 import { GradientSpreadMethod } from '../enums/GradientSpreadMethod';
 import { GradientUnits } from '../enums/GradientUnits';
-import { IAVGGradient } from './avg/Gradient';
 export declare const SVG_NS = "http://www.w3.org/2000/svg";
 export declare const uuidv4: any;
 export declare const IDENTITY_TRANSFORM = "matrix(1.000000,0.000000,0.000000,1.000000,0.000000,0.000000)";
@@ -18,6 +18,8 @@ export declare const IDENTITY_TRANSFORM = "matrix(1.000000,0.000000,0.000000,1.0
 export interface IGenericPropType {
     [key: number]: any;
 }
+export declare const copyAsPixels: (from: any, to: HTMLElement, propertyName: string) => void;
+export declare const fitElementToRectangle: (element: HTMLElement, rectangle: APL.Rect) => void;
 /**
  * @ignore
  */
@@ -29,6 +31,10 @@ export interface IComponentProperties {
     [PropertyKey.kPropertyShadowVerticalOffset]: number;
     [PropertyKey.kPropertyShadowRadius]: number;
     [PropertyKey.kPropertyShadowColor]: number;
+}
+export interface IValueWithReference {
+    value: string;
+    reference?: Element;
 }
 /**
  * @ignore
@@ -58,6 +64,7 @@ export declare abstract class Component<PropsType = IGenericPropType> extends Ev
     assignedId: string;
     /** true us destroyed was called */
     protected isDestroyed: boolean;
+    private doForceInvisible;
     /** Component state */
     protected state: {
         [UpdateType.kUpdatePagerPosition]: number;
@@ -80,9 +87,13 @@ export declare abstract class Component<PropsType = IGenericPropType> extends Ev
      * @ignore
      */
     init(): void;
+    /**
+     * Get all displayed child count
+     * @ignore
+     */
+    getDisplayedChildCount(): Promise<number>;
     protected onPropertiesUpdated(): void;
     /**
-     * TODO -> separate layout props from style properties
      * @param props
      * @ignore
      */
@@ -110,9 +121,7 @@ export declare abstract class Component<PropsType = IGenericPropType> extends Ev
     static numberToColor(val: number): string;
     static getGradientSpreadMethod(gradientSpreadMethod: GradientSpreadMethod): string;
     static getGradientUnits(gradientUnits: GradientUnits): string;
-    static fillAndStrokeConverter(val: object, transform: string, parent: Element, logger: ILogger): string;
-    static getGradientUrl(val: IAVGGradient, transform: string, parent: Element, logger: ILogger): string;
-    static getPatternUrl(pattern: APL.GraphicPattern, transform: string, parent: Element, logger: ILogger): string;
+    static fillAndStrokeConverter(val: object, transform: string, parent: Element, logger: ILogger): IValueWithReference | undefined;
     hasValidBounds(): boolean;
     static getClipPathElementId(pathData: string, parent: Element): string;
     inflateAndAddChild(index: number, data: string): Component | undefined;
@@ -128,6 +137,8 @@ export declare abstract class Component<PropsType = IGenericPropType> extends Ev
     protected getProperties(): PropsType;
     protected setTransform: () => void;
     protected setOpacity: () => void;
+    forceInvisible(doForceInvisible: boolean): void;
+    protected getNormalDisplay(): string;
     protected setDisplay: () => void;
     protected setBoundsAndDisplay: () => void;
     protected setUserProperties: () => void;
@@ -135,4 +146,5 @@ export declare abstract class Component<PropsType = IGenericPropType> extends Ev
     protected getCssShadow: () => string;
     private setShadow;
     protected applyCssShadow: (shadowParams: string) => void;
+    protected takeFocus(): Promise<void>;
 }

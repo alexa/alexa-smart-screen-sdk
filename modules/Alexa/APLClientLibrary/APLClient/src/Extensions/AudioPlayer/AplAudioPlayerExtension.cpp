@@ -122,7 +122,7 @@ void AplAudioPlayerExtension::applySettings(const apl::Object& settings) {
     // Reset to defaults
     m_playbackStateName = "";
     /// Apply @c apl::Content defined settings
-    logMessage(apl::LogLevel::INFO, TAG, __func__, settings.toDebugString());
+    logMessage(apl::LogLevel::kInfo, TAG, __func__, settings.toDebugString());
     if (settings.isMap()) {
         if (settings.has(SETTING_PLAYBACK_STATE_NAME)) {
             m_playbackStateName = settings.get(SETTING_PLAYBACK_STATE_NAME).getString();
@@ -167,7 +167,7 @@ void AplAudioPlayerExtension::onExtensionEvent(
                 if (std::find(TOGGLE_COMMAND_NAMES.begin(), TOGGLE_COMMAND_NAMES.end(), toggleName) != TOGGLE_COMMAND_NAMES.end()) {
                     m_observer->onAudioPlayerToggle(toggleName, params.get(PROPERTY_TOGGLE_CHECKED).getBoolean());
                 } else {
-                    logMessage(apl::LogLevel::ERROR, TAG, __func__, "Invalid Toggle Command Name: " + eventDebugString);
+                    logMessage(apl::LogLevel::kError, TAG, __func__, "Invalid Toggle Command Name: " + eventDebugString);
                     succeeded = false;
                 }
             } else {
@@ -198,11 +198,11 @@ void AplAudioPlayerExtension::onExtensionEvent(
                 flushLyricData(lyricData);
             }
         } else {
-            logMessage(apl::LogLevel::ERROR, TAG, __func__, "Invalid Command: " + eventDebugString);
+            logMessage(apl::LogLevel::kError, TAG, __func__, "Invalid Command: " + eventDebugString);
             succeeded = false;
         }
     } else {
-        logMessage(apl::LogLevel::ERROR, TAG, __func__, "No Event Observer: " + eventDebugString);
+        logMessage(apl::LogLevel::kError, TAG, __func__, "No Event Observer: " + eventDebugString);
         succeeded = false;
     }
 
@@ -244,7 +244,7 @@ void AplAudioPlayerExtension::flushLyricData(const std::shared_ptr<LyricsViewedD
 
 void AplAudioPlayerExtension::updatePlayerActivity(const std::string& state, int offset) {
     if (std::find(PLAYER_ACTIVITY.begin(), PLAYER_ACTIVITY.end(), state) == PLAYER_ACTIVITY.end()) {
-        logMessage(apl::LogLevel::ERROR, TAG, __func__, "Invalid Player Activity: " + state);
+        logMessage(apl::LogLevel::kError, TAG, __func__, "Invalid Player Activity: " + state);
         return;
     }
 
@@ -252,7 +252,7 @@ void AplAudioPlayerExtension::updatePlayerActivity(const std::string& state, int
     m_playbackState->set(PROPERTY_OFFSET, offset);
 
     if (!m_eventHandler) {
-        logMessage(apl::LogLevel::WARN, TAG, __func__, "No Event Handler");
+        logMessage(apl::LogLevel::kWarn, TAG, __func__, "No Event Handler");
         return;
     }
 

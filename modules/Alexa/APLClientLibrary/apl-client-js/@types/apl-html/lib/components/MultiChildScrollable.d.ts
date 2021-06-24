@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import APLRenderer from '../APLRenderer';
 import { PropertyKey } from '../enums/PropertyKey';
@@ -36,11 +37,7 @@ export declare abstract class MultiChildScrollable extends Scrollable<IMultiChil
     protected allowFocus(requestedDistance: number, moveTo: HTMLDivElement): boolean;
     private adjustIndices(target, insert);
     private updateUponChildrenChange;
-    private setSnapAlign;
-    private setSnapType;
-    private getSnapType(snapType);
     private setScrollDirection;
-    private onScroll(relativePosition);
     private createItem(index, insertAt?);
     private onUpdate;
 }

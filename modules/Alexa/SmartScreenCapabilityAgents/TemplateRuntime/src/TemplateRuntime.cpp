@@ -263,8 +263,10 @@ void TemplateRuntime::renderDocument(
     m_activeNonPlayerInfoType = NonPlayerInfoDisplayType::ALEXA_PRESENTATION;
 }
 
-void TemplateRuntime::clearDocument(const std::string& token) {
-    m_executor->submit([this]() { executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType::ALEXA_PRESENTATION); });
+void TemplateRuntime::clearDocument(const std::string& token, const bool focusCleared) {
+    if (focusCleared) {
+        m_executor->submit([this]() { executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType::ALEXA_PRESENTATION); });
+    }
 }
 
 void TemplateRuntime::executeCommands(const std::string& jsonPayload, const std::string& token) {
@@ -277,7 +279,11 @@ void TemplateRuntime::dataSourceUpdate(
 void TemplateRuntime::interruptCommandSequence(const std::string& token) {
 }
 
-void TemplateRuntime::onPresentationSessionChanged(const std::string& id, const std::string& skillId) {
+void TemplateRuntime::onPresentationSessionChanged(
+    const std::string& id,
+    const std::string& skillId,
+    const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
+    const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions) {
 }
 
 void TemplateRuntime::addObserver(
@@ -594,10 +600,12 @@ void TemplateRuntime::executeAudioPlayerInfoUpdates(
             executeAudioPlayerStartTimer(state);
         }
 
-        if (NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoType) {
+        if (NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoType && !m_playerInfoCardToken.empty()) {
             /**
              *  If we're displaying another card stop here.
              *  executeNonPlayerInfoCardCleared will handle presenting the updated PlayerInfoCard.
+             *  An exception to this is - if a playerInfo card has been received for the first time (i.e. music card is
+             *  not rendering in the background already), the active presentation session is over
              */
             return;
         }

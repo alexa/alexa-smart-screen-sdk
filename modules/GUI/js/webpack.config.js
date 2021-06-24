@@ -20,7 +20,8 @@ module.exports = (env) => {
 
         output: {
             filename: '[name].bundle.js',
-            path: DEST
+            path: DEST,
+            publicPath : ''
         },
 
         resolve: {
@@ -47,7 +48,15 @@ module.exports = (env) => {
 
                 {
                     test: /\.css$/,
-                    use: ['style-loader', 'css-loader']
+                    use: [
+                        { loader: 'style-loader' },
+                        {
+                            loader: 'css-loader',
+                            options: {
+                                esModule: false
+                            }
+                        }
+                    ]
                 },
                 {
                     test: /\.(png|jpg|gif|wav)$/,

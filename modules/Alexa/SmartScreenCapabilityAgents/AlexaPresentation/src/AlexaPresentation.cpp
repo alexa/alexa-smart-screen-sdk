@@ -50,7 +50,7 @@ static const std::string ALEXAPRESENTATION_CAPABILITY_INTERFACE_TYPE = "AlexaInt
 static const std::string ALEXAPRESENTATIONAPL_CAPABILITY_INTERFACE_NAME = "Alexa.Presentation.APL";
 
 /// AlexaPresentation interface version for Alexa.Presentation.APL
-static const std::string ALEXAPRESENTATIONAPL_CAPABILITY_INTERFACE_VERSION = "1.1";
+static const std::string ALEXAPRESENTATIONAPL_CAPABILITY_INTERFACE_VERSION = "1.3";
 
 /// AlexaPresentation interface name3
 static const std::string ALEXAPRESENTATION_CAPABILITY_INTERFACE_NAME = "Alexa.Presentation";
@@ -63,9 +63,6 @@ static const std::string TAG{"AlexaPresentation"};
 
 /// The key in our config file to find the root of APL Presentation configuration.
 static const std::string ALEXAPRESENTATION_CONFIGURATION_ROOT_KEY = "alexaPresentationCapabilityAgent";
-
-/// The key in our config file to set the display card timeout value for RenderDocument case
-static const std::string ALEXAPRESENTATION_DOCUMENT_INTERACTION_KEY = "displayDocumentInteractionIdleTimeout";
 
 /// The key in our config file to set the minimum time in ms between reporting proactive state report events
 static const std::string ALEXAPRESENTATION_MIN_STATE_REPORT_INTERVAL_KEY = "minStateReportIntervalMs";
@@ -145,6 +142,9 @@ static const std::string APL_MAX_VERSION = "maxVersion";
 /// Identifier for the presentationToken's sent in a RenderDocument directive
 static const std::string PRESENTATION_TOKEN = "presentationToken";
 
+/// Identifier for the timeoutType sent in a RenderDocument directive
+static const std::string TIMEOUTTYPE_FIELD = "timeoutType";
+
 /// Identifier for the windowId's sent in a RenderDocument directive
 static const std::string WINDOW_ID = "windowId";
 
@@ -162,9 +162,6 @@ static const std::string DYNAMIC_INDEX_LIST{"dynamicIndexList"};
 
 /// Dynamic token list data source type
 static const std::string DYNAMIC_TOKEN_LIST{"dynamicTokenList"};
-
-/// Default timeout for clearing the RenderDocument display card when there is no interaction happening.
-static const std::chrono::milliseconds DEFAULT_DOCUMENT_INTERACTION_TIMEOUT_MS{30000};
 
 /// The AlexaPresentation context state signature.
 static const avsCommon::avs::NamespaceAndName RENDERED_DOCUMENT_STATE{
@@ -191,13 +188,17 @@ static std::chrono::milliseconds DEFAULT_MIN_STATE_REPORT_INTERVAL_MS{600};
 /// Default interval between proactive state report checks - disabled by default
 static std::chrono::milliseconds DEFAULT_STATE_REPORT_CHECK_INTERVAL_MS{0};
 
+/// Represents an invalid / unspecified timeout value
+const std::chrono::milliseconds INVALID_TIMEOUT = std::chrono::milliseconds(-1);
+
 std::shared_ptr<AlexaPresentation> AlexaPresentation::create(
     std::shared_ptr<avsCommon::sdkInterfaces::FocusManagerInterface> focusManager,
     std::shared_ptr<avsCommon::sdkInterfaces::ExceptionEncounteredSenderInterface> exceptionSender,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder,
     std::shared_ptr<avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
     std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface> contextManager,
-    std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> visualStateProvider) {
+    std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> visualStateProvider,
+    std::shared_ptr<avsCommon::sdkInterfaces::timing::TimerDelegateFactoryInterface> timerDelegateFactory) {
     if (!focusManager) {
         ACSDK_ERROR(LX("createFailed").d("reason", "nullFocusManager"));
         return nullptr;
@@ -219,7 +220,13 @@ std::shared_ptr<AlexaPresentation> AlexaPresentation::create(
     }
 
     std::shared_ptr<AlexaPresentation> alexaPresentation(new AlexaPresentation(
-        focusManager, exceptionSender, metricRecorder, messageSender, contextManager, visualStateProvider));
+        focusManager,
+        exceptionSender,
+        metricRecorder,
+        messageSender,
+        contextManager,
+        visualStateProvider,
+        timerDelegateFactory));
 
     if (!alexaPresentation->initialize()) {
         ACSDK_ERROR(LX("createFailed").d("reason", "Initialization error."));
@@ -236,12 +243,6 @@ std::shared_ptr<AlexaPresentation> AlexaPresentation::create(
 /// Initializes the object by reading the values from configuration.
 bool AlexaPresentation::initialize() {
     auto configurationRoot = ConfigurationNode::getRoot()[ALEXAPRESENTATION_CONFIGURATION_ROOT_KEY];
-
-    // If key is present, then read and initialize the value from config or set to default.
-    configurationRoot.getDuration<std::chrono::milliseconds>(
-        ALEXAPRESENTATION_DOCUMENT_INTERACTION_KEY,
-        &m_sdkConfiguredDocumentInteractionTimeout,
-        DEFAULT_DOCUMENT_INTERACTION_TIMEOUT_MS);
 
     configurationRoot.getDuration<std::chrono::milliseconds>(
         ALEXAPRESENTATION_MIN_STATE_REPORT_INTERVAL_KEY,
@@ -307,7 +308,6 @@ void AlexaPresentation::handleDirective(std::shared_ptr<DirectiveInfo> info) {
     }
 
     if (info->directive->getNamespace() == DOCUMENT.nameSpace && info->directive->getName() == DOCUMENT.name) {
-        setDocumentIdleTimeout(m_sdkConfiguredDocumentInteractionTimeout);
         handleRenderDocumentDirective(info);
     } else if (info->directive->getNamespace() == COMMAND.nameSpace && info->directive->getName() == COMMAND.name) {
         handleExecuteCommandDirective(info);
@@ -351,15 +351,16 @@ void AlexaPresentation::clearCard() {
         executeResetActivityTracker();
         executeClearCardEvent();
         // TODO: ARC-575 consider cleaning the commands on CommandsSequencer
-        doClearExecuteCommand("Card cleared");
+        executeClearExecuteCommands("Card cleared");
     });
 }
 
 void AlexaPresentation::clearExecuteCommands(const std::string& token, const bool markAsFailed) {
-    m_executor->submit([this, token, markAsFailed]() { doClearExecuteCommand("User exited", token, markAsFailed); });
+    m_executor->submit(
+        [this, token, markAsFailed]() { executeClearExecuteCommands("User exited", token, markAsFailed); });
 }
 
-void AlexaPresentation::doClearExecuteCommand(
+void AlexaPresentation::executeClearExecuteCommands(
     const std::string& reason,
     const std::string& token,
     const bool markAsFailed) {
@@ -397,7 +398,7 @@ void AlexaPresentation::onDialogUXStateChanged(
             // Restart timer in case if event arrived while GUI is not active.
             if (m_lastDisplayedDirective && m_lastDisplayedDirective->directive->getName() == RENDER_DOCUMENT &&
                 InteractionState::INACTIVE == m_documentInteractionState) {
-                executeStartTimer(m_documentInteractionTimeout);
+                executeStartOrExtendTimer();
             }
         } else {
             if (m_lastDisplayedDirective && m_lastDisplayedDirective->directive->getName() == RENDER_DOCUMENT) {
@@ -445,7 +446,8 @@ AlexaPresentation::AlexaPresentation(
     std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder,
     std::shared_ptr<avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
     std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface> contextManager,
-    std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> visualStateProvider) :
+    std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> visualStateProvider,
+    std::shared_ptr<avsCommon::sdkInterfaces::timing::TimerDelegateFactoryInterface> timerDelegateFactory) :
         CapabilityAgent{ALEXA_PRESENTATION_NAMESPACE, exceptionSender},
         RequiresShutdown{"AlexaPresentation"},
         m_focus{FocusState::NONE},
@@ -462,7 +464,8 @@ AlexaPresentation::AlexaPresentation(
         m_minStateReportInterval{DEFAULT_MIN_STATE_REPORT_INTERVAL_MS},
         m_stateReportPending{false},
         m_documentRendered{false},
-        m_presentationSession{} {
+        m_presentationSession{},
+        m_idleTimer{timerDelegateFactory} {
     m_executor = std::make_shared<alexaClientSDK::avsCommon::utils::threading::Executor>();
     m_capabilityConfigurations.insert(getAlexaPresentationCapabilityConfiguration());
 }
@@ -512,23 +515,16 @@ std::shared_ptr<CapabilityConfiguration> AlexaPresentation::getAlexaPresentation
 }
 
 void AlexaPresentation::sendUserEvent(const std::string& payload) {
-    m_executor->submit([this, payload]() {
-        m_events.push(std::make_pair(AlexaPresentationEvents::APL_USER_EVENT, payload));
-        m_contextManager->getContext(shared_from_this());
-    });
+    m_executor->submit([this, payload]() { executeSendEvent(ALEXA_PRESENTATION_APL_NAMESPACE, USER_EVENT, payload); });
 }
 
 void AlexaPresentation::sendDataSourceFetchRequestEvent(const std::string& type, const std::string& payload) {
     if (type == DYNAMIC_INDEX_LIST) {
-        m_executor->submit([this, payload]() {
-            m_events.push(std::make_pair(AlexaPresentationEvents::APL_LOAD_INDEX_LIST_DATA, payload));
-            m_contextManager->getContext(shared_from_this());
-        });
+        m_executor->submit(
+            [this, payload]() { executeSendEvent(ALEXA_PRESENTATION_APL_NAMESPACE, LOAD_INDEX_LIST_DATA, payload); });
     } else if (type == DYNAMIC_TOKEN_LIST) {
-        m_executor->submit([this, payload]() {
-            m_events.push(std::make_pair(AlexaPresentationEvents::APL_LOAD_TOKEN_LIST_DATA, payload));
-            m_contextManager->getContext(shared_from_this());
-        });
+        m_executor->submit(
+            [this, payload]() { executeSendEvent(ALEXA_PRESENTATION_APL_NAMESPACE, LOAD_TOKEN_LIST_DATA, payload); });
     } else {
         ACSDK_WARN(LX("sendDataSourceFetchRequestEventIgnored").d("reason", "Trying to process unknown data source."));
         return;
@@ -536,17 +532,15 @@ void AlexaPresentation::sendDataSourceFetchRequestEvent(const std::string& type,
 }
 
 void AlexaPresentation::sendRuntimeErrorEvent(const std::string& payload) {
-    m_executor->submit([this, payload]() {
-        m_events.push(std::make_pair(AlexaPresentationEvents::APL_RUNTIME_ERROR, payload));
-        m_contextManager->getContext(shared_from_this());
-    });
+    m_executor->submit(
+        [this, payload]() { executeSendEvent(ALEXA_PRESENTATION_APL_NAMESPACE, RUNTIME_ERROR, payload); });
 }
 
 void AlexaPresentation::doShutdown() {
     m_proactiveStateTimer.stop();
     m_executor->shutdown();
 
-    doClearExecuteCommand("AlexaPresentationShuttingDown");
+    executeClearExecuteCommands("AlexaPresentationShuttingDown");
 
     m_visualStateProvider.reset();
     m_messageSender.reset();
@@ -608,6 +602,26 @@ void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveI
             return;
         }
 
+        std::string timeoutType;
+        if (!jsonUtils::retrieveValue(payload, TIMEOUTTYPE_FIELD, &timeoutType)) {
+            ACSDK_ERROR(LX("handleRenderDocumentDirectiveFailedInExecutor").d("reason", "NoTimeoutTypeField"));
+            sendExceptionEncounteredAndReportFailed(info, "missing timeoutType");
+            notifyAbort();
+            return;
+        }
+
+        // Validate timeoutType
+        auto maybeValidTimeout = TimeoutTypeUtils::fromString(timeoutType);
+        if (!maybeValidTimeout.hasValue()) {
+            ACSDK_ERROR(LX("handleRenderDocumentDirectiveFailedInExecutor")
+                            .d("reason", "InvalidTimeoutType")
+                            .d("receivedTimeoutType", timeoutType));
+            sendExceptionEncounteredAndReportFailed(info, "invalid timeoutType");
+            notifyAbort();
+            return;
+        }
+        m_documentInteractionTimeout = TimeoutTypeUtils::asDuration(maybeValidTimeout.value());
+
         std::string APLdocument;
         if (!jsonUtils::retrieveValue(payload, DOCUMENT_FIELD, &APLdocument)) {
             ACSDK_ERROR(LX("handleRenderDocumentDirectiveFailedInExecutor").d("reason", "NoDocument"));
@@ -632,7 +646,48 @@ void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveI
                 ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor").m("Failed to find presentationSession id"));
             }
 
-            presentationSession = PresentationSession(skillId, id);
+            rapidjson::Document doc;
+            doc.Parse(presentationSessionPayload);
+            std::vector<smartScreenSDKInterfaces::GrantedExtension> grantedExtensions;
+            if (doc.HasMember(PRESENTATION_SESSION_GRANTEDEXTENSIONS) &&
+                doc[PRESENTATION_SESSION_GRANTEDEXTENSIONS].IsArray()) {
+                auto grantExtensionArray = doc[PRESENTATION_SESSION_GRANTEDEXTENSIONS].GetArray();
+                for (auto& itr : grantExtensionArray) {
+                    auto grantedExtension = new smartScreenSDKInterfaces::GrantedExtension();
+                    if (itr.HasMember(PRESENTATION_SESSION_URI) && itr[PRESENTATION_SESSION_URI].IsString()) {
+                        grantedExtension->uri = itr[PRESENTATION_SESSION_URI].GetString();
+                        grantedExtensions.push_back(*grantedExtension);
+                    } else {
+                        ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor").m("Error parsing grantedExtensions"));
+                    }
+                }
+            } else {
+                ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor")
+                               .m("Failed to find presentationSession grantedExtensions"));
+            }
+
+            std::vector<smartScreenSDKInterfaces::AutoInitializedExtension> autoInitializedExtensions;
+            if (doc.HasMember(PRESENTATION_SESSION_AUTOINITIALIZEDEXTENSIONS) &&
+                doc[PRESENTATION_SESSION_AUTOINITIALIZEDEXTENSIONS].IsArray()) {
+                auto autoInitializedExtensionArray = doc[PRESENTATION_SESSION_AUTOINITIALIZEDEXTENSIONS].GetArray();
+                for (auto& itr : autoInitializedExtensionArray) {
+                    auto autoInitializedExtension = new smartScreenSDKInterfaces::AutoInitializedExtension();
+                    if (itr.HasMember(PRESENTATION_SESSION_URI) && itr[PRESENTATION_SESSION_URI].IsString() &&
+                        itr.HasMember(PRESENTATION_SESSION_SETTINGS) && itr[PRESENTATION_SESSION_SETTINGS].IsString()) {
+                        autoInitializedExtension->uri = itr[PRESENTATION_SESSION_URI].GetString();
+                        autoInitializedExtension->settings = itr[PRESENTATION_SESSION_SETTINGS].GetString();
+                        autoInitializedExtensions.push_back(*autoInitializedExtension);
+                    } else {
+                        ACSDK_WARN(
+                            LX("handleRenderDocumentDirectiveInExecutor").m("Error parsing autoInitializedExtensions"));
+                    }
+                }
+            } else {
+                ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor")
+                               .m("Failed to find presentationSession autoInitializedExtensions"));
+            }
+
+            presentationSession = PresentationSession(skillId, id, grantedExtensions, autoInitializedExtensions);
         }
 
         if (presentationSession != m_presentationSession) {
@@ -641,12 +696,16 @@ void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveI
                              .d("previousSkillId", m_presentationSession.skillId)
                              .d("newSkillId", presentationSession.skillId));
             for (auto& observer : m_observers) {
-                observer->onPresentationSessionChanged(presentationSession.id, presentationSession.skillId);
+                observer->onPresentationSessionChanged(
+                    presentationSession.id,
+                    presentationSession.skillId,
+                    presentationSession.grantedExtensions,
+                    presentationSession.autoInitializedExtensions);
             }
             m_presentationSession = presentationSession;
         }
 
-        executeDisplayCardEvent(info);
+        executeRenderDocumentEvent(info);
     });
 }
 
@@ -769,7 +828,7 @@ void AlexaPresentation::handleDynamicListDataDirective(
         }
 
         // Core will do checks for us for content of it, so just pass through.
-        executeDynamicListDataEvent(info, sourceType);
+        executeDataSourceUpdateEvent(info, sourceType);
     });
 }
 
@@ -850,8 +909,11 @@ void AlexaPresentation::executeRenderDocumentCallbacks(bool isClearCard) {
     for (auto& observer : m_observers) {
         if (isClearCard) {
             m_presentationSession = {};
-            observer->clearDocument(m_lastRenderedAPLToken);
+            observer->clearDocument(m_lastRenderedAPLToken, true);
         } else {
+            if (dismissPrevious && m_lastTargetedWindowId != windowId) {
+                observer->clearDocument(m_lastRenderedAPLToken, false);
+            }
             observer->renderDocument(m_lastDisplayedDirective->directive->getPayload(), newToken, windowId);
             if (m_renderReceivedTime.time_since_epoch().count() != 0) {
                 observer->onRenderDirectiveReceived(m_lastRenderedAPLToken, m_renderReceivedTime);
@@ -865,13 +927,20 @@ void AlexaPresentation::executeRenderDocumentCallbacks(bool isClearCard) {
          * Send @c Dismissed event for the previous document
          * Whether we are displaying new card or just dismissing this one.
          */
-        executeSendDismissedEvent();
+        ACSDK_DEBUG5(LX(__func__).d("Token", m_lastRenderedAPLToken));
+
+        // Assemble the event payload.
+        std::ostringstream payload;
+        payload << R"({"presentationToken":")" << m_lastRenderedAPLToken << R"("})";
+
+        executeSendEvent(ALEXA_PRESENTATION_NAMESPACE, DOCUMENT_DISMISSED, payload.str());
     }
 
+    m_lastTargetedWindowId = windowId;
     m_lastRenderedAPLToken = newToken;
 }
 
-void AlexaPresentation::executeDisplayCard() {
+void AlexaPresentation::executeRenderDocument() {
     ACSDK_DEBUG5(LX(__func__));
 
     if (m_lastDisplayedDirective &&
@@ -882,13 +951,13 @@ void AlexaPresentation::executeDisplayCard() {
     }
 }
 
-void AlexaPresentation::executeCommandEvent(std::shared_ptr<DirectiveInfo> info) {
+void AlexaPresentation::executeExecuteCommand(std::shared_ptr<DirectiveInfo> info) {
     ACSDK_DEBUG5(LX(__func__));
 
     if (m_lastDisplayedDirective->directive->getNamespace() != ALEXA_PRESENTATION_APL_NAMESPACE &&
         m_lastDisplayedDirective->directive->getName() != RENDER_DOCUMENT) {
         sendExceptionEncounteredAndReportFailed(info, "APL document that requires command executed is not rendered.");
-        ACSDK_ERROR(LX("executeCommandEventFailed")
+        ACSDK_ERROR(LX("executeExecuteCommandFailed")
                         .d("reason", "Cannot execute command when an APL document is not rendered."));
         return;
     }
@@ -900,13 +969,13 @@ void AlexaPresentation::executeCommandEvent(std::shared_ptr<DirectiveInfo> info)
     }
 }
 
-void AlexaPresentation::dataSourceUpdateEvent(std::shared_ptr<DirectiveInfo> info, const std::string& sourceType) {
+void AlexaPresentation::executeDataSourceUpdate(std::shared_ptr<DirectiveInfo> info, const std::string& sourceType) {
     ACSDK_DEBUG5(LX(__func__));
 
     if (m_lastDisplayedDirective->directive->getNamespace() != ALEXA_PRESENTATION_APL_NAMESPACE &&
         m_lastDisplayedDirective->directive->getName() != RENDER_DOCUMENT) {
         sendExceptionEncounteredAndReportFailed(info, "APL document that requires data source update is not rendered.");
-        ACSDK_ERROR(LX("dataSourceUpdateEventFailed")
+        ACSDK_ERROR(LX("executeDataSourceUpdateFailed")
                         .d("reason", "Cannot do DataSource update when an APL document is not rendered."));
         return;
     }
@@ -930,18 +999,19 @@ void AlexaPresentation::executeClearCard() {
     }
 }
 
-void AlexaPresentation::executeRestartTimer(std::chrono::milliseconds timeout) {
+void AlexaPresentation::executeStartOrExtendTimer() {
     if (smartScreenSDKInterfaces::State::DISPLAYING == m_state) {
-        ACSDK_DEBUG3(LX(__func__).d("timeoutInMilliseconds", timeout.count()));
         m_idleTimer.stop();
-        m_idleTimer.start(timeout, [this] { m_executor->submit([this] { executeClearCardEvent(); }); });
-    }
-}
 
-void AlexaPresentation::executeStartTimer(std::chrono::milliseconds timeout) {
-    if (smartScreenSDKInterfaces::State::DISPLAYING == m_state) {
-        ACSDK_DEBUG3(LX(__func__).d("timeoutInMilliseconds", timeout.count()));
-        m_idleTimer.start(timeout, [this] { m_executor->submit([this] { executeClearCardEvent(); }); });
+        ACSDK_DEBUG3(
+            LX(__func__)
+                .d("timeoutInMilliseconds.hasValue", m_documentInteractionTimeout.hasValue())
+                .d("timeoutinMilliseconds.value", m_documentInteractionTimeout.valueOr(INVALID_TIMEOUT).count()));
+        if (m_documentInteractionTimeout.hasValue()) {
+            m_idleTimer.start(m_documentInteractionTimeout.value(), [this] {
+                m_executor->submit([this] { executeClearCardEvent(); });
+            });
+        }
     }
 }
 
@@ -955,14 +1025,14 @@ void AlexaPresentation::executeStopTimer() {
  * A state machine is used to acquire and release the visual channel from the visual @c FocusManager.  The state machine
  * has five @c State, and four events as listed below:
  *
- * displayCard - This event happens when the AlexaPresentation is ready to notify its observers to display a
- * displayCard.
+ * renderDocument - This event happens when the AlexaPresentation is ready to notify its observers to display a
+ * document.
  *
  * focusChanged - This event happens when the @c FocusManager notifies a change in @c FocusState in the visual
  * channel.
  *
  * timer - This event happens when m_idleTimer expires and needs to notify its observers to clear the
- * displayCard.
+ * document.
  *
  * cardCleared - This event happens when @c displayCardCleared() is called to notify @c RenderingHandler the device has
  * cleared the screen.
@@ -970,15 +1040,15 @@ void AlexaPresentation::executeStopTimer() {
  * Each state transition may result in one or more of the following actions:
  * (A) Acquire channel
  * (B) Release channel
- * (C) Notify observers to display displayCard
- * (D) Notify observers to clear displayCard
+ * (C) Notify observers to display document
+ * (D) Notify observers to clear document
  * (E) Log error about unexpected focusChanged event.
  *
  * Below is the state table illustrating the state transition and its action.  NC means no change in state.
  *
  *                                              E  V  E  N  T  S
  *                -----------------------------------------------------------------------------------------
- *  Current State | displayCard  | timer          | focusChanged::NONE | focusChanged::FG/BG | cardCleared
+ *  Current State | render       | timer          | focusChanged::NONE | focusChanged::FG/BG | cardCleared
  * --------------------------------------------------------------------------------------------------------
  * | IDLE         | ACQUIRING(A) | NC             | NC                 | RELEASING(B&E)      | NC
  * | ACQUIRING    | NC           | NC             | IDLE(E)            | DISPLAYING(C)       | NC
@@ -1036,7 +1106,7 @@ void AlexaPresentation::executeOnFocusChangedEvent(avsCommon::avs::FocusState ne
             switch (newFocus) {
                 case FocusState::FOREGROUND:
                 case FocusState::BACKGROUND:
-                    executeDisplayCard();
+                    executeRenderDocument();
                     nextState = smartScreenSDKInterfaces::State::DISPLAYING;
                     break;
                 case FocusState::NONE:
@@ -1052,7 +1122,7 @@ void AlexaPresentation::executeOnFocusChangedEvent(avsCommon::avs::FocusState ne
             switch (newFocus) {
                 case FocusState::FOREGROUND:
                 case FocusState::BACKGROUND:
-                    executeDisplayCard();
+                    executeRenderDocument();
                     break;
                 case FocusState::NONE:
                     executeClearCard();
@@ -1099,7 +1169,7 @@ void AlexaPresentation::executeOnFocusChangedEvent(avsCommon::avs::FocusState ne
     m_state = nextState;
 }
 
-void AlexaPresentation::executeDisplayCardEvent(
+void AlexaPresentation::executeRenderDocumentEvent(
     const std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityAgent::DirectiveInfo> info) {
     smartScreenSDKInterfaces::State nextState = m_state;
     m_lastDisplayedDirective = info;
@@ -1115,7 +1185,7 @@ void AlexaPresentation::executeDisplayCardEvent(
             break;
         case smartScreenSDKInterfaces::State::DISPLAYING:
             if (m_focusHoldingInterface == m_lastDisplayedDirective->directive->getNamespace()) {
-                executeDisplayCard();
+                executeRenderDocument();
                 nextState = smartScreenSDKInterfaces::State::DISPLAYING;
             } else {
                 nextState = smartScreenSDKInterfaces::State::REACQUIRING;
@@ -1145,7 +1215,7 @@ void AlexaPresentation::executeExecuteCommandEvent(
             // Do Nothing.
             break;
         case smartScreenSDKInterfaces::State::DISPLAYING:
-            executeCommandEvent(info);
+            executeExecuteCommand(info);
             nextState = smartScreenSDKInterfaces::State::DISPLAYING;
             break;
         case smartScreenSDKInterfaces::State::RELEASING:
@@ -1161,12 +1231,12 @@ void AlexaPresentation::executeExecuteCommandEvent(
     m_state = nextState;
 }
 
-void AlexaPresentation::executeDynamicListDataEvent(
+void AlexaPresentation::executeDataSourceUpdateEvent(
     const std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityAgent::DirectiveInfo> info,
     const std::string& sourceType) {
     switch (m_state) {
         case smartScreenSDKInterfaces::State::DISPLAYING:
-            dataSourceUpdateEvent(info, sourceType);
+            executeDataSourceUpdate(info, sourceType);
             break;
         default:
             // Do nothing
@@ -1179,19 +1249,11 @@ std::unordered_set<std::shared_ptr<avsCommon::avs::CapabilityConfiguration>> Ale
     return m_capabilityConfigurations;
 }
 
-void AlexaPresentation::executeSendDismissedEvent() {
-    ACSDK_DEBUG5(LX(__func__).d("Token", m_lastRenderedAPLToken));
-
-    if (m_lastRenderedAPLToken.empty()) {
-        return;
-    }
-
-    // Assemble the event payload.
-    std::ostringstream payload;
-    payload << R"({"presentationToken":")" << m_lastRenderedAPLToken << R"("})";
-
-    m_events.push(std::make_pair(AlexaPresentationEvents::APL_DISMISSED, payload.str()));
-    ACSDK_DEBUG5(LX(__func__).d("APL_TOKEN", m_lastRenderedAPLToken).m("Pushed APL Dismissed"));
+void AlexaPresentation::executeSendEvent(
+    const std::string& avsNamespace,
+    const std::string& name,
+    const std::string& payload) {
+    m_events.push(std::make_tuple(avsNamespace, name, payload));
     m_contextManager->getContext(shared_from_this());
 }
 
@@ -1201,55 +1263,11 @@ void AlexaPresentation::onContextAvailable(const std::string& jsonContext) {
 
         if (!m_events.empty()) {
             auto event = m_events.front();
-
-            switch (event.first) {
-                case AlexaPresentationEvents::APL_USER_EVENT: {
-                    auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
-                        ALEXA_PRESENTATION_APL_NAMESPACE, USER_EVENT, "", event.second, jsonContext);
-                    auto userEventMessage = std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
-
-                    ACSDK_DEBUG9(LX("onContextAvailable : Send UserEvent to AVS."));
-                    m_messageSender->sendMessage(userEventMessage);
-                    break;
-                }
-                case AlexaPresentationEvents::APL_LOAD_INDEX_LIST_DATA: {
-                    auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
-                        ALEXA_PRESENTATION_APL_NAMESPACE, LOAD_INDEX_LIST_DATA, "", event.second, jsonContext);
-                    auto fetchRequestEvent = std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
-
-                    ACSDK_DEBUG9(LX("onContextAvailable : Send DataSourceFetchRequest event to AVS."));
-                    m_messageSender->sendMessage(fetchRequestEvent);
-                    break;
-                }
-                case AlexaPresentationEvents::APL_LOAD_TOKEN_LIST_DATA: {
-                    auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
-                        ALEXA_PRESENTATION_APL_NAMESPACE, LOAD_TOKEN_LIST_DATA, "", event.second, jsonContext);
-                    auto fetchRequestEvent = std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
-
-                    ACSDK_DEBUG9(LX("onContextAvailable : Send DataSourceFetchRequest event to AVS."));
-                    m_messageSender->sendMessage(fetchRequestEvent);
-                    break;
-                }
-                case AlexaPresentationEvents::APL_RUNTIME_ERROR: {
-                    auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
-                        ALEXA_PRESENTATION_APL_NAMESPACE, RUNTIME_ERROR, "", event.second, jsonContext);
-                    auto runtimeErrorEvent = std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
-
-                    ACSDK_DEBUG9(LX("onContextAvailable : Send RuntimeError event to AVS."));
-                    m_messageSender->sendMessage(runtimeErrorEvent);
-                    break;
-                }
-                case AlexaPresentationEvents::APL_DISMISSED: {
-                    auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
-                        ALEXA_PRESENTATION_NAMESPACE, DOCUMENT_DISMISSED, "", event.second, jsonContext);
-                    auto documentDismissedEvent =
-                        std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
-
-                    ACSDK_DEBUG9(LX("onContextAvailable : Send documentDismissed event to AVS."));
-                    m_messageSender->sendMessage(documentDismissedEvent);
-                    break;
-                }
-            }
+            auto msgIdAndJsonEvent = avsCommon::avs::buildJsonEventString(
+                std::get<0>(event), std::get<1>(event), "", std::get<2>(event), jsonContext);
+            auto userEventMessage = std::make_shared<avsCommon::avs::MessageRequest>(msgIdAndJsonEvent.second);
+            ACSDK_DEBUG9(LX("Sending event to AVS").d("namespace", std::get<0>(event)).d("name", std::get<1>(event)));
+            m_messageSender->sendMessage(userEventMessage);
 
             m_events.pop();
         }
@@ -1345,7 +1363,11 @@ void AlexaPresentation::setAPLMaxVersion(const std::string& APLMaxVersion) {
 }
 
 void AlexaPresentation::setDocumentIdleTimeout(std::chrono::milliseconds timeout) {
-    m_documentInteractionTimeout = timeout;
+    ACSDK_DEBUG1(LX(__func__).d("timeout", timeout.count()));
+
+    if (INVALID_TIMEOUT != timeout) {
+        m_documentInteractionTimeout.set(timeout);
+    }
 }
 
 void AlexaPresentation::processRenderDocumentResult(
@@ -1384,7 +1406,7 @@ void AlexaPresentation::processRenderDocumentResult(
         }
 
         if (DialogUXState::IDLE == m_dialogUxState && InteractionState::INACTIVE == m_documentInteractionState) {
-            executeStartTimer(m_sdkConfiguredDocumentInteractionTimeout);
+            executeStartOrExtendTimer();
         }
     });
 }
@@ -1459,14 +1481,14 @@ void AlexaPresentation::processActivityEvent(
                     }
                     if (DialogUXState::IDLE == m_dialogUxState &&
                         InteractionState::INACTIVE == m_documentInteractionState) {
-                        executeStartTimer(m_sdkConfiguredDocumentInteractionTimeout);
+                        executeStartOrExtendTimer();
                     }
                 }
                 break;
             case smartScreenSDKInterfaces::ActivityEvent::ONE_TIME:
                 if (DialogUXState::IDLE == m_dialogUxState &&
                     InteractionState::INACTIVE == m_documentInteractionState) {
-                    executeRestartTimer(m_sdkConfiguredDocumentInteractionTimeout);
+                    executeStartOrExtendTimer();
                 }
                 break;
             case smartScreenSDKInterfaces::ActivityEvent::INTERRUPT:
@@ -1475,7 +1497,7 @@ void AlexaPresentation::processActivityEvent(
                 }
                 if (DialogUXState::IDLE == m_dialogUxState &&
                     InteractionState::INACTIVE == m_documentInteractionState) {
-                    executeRestartTimer(m_sdkConfiguredDocumentInteractionTimeout);
+                    executeStartOrExtendTimer();
                 }
                 break;
             default:

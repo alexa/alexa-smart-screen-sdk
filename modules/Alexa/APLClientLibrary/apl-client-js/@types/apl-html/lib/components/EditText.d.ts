@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import APLRenderer from '../APLRenderer';
 import { ActionableComponent } from './ActionableComponent';
@@ -40,7 +41,9 @@ export declare class EditText extends ActionableComponent<IEditTextProperties> {
     private enterPressedDown;
     private isEdge;
     constructor(renderer: APLRenderer, component: APL.Component, factory: FactoryFunction, parent?: Component);
+    protected setTextBoundsAndDisplay: () => void;
     private initEditTextHtmlComponent();
+    private setInnerBounds();
     private setBorderColor;
     private setBorderWidth;
     private setColor;
@@ -59,14 +62,14 @@ export declare class EditText extends ActionableComponent<IEditTextProperties> {
     private setSelectTextOnFocus;
     private setInputSize;
     private setInputText;
-    private onFocus;
-    private onBlur;
+    focus: () => void;
+    protected blur: () => void;
     private onInput;
     private onSubmit;
     private onKeyup;
     private onKeydown;
-    private getSectionId;
-    protected navigate: (event: any) => void;
     private filterText(text);
     private addRuleToAvailableStyleSheet(selector, style);
+    private filterEventPropagation(event, inputElement);
+    private shouldStopPropagation(event, inputElement);
 }

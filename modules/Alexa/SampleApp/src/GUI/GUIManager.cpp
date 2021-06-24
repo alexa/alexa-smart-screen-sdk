@@ -176,8 +176,12 @@ void GUIManager::interruptCommandSequence(const std::string& token) {
     m_guiClient->interruptCommandSequence(token);
 }
 
-void GUIManager::onPresentationSessionChanged(const std::string& id, const std::string& skillId) {
-    m_guiClient->onPresentationSessionChanged(id, skillId);
+void GUIManager::onPresentationSessionChanged(
+    const std::string& id,
+    const std::string& skillId,
+    const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
+    const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions) {
+    m_guiClient->onPresentationSessionChanged(id, skillId, grantedExtensions, autoInitializedExtensions);
 }
 
 void GUIManager::renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) {
@@ -185,9 +189,9 @@ void GUIManager::renderDocument(const std::string& jsonPayload, const std::strin
     m_guiClient->renderDocument(jsonPayload, token, windowId);
 }
 
-void GUIManager::clearDocument(const std::string& token) {
+void GUIManager::clearDocument(const std::string& token, const bool focusCleared) {
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::NONE;
-    m_guiClient->clearDocument(token);
+    m_guiClient->clearDocument(token, focusCleared);
 }
 
 void GUIManager::executeCommands(const std::string& jsonPayload, const std::string& token) {
@@ -652,24 +656,6 @@ void GUIManager::handleRenderComplete() {
         bool isAlexaPresentationPresenting =
             NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType;
         m_ssClient->handleRenderComplete(isAlexaPresentationPresenting);
-    });
-}
-
-void GUIManager::handleDisplayMetrics(uint64_t dropFrameCount) {
-    m_executor.submit([this, dropFrameCount]() {
-        m_ssClient->handleDropFrameCount(
-            dropFrameCount, NonPlayerInfoDisplayType::ALEXA_PRESENTATION == m_activeNonPlayerInfoDisplayType);
-    });
-}
-
-void GUIManager::handleDisplayMetrics(const std::vector<APLClient::DisplayMetric>& metrics) {
-    m_executor.submit([this, metrics]() {
-        for (const auto& metric : metrics) {
-            // for backwards compatibility, to remove when the viewhost changes are merged
-            if (metric.name == "APL-Web.RootContext.dropFrame") {
-                handleDisplayMetrics(metric.value);
-            }
-        }
     });
 }
 

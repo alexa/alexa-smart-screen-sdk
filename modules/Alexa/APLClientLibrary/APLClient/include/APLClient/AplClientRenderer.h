@@ -163,7 +163,7 @@ public:
     /// @{
     void onRenderDirectiveReceived(const std::chrono::steady_clock::time_point &receiveTime) override;
     void onRenderingEvent(AplRenderingEvent event) override;
-    void onMetricsReported(const std::vector<DisplayMetric> &metrics) override;
+    void onMetricsReported(const std::string& jsonPayload) override;
     void onTelemetrySinkUpdated(APLClient::Telemetry::AplMetricsSinkInterfacePtr sink) override;
     /// @}
 
@@ -189,6 +189,14 @@ private:
     uint64_t m_lastReportedComplexity;
 
     std::unique_ptr<Telemetry::AplTimerHandle> m_renderTimer;
+
+    /**
+     * Validates the content from the metrics payload
+     * 
+     * @param jsonMetric The metric item to validate
+     * @return bool Indicates whether the metric content is valid
+     */
+    bool validateJsonMetric(const rapidjson::Value& jsonMetric);
 };
 
 using AplClientRendererPtr = std::shared_ptr<AplClientRenderer>;

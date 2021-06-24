@@ -26,10 +26,10 @@ namespace {
 static std::string TID_DELIMITER = "#TID#";
 static std::string UNKNOWN_CLIENT_ID = "";
 static std::string UNKNOWN_SKILL_ID = "";
+static std::string METRIC_KIND_TIMER = "timer";
+static std::string METRIC_KIND_COUNTER = "counter";
 
 /*
- * See: https://wiki.labcollab.net/confluence/display/Doppler/TemplateRuntime+-+AskPresentationToken
- *
  * The presentationToken format is as follows:
  * amzn{Amazon Common Id version}.{namespace}.{templateToken version}.{clientId}#TID#{SkillId}:{Skill-Sent-Token}:{Random-Number}.
  */
@@ -200,27 +200,107 @@ void AplClientRenderer::onRenderingEvent(AplRenderingEvent event) {
     }
 }
 
-void AplClientRenderer::onMetricsReported(const std::vector<DisplayMetric>& metrics) {
+void AplClientRenderer::onMetricsReported(const std::string& jsonPayload) {
+    rapidjson::Document doc;
+    rapidjson::Value metricsPayload;
+
+    auto aplOptions = m_aplConfiguration->getAplOptions();
     auto metricsRecorder = m_aplConfiguration->getMetricsRecorder();
-    for (const auto &metric : metrics) {
-        if (metric.kind == DisplayMetricKind::kTimer) {
+
+    if (doc.Parse(jsonPayload.c_str()).HasParseError()) {
+        aplOptions->logMessage(LogLevel::ERROR, "onMetricsReportedFailed", "Error whilst parsing message");
+        return;
+    }
+
+    if (!doc.HasMember("payload")) {
+        aplOptions->logMessage(LogLevel::ERROR, "onMetricsReportedFailed", "Payload not found");
+        return;
+    }
+    metricsPayload = doc["payload"];
+
+    if (metricsPayload.GetType() != rapidjson::Type::kArrayType) {
+        aplOptions->logMessage(LogLevel::ERROR, "onMetricsReportedFailed", "Payload is not an array");
+        return;
+    }
+
+    for (rapidjson::SizeType i = 0; i < metricsPayload.Size(); i++) {
+        const auto& jsonMetric = metricsPayload[i];
+
+        if (!validateJsonMetric(jsonMetric)) {
+            aplOptions->logMessage(LogLevel::ERROR, "onMetricsReportedFailed", "jsonMetric is invalid");
+            return;
+        }
+
+        std::string kind = jsonMetric["kind"].GetString();
+        std::string name = jsonMetric["name"].GetString();
+
+        rapidjson::Value::ConstMemberIterator iterator;
+        iterator = jsonMetric.FindMember("value");
+        if (iterator == jsonMetric.MemberEnd()) {
+            aplOptions->logMessage(LogLevel::ERROR, "onMetricsReportedFailed", "Unable to find jsonMetric value");
+            return;
+        }
+
+        double d_value = 0;
+        uint64_t i_value = 0;
+        uint64_t value = 0;
+        if (iterator->value.IsDouble()) {
+            d_value = iterator->value.GetDouble();
+            value = static_cast<uint64_t>(d_value);
+        } else if (iterator->value.IsUint64()) {
+            i_value = iterator->value.GetUint64();
+            value = static_cast<uint64_t>(i_value);
+        } else {
+            aplOptions->logMessage(LogLevel::ERROR, "onMetricsReportedFailed", "jsonMetric contains incorrect type or value");
+            return;
+        }
+
+        if (kind == METRIC_KIND_TIMER) {
             auto timer = metricsRecorder->createTimer(
                 Telemetry::AplMetricsRecorderInterface::CURRENT_DOCUMENT,
-                metric.name);
-            std::chrono::milliseconds elapsed(metric.value);
+                name);
+            std::chrono::milliseconds elapsed(value);
             timer->elapsed(elapsed);
         } else {
-            if (metric.name == "componentComplexity") {
-                m_lastReportedComplexity = metric.value;
+            if (name == "componentComplexity") {
+                m_lastReportedComplexity = value;
             } else {
                 auto counter = metricsRecorder->createCounter(
-                    Telemetry::AplMetricsRecorderInterface::CURRENT_DOCUMENT, metric.name);
-                counter->incrementBy(metric.value);
+                        Telemetry::AplMetricsRecorderInterface::CURRENT_DOCUMENT, name);
+                counter->incrementBy(value);
             }
         }
     }
 
     metricsRecorder->flush();
+}
+
+bool AplClientRenderer::validateJsonMetric(
+    const rapidjson::Value& jsonMetric) {
+    auto aplOptions = m_aplConfiguration->getAplOptions();
+
+    if (!jsonMetric.HasMember("kind")) {
+        aplOptions->logMessage(LogLevel::ERROR, "validateJsonMetricFailed", "missingMetricKind");
+        return false;
+    }
+    std::string kind = jsonMetric["kind"].GetString();
+
+    if (kind != METRIC_KIND_TIMER && kind != METRIC_KIND_COUNTER) {
+        aplOptions->logMessage(LogLevel::ERROR, "validateJsonMetricFailed", "unsupportedMetricKind");
+        return false;
+    }
+
+    if (!jsonMetric.HasMember("name")) {
+        aplOptions->logMessage(LogLevel::ERROR, "validateJsonMetricFailed", "missingMetricName");
+        return false;
+    }
+
+    if (!jsonMetric.HasMember("value")) {
+        aplOptions->logMessage(LogLevel::ERROR, "validateJsonMetricFailed", "missingMetricValue");
+        return false;
+    }
+
+    return true;
 }
 
 void AplClientRenderer::onTelemetrySinkUpdated(APLClient::Telemetry::AplMetricsSinkInterfacePtr sink) {

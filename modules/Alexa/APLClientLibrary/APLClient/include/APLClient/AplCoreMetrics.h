@@ -57,6 +57,13 @@ public:
      * @return pixel height
      */
     float getViewhostHeight() const override;
+
+    /**
+     * Converts px from VH to Core based on Scale.
+     * @param value
+     * @return
+     */
+    float toCorePixel(float value);
 };
 
 using AplCoreMetricsPtr = std::shared_ptr<AplCoreMetrics>;

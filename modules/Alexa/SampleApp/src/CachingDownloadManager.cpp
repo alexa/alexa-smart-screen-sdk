@@ -20,8 +20,6 @@
 
 #include "SampleApp/CachingDownloadManager.h"
 
-#include <RegistrationManager/CustomerDataManager.h>
-
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
@@ -58,7 +56,7 @@ CachingDownloadManager::CachingDownloadManager(
     unsigned long cachePeriodInSeconds,
     unsigned long maxCacheSize,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
-    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager) :
+    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> customerDataManager) :
         CustomerDataHandler{customerDataManager},
         m_contentFetcherFactory{httpContentFetcherInterfaceFactoryInterface},
         m_cachePeriod{std::chrono::seconds(cachePeriodInSeconds)},

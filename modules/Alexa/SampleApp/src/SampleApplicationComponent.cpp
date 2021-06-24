@@ -27,6 +27,8 @@
 
 #endif
 
+#include <RegistrationManager/CustomerDataManagerFactory.h>
+
 #include "SampleApp/LocaleAssetsManager.h"
 #include "SampleApp/SampleApplicationComponent.h"
 
@@ -43,13 +45,7 @@ using namespace alexaClientSDK;
 using namespace alexaClientSDK::acsdkManufactory;
 using namespace alexaClientSDK::avsCommon::avs::initialization;
 
-Component<
-    acsdkManufactory::Import<std::unique_ptr<avsCommon::utils::libcurlUtils::HttpPostInterface>>,
-    acsdkManufactory::Import<std::shared_ptr<avsCommon::utils::DeviceInfo>>,
-    acsdkManufactory::Import<std::shared_ptr<registrationManager::CustomerDataManager>>,
-    std::shared_ptr<avsCommon::utils::logger::Logger>,
-    std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>
-getSampleApplicationOptionsComponent() {
+SampleApplicationOptionsComponent getSampleApplicationOptionsComponent() {
     return ComponentAccumulator<>()
         .addComponent(acsdkShared::getComponent())
 #ifdef ANDROID_LOGGER
@@ -86,17 +82,12 @@ getCreateLocaleAssetsManagerInterface(
         };
 }
 
-Component<
-    std::shared_ptr<avsCommon::avs::initialization::AlexaClientSDKInit>,
-    std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface>,
-    std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>,
-    std::shared_ptr<avsCommon::utils::configuration::ConfigurationNode>,
-    std::shared_ptr<avsCommon::utils::DeviceInfo>,
-    std::shared_ptr<registrationManager::CustomerDataManager>,
-    std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>
-getComponent(
+SampleApplicationComponent getComponent(
     std::unique_ptr<avsCommon::avs::initialization::InitializationParameters> initParams,
-    std::vector<std::shared_ptr<avsCommon::utils::RequiresShutdown>>& requiresShutdownList) {
+    std::vector<std::shared_ptr<avsCommon::utils::RequiresShutdown>>& requiresShutdownList,
+    const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AuthDelegateInterface>& authDelegate,
+    const std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>& metricRecorder,
+    const std::shared_ptr<alexaClientSDK::avsCommon::utils::logger::Logger>& logger) {
     return ComponentAccumulator<>()
 #ifdef ACSDK_ACS_UTILS
         .addComponent(acsdkSampleApplication::getSampleApplicationOptionsComponent())
@@ -110,7 +101,7 @@ getComponent(
         .addRetainedFactory(getCreateLocaleAssetsManagerInterface(requiresShutdownList))
         .addRetainedFactory(contextManager::ContextManager::createContextManagerInterface)
         .addRetainedFactory(avsCommon::utils::DeviceInfo::createFromConfiguration)
-        .addRetainedFactory(registrationManager::CustomerDataManager::createCustomerDataManager);
+        .addRetainedFactory(registrationManager::CustomerDataManagerFactory::createCustomerDataManagerInterface);
 }
 
 }  // namespace sampleApp

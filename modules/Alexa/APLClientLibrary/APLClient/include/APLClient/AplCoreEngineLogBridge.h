@@ -18,7 +18,6 @@
 
 #include <string>
 
-// TODO: Tidy up core to prevent this (ARC-917)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreorder"
 #pragma push_macro("DEBUG")

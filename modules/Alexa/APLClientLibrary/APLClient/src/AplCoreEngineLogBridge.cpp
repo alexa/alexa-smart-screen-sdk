@@ -24,23 +24,22 @@ AplCoreEngineLogBridge::AplCoreEngineLogBridge(AplOptionsInterfacePtr aplOptions
 
 void AplCoreEngineLogBridge::transport(apl::LogLevel level, const std::string& log) {
     switch (level) {
-        case apl::LogLevel::TRACE:
+        case apl::LogLevel::kTrace:
             m_aplOptions->logMessage(LogLevel::TRACE, TAG, log);
             break;
-            // TODO: Same problem as in AplCoreGuiRenderer.h but not solved by undef by some reason.
         case static_cast<apl::LogLevel>(1):
             m_aplOptions->logMessage(LogLevel::DBG, TAG, log);
             break;
-        case apl::LogLevel::INFO:
+        case apl::LogLevel::kInfo:
             m_aplOptions->logMessage(LogLevel::INFO, TAG, log);
             break;
-        case apl::LogLevel::WARN:
+        case apl::LogLevel::kWarn:
             m_aplOptions->logMessage(LogLevel::WARN, TAG, log);
             break;
-        case apl::LogLevel::ERROR:
+        case apl::LogLevel::kError:
             m_aplOptions->logMessage(LogLevel::ERROR, TAG, log);
             break;
-        case apl::LogLevel::CRITICAL:
+        case apl::LogLevel::kCritical:
             m_aplOptions->logMessage(LogLevel::CRITICAL, TAG, log);
             break;
         default:

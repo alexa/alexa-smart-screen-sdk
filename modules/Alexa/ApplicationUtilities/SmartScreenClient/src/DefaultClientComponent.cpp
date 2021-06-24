@@ -14,28 +14,16 @@
  */
 
 #include <ACL/AVSConnectionManager.h>
-#include <acsdkManufactory/ComponentAccumulator.h>
-#include <acsdkAlerts/AlertsComponent.h>
-#include <acsdkDeviceSettingsManager/DeviceSettingsManagerComponent.h>
-#include <acsdkDoNotDisturb/DoNotDisturbComponent.h>
-#include <acsdkShared/SharedComponent.h>
-#include <AVSCommon/Utils/LibcurlUtils/HTTPContentFetcherFactory.h>
-
-#include <acsdkAudioPlayer/AudioPlayerComponent.h>
-#include <acsdkBluetooth/BluetoothComponent.h>
-#include <acsdkExternalMediaPlayer/ExternalMediaPlayerComponent.h>
-#include <acsdkPostConnectOperationProviderRegistrar/PostConnectOperationProviderRegistrar.h>
-#include <acsdkShared/SharedComponent.h>
-#include <acsdkShutdownManagerInterfaces/ShutdownNotifierInterface.h>
-#include <acsdkSystemClockMonitor/SystemClockMonitor.h>
-#include <acsdkSystemClockMonitor/SystemClockNotifier.h>
+#include <ADSL/ADSLComponent.h>
 #include <AFML/FocusManagementComponent.h>
-#include <AVSCommon/SDKInterfaces/AudioFocusAnnotation.h>
 #include <AVSCommon/AVS/Attachment/AttachmentManager.h>
+#include <AVSCommon/AVS/DialogUXStateAggregator.h>
 #include <AVSCommon/AVS/ExceptionEncounteredSender.h>
+#include <AVSCommon/SDKInterfaces/AudioFocusAnnotation.h>
 #include <AVSCommon/SDKInterfaces/AuthDelegateInterface.h>
-#include <AVSCommon/Utils/Logger/Logger.h>
 #include <AVSCommon/Utils/LibcurlUtils/DefaultSetCurlOptionsCallbackFactory.h>
+#include <AVSCommon/Utils/LibcurlUtils/HTTPContentFetcherFactory.h>
+#include <AVSCommon/Utils/Logger/Logger.h>
 #include <AVSGatewayManager/AVSGatewayManager.h>
 #include <AVSGatewayManager/Storage/AVSGatewayManagerStorage.h>
 #include <Alexa/AlexaEventProcessedNotifier.h>
@@ -45,13 +33,30 @@
 #include <Captions/CaptionsComponent.h>
 #include <ContextManager/ContextManager.h>
 #include <Endpoints/DefaultEndpointBuilder.h>
-#include <PlaybackController/PlaybackController.h>
-#include <PlaybackController/PlaybackRouter.h>
+#include <PlaybackController/PlaybackControllerComponent.h>
+#include <RegistrationManager/RegistrationManagerComponent.h>
 #include <SpeakerManager/SpeakerManagerComponent.h>
 #include <SynchronizeStateSender/SynchronizeStateSenderFactory.h>
+#include <System/SystemComponent.h>
 #include <SystemSoundPlayer/SystemSoundPlayer.h>
 #include <TemplateRuntime/RenderPlayerInfoCardsProviderRegistrar.h>
-
+#include <acsdkAlerts/AlertsComponent.h>
+#include <acsdkAudioPlayer/AudioPlayerComponent.h>
+#include <acsdkBluetooth/BluetoothComponent.h>
+#include <acsdkDeviceSettingsManager/DeviceSettingsManagerComponent.h>
+#include <acsdkDeviceSetup/DeviceSetupComponent.h>
+#include <acsdkDoNotDisturb/DoNotDisturbComponent.h>
+#include <acsdkExternalMediaPlayer/ExternalMediaPlayerComponent.h>
+#include <acsdkInteractionModel/InteractionModelComponent.h>
+#include <acsdkManufactory/ComponentAccumulator.h>
+#include <acsdkNotifications/NotificationRenderer.h>
+#include <acsdkNotifications/NotificationsComponent.h>
+#include <acsdkPostConnectOperationProviderRegistrar/PostConnectOperationProviderRegistrar.h>
+#include <acsdkShared/SharedComponent.h>
+#include <acsdkShutdownManagerInterfaces/ShutdownNotifierInterface.h>
+#include <acsdkSpeechEncoder/SpeechEncoderComponent.h>
+#include <acsdkSystemClockMonitor/SystemClockMonitor.h>
+#include <acsdkSystemClockMonitor/SystemClockNotifier.h>
 #include "SmartScreenClient/DefaultClientComponent.h"
 #include "SmartScreenClient/StubApplicationAudioPipelineFactory.h"
 
@@ -61,6 +66,7 @@ namespace smartScreenClient {
 using namespace alexaClientSDK;
 using namespace alexaClientSDK::storage;
 using namespace alexaClientSDK::storage::sqliteStorage;
+using namespace alexaClientSDK::adsl;
 using namespace alexaClientSDK::acl;
 using namespace alexaClientSDK::acsdkAlexaEventProcessedNotifierInterfaces;
 using namespace alexaClientSDK::acsdkApplicationAudioPipelineFactoryInterfaces;
@@ -80,6 +86,7 @@ using namespace alexaClientSDK::capabilitiesDelegate::storage;
 using namespace alexaClientSDK::contextManager;
 using namespace alexaClientSDK::registrationManager;
 using namespace alexaClientSDK::synchronizeStateSender;
+using namespace alexaClientSDK::avsCommon::avs;
 
 /// String to identify log entries originating from this file.
 static const std::string TAG("DefaultClientComponent");
@@ -195,7 +202,7 @@ SmartScreenClientComponent getComponent(
     const std::shared_ptr<avsCommon::sdkInterfaces::ContextManagerInterface>& contextManager,
     const std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>& localeAssetsManager,
     const std::shared_ptr<avsCommon::utils::DeviceInfo>& deviceInfo,
-    const std::shared_ptr<registrationManager::CustomerDataManager>& customerDataManager,
+    const std::shared_ptr<registrationManager::CustomerDataManagerInterface>& customerDataManager,
     const std::shared_ptr<avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
     const std::shared_ptr<avsCommon::sdkInterfaces::InternetConnectionMonitorInterface>& internetConnectionMonitor,
     const std::shared_ptr<avsCommon::sdkInterfaces::AVSGatewayManagerInterface>& avsGatewayManager,
@@ -221,7 +228,8 @@ SmartScreenClientComponent getComponent(
     const std::shared_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceManagerInterface>& bluetoothDeviceManager,
     const std::shared_ptr<acsdkBluetoothInterfaces::BluetoothStorageInterface>& bluetoothStorage,
     const std::shared_ptr<acsdkBluetoothInterfaces::BluetoothDeviceConnectionRulesProviderInterface>&
-        bluetoothConnectionRulesProvider) {
+        bluetoothConnectionRulesProvider,
+    const std::shared_ptr<acsdkNotificationsInterfaces::NotificationsStorageInterface>& notificationsStorage) {
     std::shared_ptr<avsCommon::utils::bluetooth::BluetoothEventBus> bluetoothEventBus;
     if (bluetoothDeviceManager) {
         bluetoothEventBus = bluetoothDeviceManager->getEventBus();
@@ -230,10 +238,8 @@ SmartScreenClientComponent getComponent(
     }
 
     return ComponentAccumulator<>()
-        .addComponent(acsdkDeviceSettingsManager::getComponent())
-        .addComponent(acsdkShared::getComponent())
-        .addRetainedFactory(acsdkSystemClockMonitor::SystemClockMonitor::createSystemClockMonitorInterface)
-        .addRetainedFactory(acsdkSystemClockMonitor::SystemClockNotifier::createSystemClockNotifierInterface)
+        /// Instead of using factory methods to instantiate these interfaces, DefaultClientComponent accepts pre-made
+        /// implementations and adds them to the manufactory.
         .addInstance(authDelegate)
         .addInstance(contextManager)
         .addInstance(localeAssetsManager)
@@ -249,8 +255,6 @@ SmartScreenClientComponent getComponent(
         .addInstance(channelVolumeFactory)
         .addInstance(expectSpeechTimeoutHandler)
         .addInstance(equalizerRuntimeSetup)
-        .addRetainedFactory(getCreateApplicationAudioPipelineFactory(stubAudioPipelineFactory))
-        .addRetainedFactory(getCreateDeviceSettingStorageInterface(deviceSettingStorage))
         .addInstance(audioMediaResourceProvider)
         .addInstance(messageStorage)
         .addInstance(powerResourceManager)
@@ -261,38 +265,57 @@ SmartScreenClientComponent getComponent(
         .addInstance(bluetoothDeviceManager)
         .addInstance(bluetoothEventBus)
         .addInstance(bluetoothStorage)
-        .addComponent(capabilityAgents::speakerManager::getComponent())
-        .addComponent(captions::getComponent())
-        .addRetainedFactory(HTTPContentFetcherFactory::createHTTPContentFetcherInterfaceFactoryInterface)
-        .addRetainedFactory(AVSConnectionManager::createAVSConnectionManagerInterface)
-        .addRetainedFactory(getCreateMessageRouter(messageRouterFactory))
-        .addRetainedFactory(systemSoundPlayer::SystemSoundPlayer::createSystemSoundPlayerInterface)
-        .addRetainedFactory(AttachmentManager::createInProcessAttachmentManagerInterface)
-        .addRetainedFactory(PostConnectOperationProviderRegistrar::createPostConnectOperationProviderRegistrarInterface)
-        .addUniqueFactory(SQLiteCapabilitiesDelegateStorage::createCapabilitiesDelegateStorageInterface)
-        .addRequiredFactory(SynchronizeStateSenderFactory::createPostConnectOperationProviderInterface)
-        .addRetainedFactory(AVSConnectionManager::createMessageSenderInterface)
-        .addRetainedFactory(avsCommon::avs::ExceptionEncounteredSender::createExceptionEncounteredSenderInterface)
+        .addInstance(notificationsStorage)
+        .addRetainedFactory(getCreateApplicationAudioPipelineFactory(stubAudioPipelineFactory))
+        .addRetainedFactory(getCreateDeviceSettingStorageInterface(deviceSettingStorage))
+
+        /// Baseline SDK components. Applications are not expected to modify these.
+        .addComponent(acsdkDeviceSettingsManager::getComponent())
+        .addComponent(acsdkShared::getComponent())
+        .addRetainedFactory(acsdkSystemClockMonitor::SystemClockMonitor::createSystemClockMonitorInterface)
+        .addRetainedFactory(acsdkSystemClockMonitor::SystemClockNotifier::createSystemClockNotifierInterface)
+        .addComponent(adsl::getComponent())
+        .addRetainedFactory(afml::interruptModel::InterruptModel::createInterruptModel)
+        .addComponent(afml::getComponent())
         .addRetainedFactory(AlexaInterfaceMessageSender::createAlexaInterfaceMessageSender)
         .addRetainedFactory(AlexaInterfaceMessageSender::createAlexaInterfaceMessageSenderInternalInterface)
+        .addRequiredFactory(AlexaInterfaceCapabilityAgent::createDefaultAlexaInterfaceCapabilityAgent)
         .addRetainedFactory(
             alexaClientSDK::endpoints::DefaultEndpointBuilder::createDefaultEndpointCapabilitiesRegistrarInterface)
         .addRetainedFactory(alexaClientSDK::endpoints::DefaultEndpointBuilder::createDefaultEndpointBuilderInterface)
+        .addRetainedFactory(avsCommon::avs::ExceptionEncounteredSender::createExceptionEncounteredSenderInterface)
+        .addRetainedFactory(AVSConnectionManager::createAVSConnectionManagerInterface)
+        .addRetainedFactory(AVSConnectionManager::createMessageSenderInterface)
+        .addRetainedFactory(AttachmentManager::createInProcessAttachmentManagerInterface)
+        .addRetainedFactory(certifiedSender::CertifiedSender::create)
         .addRetainedFactory(createAlexaEventProcessedNotifierInterface)
         .addRetainedFactory(DefaultSetCurlOptionsCallbackFactory::createSetCurlOptionsCallbackFactoryInterface)
-        .addRequiredFactory(AlexaInterfaceCapabilityAgent::createDefaultAlexaInterfaceCapabilityAgent)
-        .addRetainedFactory(capabilityAgents::playbackController::PlaybackController::createPlaybackHandlerInterface)
-        .addRequiredFactory(capabilityAgents::playbackController::PlaybackRouter::createPlaybackRouterInterface)
-        .addRetainedFactory(afml::interruptModel::InterruptModel::createInterruptModel)
-        .addComponent(afml::getComponent())
-        .addRetainedFactory(capabilityAgents::templateRuntime::RenderPlayerInfoCardsProviderRegistrar::
-                                createRenderPlayerInfoCardsProviderRegistrarInterface)
+        .addRetainedFactory(DialogUXStateAggregator::createDialogUXStateAggregator)
+        .addRetainedFactory(HTTPContentFetcherFactory::createHTTPContentFetcherInterfaceFactoryInterface)
+        .addRetainedFactory(getCreateMessageRouter(messageRouterFactory))
+        .addComponent(registrationManager::getBackwardsCompatibleComponent())
+        .addRetainedFactory(systemSoundPlayer::SystemSoundPlayer::createSystemSoundPlayerInterface)
+        .addUniqueFactory(capabilitiesDelegate::storage::SQLiteCapabilitiesDelegateStorage::
+                              createCapabilitiesDelegateStorageInterface)
+
+        /// Optional, horizontal components.
+        .addComponent(acsdkSpeechEncoder::getComponent())
+        .addComponent(captions::getComponent())
+
+        /// Capability Agents. Some CAs are still instantiated in DefaultClient.cpp.
         .addComponent(acsdkAlerts::getComponent(startAlertSchedulingOnInitialization))
         .addComponent(acsdkAudioPlayer::getBackwardsCompatibleComponent())
         .addComponent(acsdkBluetooth::getComponent())
         .addComponent(acsdkDoNotDisturb::getComponent())
-        .addRetainedFactory(certifiedSender::CertifiedSender::create)
-        .addComponent(acsdkExternalMediaPlayer::getBackwardsCompatibleComponent(adapterCreationMap));
+        .addComponent(acsdkExternalMediaPlayer::getBackwardsCompatibleComponent(adapterCreationMap))
+        .addComponent(acsdkInteractionModel::getComponent())
+        .addComponent(acsdkNotifications::getComponent())
+        .addComponent(capabilityAgents::playbackController::getComponent())
+        .addComponent(capabilityAgents::speakerManager::getComponent())
+        .addComponent(capabilityAgents::system::getComponent())
+        .addRetainedFactory(capabilityAgents::templateRuntime::RenderPlayerInfoCardsProviderRegistrar::
+                                createRenderPlayerInfoCardsProviderRegistrarInterface)
+        .addComponent(acsdkDeviceSetup::getComponent());
 }
 
 }  // namespace smartScreenClient

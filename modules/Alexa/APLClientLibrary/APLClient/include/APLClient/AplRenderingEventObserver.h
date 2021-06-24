@@ -22,7 +22,6 @@
 #include <vector>
 
 #include "AplRenderingEvent.h"
-#include "DisplayMetric.h"
 #include "Telemetry/AplMetricsSinkInterface.h"
 
 namespace APLClient {
@@ -51,9 +50,9 @@ public:
     /**
      * Called when display metrics are reported by the viewhost.
      *
-     * @param metrics the reported metrics
+     * @param jsonPayload the reported metrics payload
      */
-    virtual void onMetricsReported(const std::vector<DisplayMetric> &metrics) = 0;
+    virtual void onMetricsReported(const std::string& jsonPayload) = 0;
 
     /**
      * Called when the telemetry sink is updated.

@@ -20,18 +20,8 @@ namespace sampleApp {
 
 using namespace alexaClientSDK;
 
-/// String to identify log entries originating from this file.
-static const std::string TAG("RevokeAuthorizationObserver");
-
-/**
- * Create a LogEntry using this file's TAG and the specified event string.
- *
- * @param The event string for this @c LogEntry.
- */
-#define LX(event) alexaClientSDK::avsCommon::utils::logger::LogEntry(TAG, event)
-
 RevokeAuthorizationObserver::RevokeAuthorizationObserver(
-    std::shared_ptr<alexaClientSDK::registrationManager::RegistrationManager> manager) :
+    std::shared_ptr<alexaClientSDK::registrationManager::RegistrationManagerInterface> manager) :
         m_manager{manager} {
 }
 

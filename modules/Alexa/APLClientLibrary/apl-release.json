@@ -1,0 +1,19 @@
+{
+    "name": "APLClientLibrary",
+    "manifestVersion": "1.0",
+    "description": "APLClientLibrary release version set",
+    "packages": [
+        {
+            "name": "APLCoreEngine",
+            "source": "ssh://git.amazon.com/pkg/APLCoreEngine",
+            "description": "apl-1.6-04.28.2021",
+            "commit": "878941426a86e681eeead3343b58ab8d272884f7"
+        },
+        {
+            "name": "APLViewhostWeb",
+            "source": "ssh://git.amazon.com/pkg/APLViewhostWeb",
+            "description": "apl-1.6-06.17.2021",
+            "commit": "2ccc95c1d82dfe20d2277d5c9bff9770f725acc6"
+        }
+    ]
+}

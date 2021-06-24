@@ -722,11 +722,10 @@ buildModeControllerAttributes(
 std::unique_ptr<SampleApplication> SampleApplication::create(
     const std::vector<std::string>& configFiles,
     const std::string& pathToInputFolder,
-    const std::string& configSchemaPath,
     const std::string& logLevel,
     std::shared_ptr<avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics) {
     auto clientApplication = std::unique_ptr<SampleApplication>(new SampleApplication);
-    if (!clientApplication->initialize(configFiles, pathToInputFolder, configSchemaPath, logLevel, diagnostics)) {
+    if (!clientApplication->initialize(configFiles, pathToInputFolder, logLevel, diagnostics)) {
         ACSDK_CRITICAL(LX("Failed to initialize SampleApplication"));
         return nullptr;
     }
@@ -765,6 +764,10 @@ SampleAppReturnCode SampleApplication::run() {
 }
 
 SampleApplication::~SampleApplication() {
+    if (m_aplClientBridge) {
+        m_aplClientBridge->shutdown();
+    }
+
     if (m_guiManager) {
         m_guiManager->shutdown();
     }
@@ -812,7 +815,6 @@ bool SampleApplication::createMediaPlayersForAdapters(
 bool SampleApplication::initialize(
     const std::vector<std::string>& configFiles,
     const std::string& pathToInputFolder,
-    const std::string& configSchemaPath,
     const std::string& logLevel,
     std::shared_ptr<avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics) {
     avsCommon::utils::logger::Level logLevelValue = avsCommon::utils::logger::Level::UNKNOWN;
@@ -885,7 +887,7 @@ bool SampleApplication::initialize(
         std::shared_ptr<avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>,
         std::shared_ptr<avsCommon::utils::configuration::ConfigurationNode>,
         std::shared_ptr<avsCommon::utils::DeviceInfo>,
-        std::shared_ptr<registrationManager::CustomerDataManager>,
+        std::shared_ptr<registrationManager::CustomerDataManagerInterface>,
         std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>::create(sampleAppComponent);
 
     m_sdkInit = manufactory->get<std::shared_ptr<avsCommon::avs::initialization::AlexaClientSDKInit>>();
@@ -912,10 +914,11 @@ bool SampleApplication::initialize(
         return false;
     }
 
-    auto schemaStream = std::shared_ptr<std::ifstream>(new std::ifstream(configSchemaPath));
+    auto schemaStringInAscii = decodeHexToAscii(SCHEMA_HEX);
+    auto schemaStream = std::stringstream(schemaStringInAscii);
 
-    if (schemaStream->good()) {
-        rapidjson::IStreamWrapper isw(*schemaStream);
+    if (schemaStream.good()) {
+        rapidjson::IStreamWrapper isw(schemaStream);
         rapidjson::Document jsonSchema;
         if (!jsonSchema.ParseStream(isw).HasParseError()) {
             // Validating config parameters
@@ -924,14 +927,12 @@ bool SampleApplication::initialize(
                 return false;
             }
         } else {
-            ACSDK_WARN(LX("SampleApp may not run as expected! Configuration file was not validated!")
-                           .d("reason", "failed to parse schema")
-                           .d("filename", configSchemaPath.c_str()));
+            ACSDK_ERROR(LX("Configuration file could not be validated!").d("reason", "invalid json schema"));
+            return false;
         }
     } else {
-        ACSDK_WARN(LX("SampleApp may not run as expected! Configuration file was not validated!")
-                       .d("reason", "failed to read file")
-                       .d("filename", configSchemaPath.c_str()));
+        ACSDK_ERROR(LX("Configuration file could not be validated!").d("reason", "failed to read schema string"));
+        return false;
     }
 
 #endif
@@ -1156,7 +1157,7 @@ bool SampleApplication::initialize(
      * Creating customerDataManager which will be used by the registrationManager and all classes that extend
      * CustomerDataHandler
      */
-    auto customerDataManager = manufactory->get<std::shared_ptr<registrationManager::CustomerDataManager>>();
+    auto customerDataManager = manufactory->get<std::shared_ptr<registrationManager::CustomerDataManagerInterface>>();
     if (!customerDataManager) {
         ACSDK_CRITICAL(LX("Failed to get CustomerDataManager!"));
         return false;
@@ -1197,9 +1198,9 @@ bool SampleApplication::initialize(
     }
 
     auto parameters = AplClientBridgeParameter{maxNumberOfConcurrentDownloads};
-    auto aplClientBridge = AplClientBridge::create(contentDownloadManager, m_guiClient, parameters);
+    m_aplClientBridge = AplClientBridge::create(contentDownloadManager, m_guiClient, parameters);
 
-    m_guiClient->setAplClientBridge(aplClientBridge);
+    m_guiClient->setAplClientBridge(m_aplClientBridge);
 
     /*
      * Create the presentation layer for the captions.
@@ -1609,7 +1610,7 @@ bool SampleApplication::initialize(
     client->addAlexaPresentationObserver(m_guiManager);
     client->addAlexaDialogStateObserver(m_guiManager);
     client->addAudioPlayerObserver(m_guiManager);
-    client->addAudioPlayerObserver(aplClientBridge);
+    client->addAudioPlayerObserver(m_aplClientBridge);
     client->addCallStateObserver(m_guiManager);
     client->addFocusManagersObserver(m_guiManager);
     client->addAudioInputProcessorObserver(m_guiManager);
@@ -1691,7 +1692,7 @@ bool SampleApplication::initialize(
 #endif  // ENABLE_REVOKE_AUTH
 
     authDelegate->addAuthObserver(m_guiClient);
-    client->getRegistrationManager()->addObserver(m_guiClient);
+    client->addRegistrationObserver(m_guiClient);
     m_capabilitiesDelegate->addCapabilitiesObserver(m_guiClient);
 
     m_guiManager->setDoNotDisturbSettingObserver(m_guiClient);
@@ -1998,6 +1999,18 @@ bool SampleApplication::addControllersToPeripheralEndpoint(
     return true;
 }
 #endif  // ENABLE_ENDPOINT_CONTROLLERS
+
+std::string SampleApplication::decodeHexToAscii(const std::string hexString) {
+    std::string asciiString(hexString.size() / 2, '\0');
+    std::string byte(2, '\0');
+    for (size_t i = 0; i < hexString.size() - 1; i += 2) {
+        byte[0] = hexString[i];
+        byte[1] = hexString[i + 1];
+        asciiString[i / 2] = static_cast<char>(std::stoi(byte, nullptr, 16));
+    }
+
+    return asciiString;
+}
 
 }  // namespace sampleApp
 }  // namespace alexaSmartScreenSDK

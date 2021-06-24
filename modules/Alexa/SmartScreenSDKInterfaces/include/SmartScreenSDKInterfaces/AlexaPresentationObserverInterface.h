@@ -24,6 +24,33 @@
 namespace alexaSmartScreenSDK {
 namespace smartScreenSDKInterfaces {
 
+// An extension that are granted for use by an APL document.
+struct GrantedExtension {
+    std::string uri;
+
+    bool operator==(const GrantedExtension& other) const {
+        return uri == other.uri;
+    }
+
+    bool operator!=(const GrantedExtension& other) const {
+        return uri != other.uri;
+    }
+};
+
+// An extension that is initialized in the APL runtime for an APL document.
+struct AutoInitializedExtension {
+    std::string uri;
+    std::string settings;
+
+    bool operator==(const AutoInitializedExtension& other) const {
+        return uri == other.uri && settings == other.settings;
+    }
+
+    bool operator!=(const AutoInitializedExtension& other) const {
+        return uri != other.uri || settings != other.settings;
+    }
+};
+
 /**
  * This @c AlexaPresentationObserverInterface class is used to notify observers when a @c RenderDocument,
  * @c ExecuteCommands directive is received..
@@ -69,8 +96,11 @@ public:
     /**
      * Used to notify the observer when the client should clear the APL display card.  Once the card is cleared,
      * the client should call clearDocument().
+     *
+     * @param token The token of the document to clear.
+     * @param focusCleared Whether the cleared card results in the @c AlexaPresentation CA losing focus.
      */
-    virtual void clearDocument(const std::string& token) = 0;
+    virtual void clearDocument(const std::string& token, const bool focusCleared) = 0;
 
     /**
      * Used to notify the observer that rendering has been aborted, e.g. because a check failed or an error
@@ -109,8 +139,14 @@ public:
      * Used to notify observer that the active @c PresentationSession has changed.
      * @param id The identifier of the active presentation session.
      * @param skillId The identifier of the active Skill / Speechlet who owns the session.
+     * @param grantedExtensions List of extensions that are granted for use by this APL document.
+     * @param autoInitializedExtensions List of extensions that are initialized in the APL runtime for this document.
      */
-    virtual void onPresentationSessionChanged(const std::string& id, const std::string& skillId) = 0;
+    virtual void onPresentationSessionChanged(
+        const std::string& id,
+        const std::string& skillId,
+        const std::vector<GrantedExtension>& grantedExtensions,
+        const std::vector<AutoInitializedExtension>& autoInitializedExtensions) = 0;
 
     /**
      * Called when a metricRecorder is available for use.

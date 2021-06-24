@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 export interface RenderingOptionsPayload {
     legacyKaraoke: boolean;
@@ -51,10 +52,37 @@ export interface OnHandleKeyboardPayload {
     messageId: string;
     result: boolean;
 }
+export interface LocaleMethodPayload {
+    method: string;
+    locale: string;
+    value: string;
+}
+export interface FocusableAreasPayload {
+    messageId: string;
+    areas: Map<string, APL.Rect>;
+}
+export interface DisplayedChildCountPayload {
+    componentId: string;
+    messageId: string;
+    displayedChildCount: number;
+}
+export interface DisplayedChildIdPayload {
+    componentId: string;
+    messageId: string;
+    displayedChildId: string;
+}
+export interface FocusedPayload {
+    messageId: string;
+    result: string;
+}
+export interface SupportsResizingPayload {
+    supportsResizing: boolean;
+}
 export interface PayloadTypeMap {
     "renderingOptions": RenderingOptionsPayload;
     "measure": MeasurePayload;
     "hierarchy": IComponentPayload;
+    "reHierarchy": IComponentPayload;
     "scaling": ScalingPayload;
     "event": EventPayload;
     "dirty": IComponentPayload[];
@@ -66,6 +94,12 @@ export interface PayloadTypeMap {
     "ensureLayout": string;
     "isCharacterValid": IsCharacterValidPayload;
     "handleKeyboard": OnHandleKeyboardPayload;
+    "localeMethod": LocaleMethodPayload;
+    "getFocusableAreas": FocusableAreasPayload;
+    "getFocused": FocusedPayload;
+    "getDisplayedChildCount": DisplayedChildCountPayload;
+    "getDisplayedChildId": DisplayedChildIdPayload;
+    "supportsResizing": SupportsResizingPayload;
 }
 export interface Message<Type extends keyof PayloadTypeMap> {
     type: Type;
@@ -86,6 +120,7 @@ export interface IAPLMessageListener {
     onMeasure?(message: Message<"measure">): void;
     onRenderingOptions?(message: Message<"renderingOptions">): void;
     onHierarchy?(message: Message<"hierarchy">): void;
+    onReHierarchy?(message: Message<"reHierarchy">): void;
     onScaling?(message: Message<"scaling">): void;
     onDirty?(message: Message<"dirty">): void;
     onEvent?(message: Message<"event">): void;
@@ -97,6 +132,12 @@ export interface IAPLMessageListener {
     onEnsureLayout?(message: Message<"ensureLayout">): void;
     onIsCharacterValid?(message: Message<"isCharacterValid">): void;
     onHandleKeyboard?(message: Message<"handleKeyboard">): void;
+    onLocaleMethod?(message: Message<"localeMethod">): void;
+    onGetFocusableAreas?(message: Message<"getFocusableAreas">): void;
+    onGetFocused?(message: Message<"getFocused">): void;
+    onGetDisplayedChildCount?(message: Message<"getDisplayedChildCount">): void;
+    onGetDisplayedChildId?(message: Message<"getDisplayedChildId">): void;
+    onSupportsResizing?(message: Message<"supportsResizing">): void;
 }
 /**
  * Extend this class to implement a client. Must implement events described in
@@ -129,10 +170,25 @@ export declare abstract class APLClient {
      */
     protected isCharacterValid(message: Message<"isCharacterValid">): void;
     /**
+     * Call this when the client return getDisplayedChildCount message with result
+     * @param message
+     */
+    protected getDisplayedChildCount(message: Message<"getDisplayedChildCount">): void;
+    /**
+     * Call this when the client return getDisplayedChildId message with result
+     * @param message
+     */
+    protected getDisplayedChildId(message: Message<"getDisplayedChildId">): void;
+    /**
      * Call this when the client return handleKeyboard message with result;
      * @param message
      */
     protected handleKeyboard(message: Message<"handleKeyboard">): void;
+    /**
+     * Call this when the client return supportsResizing message with result;
+     * @param message
+     */
+    protected supportsResizing(message: Message<"supportsResizing">): void;
     /**
      * Call this when the client receives a message from the server
      */

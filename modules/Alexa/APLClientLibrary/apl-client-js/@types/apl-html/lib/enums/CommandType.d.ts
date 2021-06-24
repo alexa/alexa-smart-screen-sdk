@@ -1,3 +1,7 @@
+/**
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
+ */
 export declare enum CommandType {
     kCommandTypeArray = 0,
     kCommandTypeIdle = 1,
@@ -21,5 +25,6 @@ export declare enum CommandType {
     kCommandTypeSetFocus = 19,
     kCommandTypeClearFocus = 20,
     kCommandTypeFinish = 21,
-    kCommandTypeCustomEvent = 22
+    kCommandTypeReinflate = 22,
+    kCommandTypeCustomEvent = 23
 }

@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import APLRenderer from '../../APLRenderer';
 import { AudioTrack } from '../../enums/AudioTrack';
@@ -27,6 +28,7 @@ export declare class Video extends AbstractVideoComponent {
     private playCallback;
     private pauseCallback;
     private loadCallback;
+    private isSettingSource;
     private fromEvent;
     private trackCurrentTime;
     constructor(renderer: APLRenderer, component: APL.Component, factory: FactoryFunction, parent?: Component);
@@ -46,14 +48,19 @@ export declare class Video extends AbstractVideoComponent {
     protected setSource(source: IMediaSource | IMediaSource[]): Promise<void>;
     protected setTrackCurrentTime(trackCurrentTime: number): void;
     protected setTrackIndex(trackIndex: number): void;
-    /**
-     * extract currentTime value in integer value since Medici parse this value as int
-     */
-    protected extractCurrentTime(currentTime: number): number;
     protected updateMediaState(): void;
     private resetPausePromise();
     private resetPlayPromise();
     private resetLoadPromise();
     private ensureLoaded();
+    /**
+     * Return if the video should be paused when seeking to an offset.
+     * The play/pause should depend on kPropertyAutoplay at initial load - offset == 0.
+     * The play/pause should depend on kPropertyTrackPaused once video has been played - offset > 0.
+     *
+     * @param seekOffset
+     * @private
+     */
+    private shouldPauseAtSeek(seekOffset);
     destroy(): void;
 }

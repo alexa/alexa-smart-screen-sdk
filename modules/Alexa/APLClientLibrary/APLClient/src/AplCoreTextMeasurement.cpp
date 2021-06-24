@@ -88,20 +88,38 @@ apl::LayoutSize AplCoreTextMeasurement::measure(
         msg.setPayload(std::move(payload));
 
         auto result = aplCoreConnectionManager->blockingSend(msg);
-
-        if (result.IsObject()) {
-            auto measuredWidth = aplCoreMetrics->toCore(result["payload"]["width"].GetFloat());
-            auto measuredHeight = aplCoreMetrics->toCore(result["payload"]["height"].GetFloat());
-
-            return {measuredWidth, measuredHeight};
-        }
-
-        aplOptions->logMessage(LogLevel::WARN, __func__, "Didn't get a valid reply.  Returning generic size.");
-        return {aplCoreMetrics->toCore(100), aplCoreMetrics->toCore(100)};
+        return this->GetValidMeasureResult(result, aplCoreMetrics.get());
     } else {
         aplOptions->logMessage(LogLevel::WARN, __func__, "ConnectionManager does not exist. Returning generic size.");
         return {0, 0};
     }
+}
+
+apl::LayoutSize AplCoreTextMeasurement::GetValidMeasureResult(rapidjson::Document& result, AplCoreMetrics* aplCoreMetrics) {
+
+    if (result.IsObject()) {
+        auto payloadItr = result.FindMember("payload");
+            if (payloadItr != result.MemberEnd()) {
+            auto& payload = payloadItr->value;
+            auto widthItr = payload.FindMember("width");
+            auto heightItr = payload.FindMember("height");
+
+            if (widthItr != payload.MemberEnd() && heightItr != payload.MemberEnd()) {
+
+                auto& width = widthItr->value;
+                auto& height = heightItr->value;
+                if (width.IsNumber() && height.IsNumber()) {
+                    auto measuredWidth = aplCoreMetrics->toCore(width.GetFloat());
+                    auto measuredHeight = aplCoreMetrics->toCore(height.GetFloat());
+                    return {measuredWidth, measuredHeight};
+                }
+            }
+        }
+    }
+
+    auto aplOptions = m_aplConfiguration->getAplOptions();
+    aplOptions->logMessage(LogLevel::WARN, __func__, "Didn't get a valid reply.  Returning generic size.");
+    return {aplCoreMetrics->toCore(100), aplCoreMetrics->toCore(100)};
 }
 
 /**
@@ -137,16 +155,16 @@ float AplCoreTextMeasurement::baseline(apl::Component* component, float width, f
         msg.setPayload(std::move(payload));
 
         auto result = aplCoreConnectionManager->blockingSend(msg);
-
         if (result.IsObject()) {
             auto it = result.FindMember("payload");
-            if (it != result.MemberEnd()) return aplCoreMetrics->toCore(it->value.GetFloat());
+            if (it != result.MemberEnd() && it->value.IsNumber()) {
+                return aplCoreMetrics->toCore(it->value.GetFloat());
+            }
+
+            auto aplOptions = m_aplConfiguration->getAplOptions();
+            aplOptions->logMessage(LogLevel::WARN, __func__, "Got invalid result from baseline calculation. Returning 0.");
+            return 0;
         }
     }
-
-    auto aplOptions = m_aplConfiguration->getAplOptions();
-    aplOptions->logMessage(LogLevel::WARN, __func__, "Got invalid result from baseline calculation. Returning 0.");
-    return 0;
 }
-
 }  // namespace APLClient

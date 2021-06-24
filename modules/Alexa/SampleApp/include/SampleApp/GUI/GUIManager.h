@@ -116,7 +116,7 @@ public:
 
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
 
-    void clearDocument(const std::string& token) override;
+    void clearDocument(const std::string& token, const bool focusCleared) override;
 
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
 
@@ -125,7 +125,11 @@ public:
 
     void interruptCommandSequence(const std::string& token) override;
 
-    void onPresentationSessionChanged(const std::string& id, const std::string& skillId) override;
+    void onPresentationSessionChanged(
+        const std::string& id,
+        const std::string& skillId,
+        const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
+        const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions) override;
 
     void onRenderDirectiveReceived(const std::string& token, const std::chrono::steady_clock::time_point& receiveTime)
         override;
@@ -217,10 +221,6 @@ public:
     void handleRenderComplete() override;
 
     void handleAPLEvent(APLClient::AplRenderingEvent event) override;
-
-    void handleDisplayMetrics(uint64_t dropFrameCount) override;
-
-    void handleDisplayMetrics(const std::vector<APLClient::DisplayMetric>& metrics) override;
 
     void handleToggleDoNotDisturbEvent() override;
 

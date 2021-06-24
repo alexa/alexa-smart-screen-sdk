@@ -16,7 +16,6 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_APL_APLCORETEXTMEASUREMENT_H
 #define ALEXA_SMART_SCREEN_SDK_APPLICATIONUTILITIES_APL_APLCORETEXTMEASUREMENT_H
 
-// TODO: Tidy up core to prevent this (ARC-917)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreorder"
 #pragma push_macro("DEBUG")
@@ -67,8 +66,9 @@ private:
     std::weak_ptr<AplCoreConnectionManager> m_aplCoreConnectionManager;
 
     AplConfigurationPtr m_aplConfiguration;
-
     std::unique_ptr<Telemetry::AplCounterHandle> m_textMeasureCounter;
+    apl::LayoutSize GetValidMeasureResult(rapidjson::Document& result, AplCoreMetrics* aplCoreMetrics );
+
 };
 
 }  // namespace APLClient

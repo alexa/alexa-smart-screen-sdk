@@ -75,7 +75,6 @@ public:
     static std::unique_ptr<SampleApplication> create(
         const std::vector<std::string>& configFiles,
         const std::string& pathToInputFolder,
-        const std::string& configSchemaPath,
         const std::string& logLevel = "",
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics =
             nullptr);
@@ -159,7 +158,6 @@ private:
     bool initialize(
         const std::vector<std::string>& configFiles,
         const std::string& pathToInputFolder,
-        const std::string& configSchemaPath,
         const std::string& logLevel,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics);
 
@@ -211,6 +209,8 @@ private:
     std::shared_ptr<gui::GUIClient> m_guiClient;
 
     std::shared_ptr<gui::GUIManager> m_guiManager;
+
+    std::shared_ptr<AplClientBridge> m_aplClientBridge;
 
     /// The map of the adapters and their mediaPlayers.
     std::
@@ -300,6 +300,8 @@ private:
     /// The @c PeripheralEndpointModeControllerHandler used by @c InteractionManager
     std::shared_ptr<PeripheralEndpointModeControllerHandler> m_peripheralEndpointModeHandler;
 #endif
+
+    std::string decodeHexToAscii(const std::string hexString);
 };
 
 }  // namespace sampleApp

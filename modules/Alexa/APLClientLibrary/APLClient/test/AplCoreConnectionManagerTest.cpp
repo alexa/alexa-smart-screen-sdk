@@ -1,3 +1,18 @@
+/*
+ * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *     http://aws.amazon.com/apache2.0/
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
 #include "APLClient/AplCoreConnectionManager.h"
 #include "MockAplOptionsInterface.h"
 
@@ -77,10 +92,86 @@ static const std::string VIEWPORT =
 static const std::string DOCUMENT =
     "{"
     "  \"type\": \"APL\","
-    "  \"version\": \"1.0\","
+    "  \"version\": \"1.5\","
+    "  \"theme\": \"light\","
+    "  \"settings\": {"
+    "    \"supportsResizing\": true"
+    "   },"
+    "  \"description\": \"This is a sample APL document\","
+    "  \"import\": [],"
+    "  \"layouts\": {"
+    "    \"Box\": {"
+    "      \"item\": {"
+    "        \"type\": \"VectorGraphic\","
+    "        \"width\": \"50dp\","
+    "        \"height\": \"50dp\","
+    "        \"style\": \"focusStyle\","
+    "        \"source\": \"box\""
+    "      }"
+    "    }"
+    "  },"
+    "  \"mainTemplate\": {"
+    "    \"parameters\": ["
+    "      \"payload\""
+    "    ],"
+    "    \"item\": {"
+    "          \"type\": \"Container\","
+    "          \"items\": ["
+    "            {"
+    "              \"type\": \"Text\","
+    "              \"id\": \"COMP1\","
+    "              \"width\": \"100%\","
+    "              \"text\": \"Hello World\","
+    "              \"fontSize\": 50"
+    "            },"
+    "            {"
+    "              \"type\": \"Video\","
+    "              \"id\": \"video\","
+    "              \"height\": 300,"
+    "              \"width\": 716.8,"
+    "              \"top\": 10,"
+    "              \"left\": 100,"
+    "              \"autoplay\": true,"
+    "              \"audioTrack\": \"background\","
+    "              \"source\": ["
+    "                {"
+    "                  \"url\": \"URL\""
+    "                }"
+    "              ]"
+    "            },"
+    "            {"
+    "              \"id\": \"textBox\","
+    "              \"type\": \"Text\","
+    "              \"text\": \"Hello\","
+    "              \"fontSize\": 50"
+    "            },"
+    "            {"
+    "              \"id\" : \"GRAPHIC\","
+    "              \"type\": \"Box\","
+    "              \"position\": \"absolute\","
+    "              \"top\": 0,"
+    "              \"left\": 225"
+    "            }"
+    "            ]"
+    "      }"
+    "   },"
+    "   \"onConfigChange\": ["
+    "       {"
+    "           \"type\": \"Reinflate\""
+    "       }"
+    "   ]"
+    "}";
+
+static const std::string DOCUMENT_WITH_IDLETIMEOUT =
+    "{"
+    "  \"type\": \"APL\","
+    "  \"version\": \"1.5\","
     "  \"theme\": \"light\","
     "  \"description\": \"This is a sample APL document\","
     "  \"import\": [],"
+    "  \"settings\": {"
+    "      \"idleTimeout\": 123"
+    "  },"
     "  \"layouts\": {"
     "    \"Box\": {"
     "      \"item\": {"
@@ -184,6 +275,72 @@ static const std::string EVENT_PAYLOAD =
     "  }"
     "}";
 
+static const std::string TOKEN_LIST_NAME = "tokenList";
+static const std::string INDEX_LIST_NAME = "indexList";
+
+static const std::string DOCUMENT_DYNAMIC =
+    "{"
+    "  \"type\": \"APL\","
+    "  \"version\": \"1.6\","
+    "  \"theme\": \"dark\","
+    "  \"description\": \"This is a sample APL document with dynamic data source\","
+    "  \"mainTemplate\": {"
+    "    \"parameters\": ["
+    "      \"tokenList\", \"indexList\""
+    "    ],"
+    "    \"item\": {"
+    "          \"type\": \"Container\","
+    "          \"items\": ["
+    "            {"
+    "              \"type\": \"Sequence\","
+    "              \"height\": 300,"
+    "              \"id\": \"sequence\","
+    "              \"data\": \"${tokenList}\","
+    "              \"item\": {"
+    "                \"type\": \"Text\","
+    "                \"id\": \"id${data}\","
+    "                \"width\": 100,"
+    "                \"height\": 100,"
+    "                \"text\": \"${data}\""
+    "                }"
+    "            },"
+    "            {"
+    "              \"type\": \"Sequence\","
+    "              \"height\": 300,"
+    "              \"id\": \"sequence\","
+    "              \"data\": \"${indexList}\","
+    "              \"item\": {"
+    "                \"type\": \"Text\","
+    "                \"id\": \"id${data}\","
+    "                \"width\": 100,"
+    "                \"height\": 100,"
+    "                \"text\": \"${data}\""
+    "                }"
+    "            }"
+    "            ]"
+    "      }"
+    "   }"
+    "}";
+
+static const std::string TOKEN_LIST_DATA =
+    "{"
+    "   \"type\": \"dynamicTokenList\","
+    "   \"listId\": \"vQdpOESlok2\","
+    "   \"pageToken\": \"pageToken\","
+    "   \"forwardPageToken\": \"forwardPageToken\","
+    "   \"items\": [ 10, 11, 12, 13, 14 ]"
+    "}";
+
+static const std::string INDEX_LIST_DATA =
+    "{"
+    "   \"type\": \"dynamicIndexList\","
+    "   \"listId\": \"vQdpOESlok1\","
+    "   \"startIndex\": 10,"
+    "   \"minimumInclusiveIndex\": 5,"
+    "   \"maximumExclusiveIndex\": 15,"
+    "   \"items\": [ 10, 11, 12, 13, 14 ]"
+    "}";
+
 static const std::string DEFAULT_PARAM_BINDING = "payload";
 
 static const std::string APL_COMMAND_EXECUTION{"APLCommandExecution"};
@@ -234,6 +391,12 @@ void AplCoreConnectionManagerTest::BuildDocument(
     // this is required in order to set content state to ready
     content->addData(DEFAULT_PARAM_BINDING, data);
     m_aplCoreConnectionManager->handleMessage(BUILD_PAYLOAD);
+}
+
+// Matcher for message been send out. Test Match against messaage type and expected payload.
+MATCHER_P2(MatchOutMessage, type, expectedPayload, "") {
+    const std::string messageType = type;
+    return arg.find(messageType) != std::string::npos && arg.find(expectedPayload) != std::string::npos;
 }
 
 TEST_F(AplCoreConnectionManagerTest, SetContentSuccess) {
@@ -292,7 +455,7 @@ TEST_F(AplCoreConnectionManagerTest, BlockingSendSuccess) {
 TEST_F(AplCoreConnectionManagerTest, HandleBuildSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(9);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
@@ -301,10 +464,108 @@ TEST_F(AplCoreConnectionManagerTest, HandleBuildSuccess) {
     BuildDocument(DOCUMENT, DATA, VIEWPORT);
 }
 
+TEST_F(AplCoreConnectionManagerTest, HandleDynamicDataSource) {
+    EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(2);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(6));
+    EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
+    EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, std::chrono::milliseconds(-1))).Times((1));
+    EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, true, _)).Times(1);
+
+    auto content = apl::Content::create(DOCUMENT_DYNAMIC);
+    auto token = "presentation_token";
+    m_aplCoreConnectionManager->setSupportedViewports(VIEWPORT);
+    m_aplCoreConnectionManager->setContent(content, token);
+    // this is required in order to set content state to ready
+    content->addData(TOKEN_LIST_NAME, TOKEN_LIST_DATA);
+    content->addData(INDEX_LIST_NAME, INDEX_LIST_DATA);
+    m_aplCoreConnectionManager->handleMessage(BUILD_PAYLOAD);
+    // test to send out runtime error with invalid payload
+    const std::string messageType = "\"type\":\"LIST_ERROR\"";
+    EXPECT_CALL(*m_mockAplOptions, onRuntimeErrorEvent(token, MatchOutMessage(messageType, "vQdpOESlok1"))).Times(1);
+    const std::string indexPayload =
+        "{"
+        "  \"token\": \"presentationToken\","
+        "  \"correlationToken\": \"99\","
+        "  \"listId\": \"vQdpOESlok1\","
+        "  \"startIndex\": 1,"
+        "  \"items\": []"
+        "}";
+    m_aplCoreConnectionManager->dataSourceUpdate("dynamicIndexList", indexPayload, token);
+    EXPECT_CALL(*m_mockAplOptions, onRuntimeErrorEvent(token, MatchOutMessage(messageType, "vQdpOESlok2"))).Times(1);
+    const std::string tokenPayload =
+        "{"
+        "  \"token\": \"presentationToken\","
+        "  \"correlationToken\": \"99\","
+        "  \"listId\": \"vQdpOESlok2\","
+        "  \"pageToken\": \"forwardPageToken\","
+        "  \"items\": []"
+        "}";
+    m_aplCoreConnectionManager->dataSourceUpdate("dynamicTokenList", tokenPayload, token);
+}
+
+TEST_F(AplCoreConnectionManagerTest, HandleConfigurationChangeSuccess) {
+    EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
+    EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(2).WillRepeatedly(Return(std::chrono::milliseconds()));
+    EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
+    EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, true, _)).Times(1);
+    // Given build document with reInflate defined in handleConfigurationChange successfully.
+    BuildDocument(DOCUMENT, DATA, VIEWPORT);
+    // When configuration change is handled.
+    // Then reInflate event should be send.
+    const std::string configChange =
+        "{"
+        "  \"type\":\"configurationChange\","
+        "  \"payload\":{"
+        "     \"width\": 1080,"
+        "     \"height\": 1920,"
+        "     \"docTheme\": \"dark\","
+        "     \"mode\": \"TV\","
+        "     \"fontScale\": 1.5,"
+        "     \"screenMode\": \"normal\","
+        "     \"screenReader\": false"
+        "  }"
+        "}";
+    const std::string scalingMessageType = "\"type\":\"scaling\"";
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, MatchOutMessage(scalingMessageType, ""))).Times(1);
+    const std::string themeMessageType = "\"type\":\"docTheme\"";
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, MatchOutMessage(themeMessageType, ""))).Times(1);
+    m_aplCoreConnectionManager->handleMessage(configChange);
+    int reInflateEvent = apl::EventType::kEventTypeReinflate;
+    const std::string messageType = "\"type\":\"event\"";
+    const std::string expectedPayload = "\"payload\":{\"type\":" + std::to_string(reInflateEvent) + "},\"seqno\":13}";
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, MatchOutMessage(messageType, expectedPayload))).Times(1);
+    m_aplCoreConnectionManager->onUpdateTick();
+    const std::string payload=
+            "  {"
+            "    \"type\":\"response\","
+            "    \"payload\":{"
+            "      \"event\":13"
+            "    }"
+            "  }";
+    m_aplCoreConnectionManager->handleMessage(payload);
+}
+
+TEST_F(AplCoreConnectionManagerTest, CheckDocumentTimeoutInSettings) {
+    EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(10);
+    EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
+    EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, std::chrono::milliseconds(123))).Times((1));
+    EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, true, _)).Times(1);
+
+    BuildDocument(DOCUMENT_WITH_IDLETIMEOUT, DATA, VIEWPORT);
+}
+
 TEST_F(AplCoreConnectionManagerTest, ExecuteCommandsSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(6);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(11);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(10));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(2).WillRepeatedly(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
     EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, _, _)).Times(1);
@@ -326,14 +587,18 @@ TEST_F(AplCoreConnectionManagerTest, ExecuteCommandsSuccess) {
         "  ]"
         "}";
     m_aplCoreConnectionManager->executeCommands(payload, "");
-    // Calling this to resolve pending events
+    // When onUpdateTick is called
+    // Then message contain dirty component information will be send out.
+    const std::string messageType = "\"type\":\"dirty\"";
+    const std::string dirtyPayload = "\"text\":{\"text\":\"Hi\",\"spans\":[]}}";
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, MatchOutMessage(messageType, dirtyPayload))).Times(1);
     m_aplCoreConnectionManager->onUpdateTick();
 }
 
 TEST_F(AplCoreConnectionManagerTest, ExecuteCommandsInterrupt) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(9);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
     EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, _, _)).Times(1);
@@ -364,7 +629,7 @@ TEST_F(AplCoreConnectionManagerTest, ExecuteCommandsInterrupt) {
 TEST_F(AplCoreConnectionManagerTest, HandleUpdateSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(9);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
@@ -391,7 +656,7 @@ TEST_F(AplCoreConnectionManagerTest, HandleUpdateSuccess) {
 TEST_F(AplCoreConnectionManagerTest, HandleUpdateMediaSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(9);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
@@ -426,8 +691,8 @@ TEST_F(AplCoreConnectionManagerTest, HandleUpdateMediaSuccess) {
 TEST_F(AplCoreConnectionManagerTest, HandleGraphicUpdateSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(9);
-    EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
+    EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(2).WillRepeatedly(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
     EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, _, _)).Times(1);
@@ -445,6 +710,20 @@ TEST_F(AplCoreConnectionManagerTest, HandleGraphicUpdateSuccess) {
         "}"
         "}";
     m_aplCoreConnectionManager->handleMessage(payload);
+    const std::string messageType = "\"type\":\"dirty\"";
+    const std::string dirtyPayload =
+        "\"graphic\":{"
+        "\"isValid\":true,"
+        "\"intrinsicWidth\":100.0,"
+        "\"intrinsicHeight\":100.0,"
+        "\"viewportWidth\":100.0,"
+        "\"viewportHeight\":100.0,"
+        "\"root\":{\"id\":1000,\"type\":0,\"props\":{\"height_actual\":100.0,\"viewportHeight_actual\":100.0,\"viewportWidth_actual\":100.0,\"width_actual\":100.0},\"children\":[]},"
+        "\"dirty\":[]},"
+        "\"mediaBounds\":[-25.0,-25.0,100.0,100.0]"
+        "}],";
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, MatchOutMessage(messageType, dirtyPayload))).Times(1);
+    m_aplCoreConnectionManager->onUpdateTick();
 }
 
 /**
@@ -454,7 +733,6 @@ TEST_F(AplCoreConnectionManagerTest, HandleEventResponseSuccess) {
 
      EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
      EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(2);
-     EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(8);
      EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(2).WillRepeatedly(Return(std::chrono::milliseconds()));
      EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
      EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, _, _)).Times(1);
@@ -494,7 +772,7 @@ TEST_F(AplCoreConnectionManagerTest, HandleEventResponseSuccess) {
 TEST_F(AplCoreConnectionManagerTest, HandleEnsureLayoutSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(10);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(10));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
@@ -519,7 +797,7 @@ TEST_F(AplCoreConnectionManagerTest, HandleEnsureLayoutSuccess) {
 TEST_F(AplCoreConnectionManagerTest, HandleScrollToRectInComponentSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(9);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
@@ -549,7 +827,7 @@ TEST_F(AplCoreConnectionManagerTest, HandleScrollToRectInComponentSuccess) {
 TEST_F(AplCoreConnectionManagerTest, HandleKeyboardSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(10);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(10));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
@@ -582,7 +860,7 @@ TEST_F(AplCoreConnectionManagerTest, HandleKeyboardSuccess) {
 TEST_F(AplCoreConnectionManagerTest, HandleUpdateCursorPositionSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(9);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
@@ -607,7 +885,7 @@ TEST_F(AplCoreConnectionManagerTest, HandleUpdateCursorPositionSuccess) {
 TEST_F(AplCoreConnectionManagerTest, HandlePointerEventSuccess) {
     EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
-    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(9);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
     EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
     EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
     EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
@@ -627,6 +905,58 @@ TEST_F(AplCoreConnectionManagerTest, HandlePointerEventSuccess) {
         "    \"pointerType\":0"
         "  }"
         "}";
+    m_aplCoreConnectionManager->handleMessage(payload);
+}
+
+/**
+ * Test HandleMessage function with reinflate.
+ */
+TEST_F(AplCoreConnectionManagerTest, HandleReInflateSuccess) {
+    EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
+    EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
+    EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
+    EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, true, _)).Times(1);
+    // Given a document build success.
+    BuildDocument(DOCUMENT, DATA, VIEWPORT);
+    // When reInflate received
+    // Then document rebuild with measure message, scale message, theme message and hierarchy message send out.
+    EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(3);
+    const std::string measureMessageType = "\"type\":\"measure\"";
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, MatchOutMessage(measureMessageType, ""))).Times(3);
+    const std::string hierarchyMessageType = "\"type\":\"hierarchy\"";
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, MatchOutMessage(hierarchyMessageType, ""))).Times(1);
+
+    const std::string payload =
+        "{"
+        "  \"type\":\"reInflate\","
+        "  \"payload\": {}"
+        "}";
+    m_aplCoreConnectionManager->handleMessage(payload);
+}
+
+TEST_F(AplCoreConnectionManagerTest, HandleReHierarchySuccess) {
+    EXPECT_CALL(*m_mockAplOptions, resetViewhost(_)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onRenderingEvent(_, _)).Times(5);
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, _)).Times(AtLeast(9));
+    EXPECT_CALL(*m_mockAplOptions, getTimezoneOffset()).Times(1).WillOnce(Return(std::chrono::milliseconds()));
+    EXPECT_CALL(*m_mockAplOptions, onActivityEnded(_, _)).Times(1);
+    EXPECT_CALL(*m_mockAplOptions, onSetDocumentIdleTimeout(_, _)).Times((1));
+    EXPECT_CALL(*m_mockAplOptions, onRenderDocumentComplete(_, true, _)).Times(1);
+    // Given a document build success.
+    BuildDocument(DOCUMENT, DATA, VIEWPORT);
+    // When reHierarchy received
+    // Then reHierarchy message send out.
+    const std::string hierarchyMessageType = "\"type\":\"reHierarchy\"";
+    EXPECT_CALL(*m_mockAplOptions, sendMessage(_, MatchOutMessage(hierarchyMessageType, ""))).Times(1);
+
+    const std::string payload =
+            "{"
+            "  \"type\":\"reHierarchy\","
+            "  \"payload\": {}"
+            "}";
     m_aplCoreConnectionManager->handleMessage(payload);
 }
 

@@ -69,10 +69,10 @@ const HOST = 'localhost';
 const PORT = 8933;
 
 /// Maximum APL version supported by the runtime.
-const APL_MAX_VERSION = '1.5';
+const APL_MAX_VERSION = '1.6';
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.6';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.7';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
@@ -581,9 +581,9 @@ export class App extends React.Component<any, IAppState> {
                     id={window.id}
                     key={window.id}
                     windowConfig={window}
-                    windowState={(window.id === this.state.targetWindowId && this.state.clearWindow) ||
-                        (window.id !== this.state.targetWindowId) ?
-                        APLRendererWindowState.INACTIVE : APLRendererWindowState.ACTIVE}
+                    clearRenderer={
+                        window.id === this.state.targetWindowId
+                        && this.state.clearWindow}
                     refreshRenderer={
                         window.id === this.state.targetWindowId
                         && this.state.updateActiveAPLRendererWindow}

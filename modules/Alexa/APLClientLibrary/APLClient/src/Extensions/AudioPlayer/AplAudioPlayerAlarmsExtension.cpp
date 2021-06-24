@@ -59,7 +59,7 @@ std::unordered_map<std::string, apl::LiveObjectPtr> AplAudioPlayerAlarmsExtensio
 
 void AplAudioPlayerAlarmsExtension::applySettings(const apl::Object& settings) {
     /// Apply @c apl::Content defined settings
-    logMessage(apl::LogLevel::INFO, TAG, __func__, settings.toDebugString());
+    logMessage(apl::LogLevel::kInfo, TAG, __func__, settings.toDebugString());
 }
 
 void AplAudioPlayerAlarmsExtension::onExtensionEvent(
@@ -80,11 +80,11 @@ void AplAudioPlayerAlarmsExtension::onExtensionEvent(
         } else if (COMMAND_SNOOZE_NAME == name) {
             m_observer->onAudioPlayerAlarmSnooze();
         } else {
-            logMessage(apl::LogLevel::ERROR, TAG, __func__, "Invalid Command: " + eventDebugString);
+            logMessage(apl::LogLevel::kError, TAG, __func__, "Invalid Command: " + eventDebugString);
             succeeded = false;
         }
     } else {
-        logMessage(apl::LogLevel::ERROR, TAG, __func__, "No Event Observer: " + eventDebugString);
+        logMessage(apl::LogLevel::kError, TAG, __func__, "No Event Observer: " + eventDebugString);
         succeeded = false;
     }
 

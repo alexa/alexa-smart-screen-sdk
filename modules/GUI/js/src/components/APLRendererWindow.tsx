@@ -46,7 +46,7 @@ export enum APLRendererWindowState {
 export interface IAPLRendererWindowProps {
   id : string;
   windowConfig : IAPLRendererWindowConfig;
-  windowState : APLRendererWindowState;
+  clearRenderer : boolean;
   client : WebsocketConnectionWrapper;
   refreshRenderer : boolean;
   focusManager : FocusManager;
@@ -88,10 +88,18 @@ export class WindowWebsocketClient extends APLClient {
     switch (message.type) {
       case 'executeCommands' :
       case 'renderComplete':
-      case 'renderStaticDocument' :
-      case 'displayMetrics': {
+      case 'renderStaticDocument' : {
         message.windowId = this.windowId;
         this.client.sendMessage(message);
+        break;
+      }
+      case 'displayMetrics': {
+        const metricsEvent = {
+          type: 'aplDisplayMetrics',
+          windowId: this.windowId,
+          payload: message
+        };
+        this.client.sendMessage(metricsEvent);
         break;
       }
       default : {
@@ -271,12 +279,12 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
       rendererElement.style.height = `${this.renderer.context.getViewportHeight()}px`;
 
       // onRendererInit callback
-      if (this.props.windowState === APLRendererWindowState.ACTIVE && this.props.onRendererInit) {
+      if (!this.props.clearRenderer && this.props.onRendererInit) {
         this.props.onRendererInit();
       }
       this.setState({
         // Update state once we've rendered
-        windowState : this.props.windowState
+        windowState : this.props.clearRenderer ? APLRendererWindowState.INACTIVE : APLRendererWindowState.ACTIVE
       });
 
       this.client.sendMessage({
@@ -314,13 +322,13 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
       // Allow window to transition before destroying renderer
       await Timer.delay(this.windowInactiveTransitionInMS);
       // Make sure we didn't become active again before destroying
-      if (this.props.windowState === APLRendererWindowState.INACTIVE) {
+      if (this.props.clearRenderer) {
         this.destroyRenderer();
       }
   }
 
   public componentWillReceiveProps(nextProps : IAPLRendererWindowProps) {
-    if (nextProps.windowState === APLRendererWindowState.INACTIVE) {
+    if (nextProps.clearRenderer) {
       this.setInactive();
     }
   }

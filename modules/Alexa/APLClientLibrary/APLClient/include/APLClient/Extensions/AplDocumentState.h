@@ -19,7 +19,6 @@
 #include <memory>
 #include <chrono>
 
-// TODO: Tidy up core to prevent this (ELON-4186)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreorder"
 #pragma push_macro("DEBUG")
@@ -69,6 +68,8 @@ struct AplDocumentState {
     apl::RootContextPtr rootContext;
     /// The pointer for the derived @c MetricsTransform for the document.
     std::shared_ptr<apl::MetricsTransform> metrics;
+    /// The configuration change that needs to be applied to the restoring documentState.
+    apl::ConfigurationChange configurationChange;
 };
 
 using AplDocumentStatePtr = std::shared_ptr<AplDocumentState>;

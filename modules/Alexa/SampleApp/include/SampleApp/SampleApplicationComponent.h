@@ -32,40 +32,50 @@
 #include <AVSCommon/Utils/Metrics/MetricRecorderInterface.h>
 #include <CBLAuthDelegate/CBLAuthDelegateStorageInterface.h>
 #include <CBLAuthDelegate/CBLAuthRequesterInterface.h>
-#include <RegistrationManager/CustomerDataManager.h>
 
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
 /**
- * Get the @c Manufactory @c Component for the default @c SampleApplication options
- * @return The @c Manufactory @c Component for the default @c SampleApplication options
+ * Definition of the Manufactory component for the Sample App.
+ *
  */
-alexaClientSDK::acsdkManufactory::Component<
+using SampleApplicationComponent = alexaClientSDK::acsdkManufactory::Component<
+    std::shared_ptr<alexaClientSDK::avsCommon::avs::initialization::AlexaClientSDKInit>,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerInterface>,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>,
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode>,
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo>,
+    std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface>,
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>>;
+
+using SampleApplicationOptionsComponent = alexaClientSDK::acsdkManufactory::Component<
     alexaClientSDK::acsdkManufactory::Import<
         std::unique_ptr<alexaClientSDK::avsCommon::utils::libcurlUtils::HttpPostInterface>>,
     alexaClientSDK::acsdkManufactory::Import<std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo>>,
-    alexaClientSDK::acsdkManufactory::Import<std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager>>,
+    alexaClientSDK::acsdkManufactory::Import<
+        std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface>>,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::logger::Logger>,
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>>
-getSampleApplicationOptionsComponent();
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>>;
+
+/**
+ * Get the @c Manufactory @c Component for the default @c SampleApplication options
+ * @return The @c Manufactory @c Component for the default @c SampleApplication options
+ */
+
+SampleApplicationOptionsComponent getSampleApplicationOptionsComponent();
 
 /**
  * Get the manufactory @c Component for SampleApp.
  *
  * @return The manufactory @c Component for SampleApp.
  */
-alexaClientSDK::acsdkManufactory::Component<
-    std::shared_ptr<alexaClientSDK::avsCommon::avs::initialization::AlexaClientSDKInit>,
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerInterface>,
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::LocaleAssetsManagerInterface>,
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode>,
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo>,
-    std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager>,
-    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>>
-getComponent(
+SampleApplicationComponent getComponent(
     std::unique_ptr<alexaClientSDK::avsCommon::avs::initialization::InitializationParameters> initParams,
-    std::vector<std::shared_ptr<alexaClientSDK::avsCommon::utils::RequiresShutdown>>& requiresShutdownList);
+    std::vector<std::shared_ptr<alexaClientSDK::avsCommon::utils::RequiresShutdown>>& requiresShutdownList,
+    const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AuthDelegateInterface>& authDelegate = nullptr,
+    const std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>& metricRecorder = nullptr,
+    const std::shared_ptr<alexaClientSDK::avsCommon::utils::logger::Logger>& logger = nullptr);
 
 }  // namespace sampleApp
 }  // namespace alexaSmartScreenSDK

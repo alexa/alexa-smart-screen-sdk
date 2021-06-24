@@ -11,73 +11,76 @@ macro(include_once module)
 endmacro()
 
 # Disallow out-of-source-builds.
-include(DisallowOutOfSourceBuilds)
+include_once(DisallowOutOfSourceBuilds)
 
 # Setup default build options, like compiler flags and build type.
-include(BuildOptions)
+include_once(BuildOptions)
 
 # Setup code coverage environment. This must be called after BuildOptions since it uses the variables defined there.
-include(CodeCoverage/CodeCoverage)
+include_once(CodeCoverage/CodeCoverage)
 
 # Setup package requirement variables.
-include(PackageConfigs)
+include_once(PackageConfigs)
 
 # Setup logging variables.
-include(Logger)
+include_once(Logger)
 
 # Setup keyword requirement variables.
-include(KeywordDetector)
+include_once(KeywordDetector)
 
 # Setup media player variables.
-include(MediaPlayer)
+include_once(MediaPlayer)
 
 # Setup PortAudio variables.
-include(PortAudio)
+include_once(PortAudio)
 
 # Setup Test Options variables.
-include(TestOptions)
+include_once(TestOptions)
 
 # Setup Bluetooth variables.
-include(Bluetooth)
+include_once(Bluetooth)
 
 # Setup platform dependant variables.
-include(Platforms)
+include_once(Platforms)
 
 # Setup ESP variables.
-include(ESP)
+include_once(ESP)
 
 # Setup Comms variables.
-include(Comms)
+include_once(Comms)
 
 # Setup PCC variables.
-include(PCC)
+include_once(PCC)
 
 # Setup MCC variables.
-include(MCC)
+include_once(MCC)
 
 # Setup android variables.
-include(Android)
+include_once(Android)
 
 # Setup ffmpeg variables.
-include(FFmpeg)
+include_once(FFmpeg)
 
 # Setup MRM variables.
-include (MRM)
+include_once(MRM)
 
 # Setup A4B variables.
-include (A4B)
+include_once(A4B)
 
 # Setup speech encoder variables.
-include (SpeechEncoder)
+include_once(SpeechEncoder)
 
 # Setup Metrics variables.
-include (Metrics)
+include_once(Metrics)
 
 # Setup Captions variables.
-include (Captions)
+include_once(Captions)
+
+# Setup Config Validation variables.
+include_once(ConfigValidation)
 
 if (HAS_EXTERNAL_MEDIA_PLAYER_ADAPTERS)
-    include (ExternalMediaPlayerAdapters)
+    include_once(ExternalMediaPlayerAdapters)
 endif()
 
 # Setup ducking options.

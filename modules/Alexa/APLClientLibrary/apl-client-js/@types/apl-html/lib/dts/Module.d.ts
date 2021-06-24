@@ -1,9 +1,11 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 /// <reference path="./Context.d.ts" />
 /// <reference path="./Content.d.ts" />
 /// <reference path="./Component.d.ts" />
+/// <reference path="./ConfigurationChange.d.ts" />
 /// <reference path="./Extension.d.ts" />
 /// <reference path="./ExtensionClient.d.ts" />
 /// <reference path="./Graphic.d.ts" />
@@ -20,8 +22,6 @@
 /// <reference path="./Keyboard.d.ts" />
 /// <reference path="./LiveArray.d.ts" />
 /// <reference path="./LiveMap.d.ts" />
-// TODO -> remove when upgrading to TS 3.0
-// https://issues.labcollab.net/browse/ARC-867
 declare class Exclude<U, V> {
 }
 declare namespace APL {
@@ -67,6 +67,7 @@ declare namespace APL {
     }
     export class Module {
         public onRuntimeInitialized: () => void;
+        public ConfigurationChange: typeof ConfigurationChange;
         public Content: typeof Content;
         public ExtensionCommandDefinition: typeof ExtensionCommandDefinition;
         public ExtensionFilterDefinition: typeof ExtensionFilterDefinition;

@@ -4,9 +4,8 @@
   "description": "Reference UI for AVS SDK",
   "main": "index.js",
   "engines": {
-    "node": ">=12.0"
+    "node": ">=14.0"
   },
-  "engineStrict": true,
   "scripts": {
     "lint": "tslint --project tsconfig.json -c tslint.json 'src/**/*.ts' 'src/**/*.tsx'",
     "build": "npm run lint && webpack --config webpack.config.js",
@@ -30,7 +29,7 @@
     "webpack": "^5.28.0"
   },
   "devDependencies": {
-    "css-loader": "^3.2.0",
+    "css-loader": "^5.2.4",
     "html-webpack-plugin": "^5.3.1",
     "webpack-cli": "^4.5.0"
   }

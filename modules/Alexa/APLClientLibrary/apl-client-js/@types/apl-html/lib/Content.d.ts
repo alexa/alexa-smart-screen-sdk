@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 /**
  * Holds all of the documents and data necessary to inflate an APL component hierarchy.
@@ -11,6 +12,11 @@ export declare class Content {
      * @param doc The main APL document
      */
     static create(doc: string): Content;
+    /**
+     * APL doc settings.
+     * @private
+     */
+    private settings;
     /**
      * Get Content created from Core.
      */
@@ -64,4 +70,9 @@ export declare class Content {
      * @return Map of settings, Object::NULL_OBJECT() if no settings are specified in the document.
      */
     getExtensionSettings(uri: string): object;
+    /**
+     * get APL settings in APL Doc.
+     * @param key
+     */
+    getAPLSettings(key: string): any;
 }

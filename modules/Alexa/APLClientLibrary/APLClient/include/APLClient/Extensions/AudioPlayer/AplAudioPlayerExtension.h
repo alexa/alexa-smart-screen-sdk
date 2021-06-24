@@ -30,9 +30,6 @@ static const std::string URI = "aplext:audioplayer:10";
 /**
  * An APL Extension designed for bi-directional communication between an @c AudioPlayer and APL document
  * to allow for control and command of audio stream and APL UI.
- *
- * TODO : Add link to public spec when available -
- * https://aplspec.aka.corp.amazon.com/apl-extensions-release/html/extensions/audioplayer/audioplayer_extension_10.html
  */
 class AplAudioPlayerExtension
         : public AplCoreExtensionInterface
@@ -145,7 +142,7 @@ private:
                     if (std::find(validLyricPropertyName.begin(), validLyricPropertyName.end(), it.first) != validLyricPropertyName.end()) {
                         m->emplace(it.first, it.second);
                     } else {
-                        logMessage(apl::LogLevel::WARN, "LyricsViewedData", __func__, "Ignoring invalid lyric property: " + it.first);
+                        logMessage(apl::LogLevel::kWarn, "LyricsViewedData", __func__, "Ignoring invalid lyric property: " + it.first);
                     }
                 }
                 lyricData->emplace_back(apl::Object(m));

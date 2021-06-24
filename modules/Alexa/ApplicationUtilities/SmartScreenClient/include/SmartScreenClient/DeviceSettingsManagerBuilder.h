@@ -25,8 +25,7 @@
 #include <AVSCommon/SDKInterfaces/LocaleAssetsManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/MessageSenderInterface.h>
 #include <AVSCommon/SDKInterfaces/SystemTimeZoneInterface.h>
-#include <acsdkDoNotDisturb/DoNotDisturbCapabilityAgent.h>
-#include <RegistrationManager/CustomerDataManager.h>
+#include <RegistrationManager/CustomerDataManagerInterface.h>
 #include <Settings/CloudControlledSettingProtocol.h>
 #include <Settings/DeviceControlledSettingProtocol.h>
 #include <Settings/DeviceSettingsManager.h>
@@ -36,6 +35,7 @@
 #include <Settings/SettingsManagerBuilderBase.h>
 #include <Settings/SharedAVSSettingProtocol.h>
 #include <Settings/Storage/DeviceSettingStorageInterface.h>
+#include <acsdkDoNotDisturb/DoNotDisturbCapabilityAgent.h>
 
 namespace alexaSmartScreenSDK {
 namespace smartScreenClient {
@@ -58,7 +58,7 @@ public:
         std::shared_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface> settingStorage,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AVSConnectionManagerInterface> connectionManager,
-        std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> dataManager);
+        std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> dataManager);
 
     /**
      * Configures do not disturb setting.
@@ -181,7 +181,10 @@ private:
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::AVSConnectionManagerInterface> m_connectionManager;
 
     /// The dataManager object that will track the CustomerDataHandler.
-    std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> m_dataManager;
+    std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> m_dataManager;
+
+    /// The Metric Recorder object to log metrics.
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> m_metricRecorder;
 
     /// Flag that indicates if there was any configuration error.
     bool m_foundError;

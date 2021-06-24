@@ -1,5 +1,6 @@
 /**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 import { GraphicElementData } from "./APLGraphicElement";
 export interface GraphicData {
@@ -9,6 +10,7 @@ export interface GraphicData {
     intrinsicHeight: number;
     viewportWidth: number;
     viewportHeight: number;
+    dirty: GraphicElementData[];
 }
 export declare class APLGraphic implements APL.Graphic {
     private root;
@@ -19,6 +21,7 @@ export declare class APLGraphic implements APL.Graphic {
     private viewportHeight;
     private dirty;
     constructor(data: GraphicData);
+    private addToDirty(dirty);
     getRoot(): APL.GraphicElement;
     isValid(): boolean;
     getIntrinsicHeight(): number;
@@ -26,6 +29,8 @@ export declare class APLGraphic implements APL.Graphic {
     getViewportWidth(): number;
     getViewportHeight(): number;
     clearDirty(): void;
-    getDirty(): APL.GraphicElement[];
+    getDirty(): {
+        [key: number]: APL.GraphicElement;
+    };
     delete(): void;
 }

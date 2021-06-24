@@ -139,7 +139,7 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
             id={RENDER_PLAYER_INFO_WINDOW_ID}
             key={RENDER_PLAYER_INFO_WINDOW_ID}
             windowConfig={this.windowConfig}
-            windowState={this.state.windowState}
+            clearRenderer={APLRendererWindowState.INACTIVE === this.state.windowState}
             refreshRenderer={this.props.refreshRenderer}
             client={this.client}
             focusManager={this.focusManager}

@@ -18,7 +18,6 @@
 
 #include <string>
 #include <list>
-// TODO: Tidy up core to prevent this (ELON-4186)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreorder"
 #pragma push_macro("DEBUG")
@@ -41,7 +40,6 @@ namespace APLClient {
 namespace Extensions {
 
 /// Static cast of apl::LogLevel::DEBUG
-/// TODO : Determine why this casting is required for this enum val.
 static apl::LogLevel LOGLEVEL_DEBUG = static_cast<apl::LogLevel>(1);
 
 /**
@@ -161,7 +159,7 @@ protected:
             for (auto& param : missingParams) {
                 missingParamsString += (" : " + param);
             }
-            logMessage(apl::LogLevel::ERROR, tag, __func__, missingParamsString);
+            logMessage(apl::LogLevel::kError, tag, __func__, missingParamsString);
             return false;
         }
         return true;

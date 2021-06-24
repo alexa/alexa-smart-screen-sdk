@@ -36,6 +36,7 @@
 #include <SystemSoundPlayer/SystemSoundPlayer.h>
 #include <acsdkBluetooth/Bluetooth.h>
 #include <acsdkBluetooth/DeviceConnectionRulesAdapter.h>
+#include <acsdkNotifications/NotificationRenderer.h>
 
 #ifdef ENABLE_OPUS
 #include <SpeechEncoder/OpusEncoderContext.h>
@@ -177,7 +178,7 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
 
 std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     std::shared_ptr<avsCommon::utils::DeviceInfo> deviceInfo,
-    std::shared_ptr<registrationManager::CustomerDataManager> customerDataManager,
+    std::shared_ptr<registrationManager::CustomerDataManagerInterface> customerDataManager,
     const std::unordered_map<std::string, std::shared_ptr<avsCommon::utils::mediaPlayer::MediaPlayerInterface>>&
         externalMusicProviderMediaPlayers,
     const std::unordered_map<std::string, std::shared_ptr<avsCommon::sdkInterfaces::SpeakerInterface>>&
@@ -330,7 +331,8 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
         std::move(alertStorage),
         std::move(bluetoothDeviceManager),
         std::move(bluetoothStorage),
-        bluetoothConnectionRulesProvider);
+        bluetoothConnectionRulesProvider,
+        std::move(notificationsStorage));
     auto manufactory = SmartScreenClientManufactory::create(component);
 
     auto speakerManager = manufactory->get<std::shared_ptr<SpeakerManagerInterface>>();
@@ -449,9 +451,9 @@ bool SmartScreenClient::initialize(
     // Initialize various locals from manufactory.
     auto metricRecorder = manufactory->get<std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>();
 
-    auto customerDataManager = manufactory->get<std::shared_ptr<registrationManager::CustomerDataManager>>();
+    auto customerDataManager = manufactory->get<std::shared_ptr<registrationManager::CustomerDataManagerInterface>>();
     if (!customerDataManager) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullAttachmentManager"));
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullCustomerDataManager"));
         return false;
     }
 
@@ -518,6 +520,13 @@ bool SmartScreenClient::initialize(
     auto audioFactory = manufactory->get<std::shared_ptr<avsCommon::sdkInterfaces::audio::AudioFactoryInterface>>();
     if (!audioFactory) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "nullAudioFactory"));
+        return false;
+    }
+
+    auto userInactivityMonitor =
+        manufactory->get<std::shared_ptr<avsCommon::sdkInterfaces::UserInactivityMonitorInterface>>();
+    if (!userInactivityMonitor) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "nullUserInactivityMonitorInterface"));
         return false;
     }
 
@@ -706,7 +715,7 @@ bool SmartScreenClient::initialize(
      * Capability Agent that deals with
      * directives in that Namespace/Name.
      */
-    m_directiveSequencer = adsl::DirectiveSequencer::create(m_exceptionSender, metricRecorder);
+    m_directiveSequencer = manufactory->get<std::shared_ptr<avsCommon::sdkInterfaces::DirectiveSequencerInterface>>();
     if (!m_directiveSequencer) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateDirectiveSequencer"));
         return false;
@@ -723,13 +732,17 @@ bool SmartScreenClient::initialize(
 
     m_connectionManager->addMessageObserver(messageInterpreter);
 
-    /*
-     * Creating the Registration Manager - This component is responsible for
-     * implementing any customer registration
-     * operation such as login and logout
-     */
-    m_registrationManager = std::make_shared<registrationManager::RegistrationManager>(
-        m_directiveSequencer, m_connectionManager, customerDataManager);
+    m_registrationManager = manufactory->get<std::shared_ptr<registrationManager::RegistrationManagerInterface>>();
+    if (!m_registrationManager) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToFetchRegistrationManager"));
+        return false;
+    }
+
+    m_registrationNotifier = manufactory->get<std::shared_ptr<registrationManager::RegistrationNotifierInterface>>();
+    if (!m_registrationNotifier) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToFetchRegistrationNotifier"));
+        return false;
+    }
 
     // Create endpoint related objects.
     m_capabilitiesDelegate->setMessageSender(m_connectionManager);
@@ -744,18 +757,6 @@ bool SmartScreenClient::initialize(
 
     m_deviceTimeZoneOffset = calculateDeviceTimezoneOffset(
         m_deviceSettingsManager->getSetting<settings::DeviceSettingsIndex::TIMEZONE>()->get());
-
-    /*
-     * Creating the User Inactivity Monitor - This component is responsibly for
-     * updating AVS of user inactivity as
-     * described in the System Interface of AVS.
-     */
-    m_userInactivityMonitor =
-        capabilityAgents::system::UserInactivityMonitor::create(m_connectionManager, m_exceptionSender);
-    if (!m_userInactivityMonitor) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateUserInactivityMonitor"));
-        return false;
-    }
 
     m_systemSoundPlayer = applicationUtilities::systemSoundPlayer::SystemSoundPlayer::create(
         systemSoundMediaPlayer, audioFactory->systemSounds());
@@ -780,7 +781,7 @@ bool SmartScreenClient::initialize(
         m_audioFocusManager,
         m_dialogUXStateAggregator,
         m_exceptionSender,
-        m_userInactivityMonitor,
+        userInactivityMonitor,
         m_systemSoundPlayer,
         localeAssetsManager,
         wakeWordConfirmationSetting,
@@ -800,7 +801,7 @@ bool SmartScreenClient::initialize(
         m_audioFocusManager,
         m_dialogUXStateAggregator,
         m_exceptionSender,
-        m_userInactivityMonitor,
+        userInactivityMonitor,
         m_systemSoundPlayer,
         localeAssetsManager,
         wakeWordConfirmationSetting,
@@ -905,40 +906,23 @@ bool SmartScreenClient::initialize(
 
     addConnectionObserver(m_dialogUXStateAggregator);
 
-    m_notificationsRenderer =
-        acsdkNotifications::NotificationRenderer::create(audioPipelineFactory, m_audioFocusManager);
-    if (!m_notificationsRenderer) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateNotificationsRenderer"));
+    m_notificationsNotifierInterface =
+        manufactory->get<std::shared_ptr<acsdkNotificationsInterfaces::NotificationsNotifierInterface>>();
+    if (!m_notificationsNotifierInterface) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToFetchNotificationsNotifier"));
         return false;
     }
 
-    /*
-     * Creating the Notifications Capability Agent - This component is the
-     * Capability Agent that implements the
-     * Notifications interface of AVS.
-     */
-    m_notificationsCapabilityAgent = acsdkNotifications::NotificationsCapabilityAgent::create(
-        notificationsStorage,
-        m_notificationsRenderer,
-        m_contextManager,
-        m_exceptionSender,
-        audioFactory->notifications(),
-        customerDataManager,
-        metricRecorder);
-    if (!m_notificationsCapabilityAgent) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateNotificationsCapabilityAgent"));
+    m_interactionModelNotifier =
+        manufactory->get<std::shared_ptr<acsdkInteractionModelInterfaces::InteractionModelNotifierInterface>>();
+    if (!m_interactionModelNotifier) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToFetchInteractionModelCapabilityAgent"));
         return false;
     }
 
-    m_interactionCapabilityAgent = capabilityAgents::interactionModel::InteractionModelCapabilityAgent::create(
-        m_directiveSequencer, m_exceptionSender);
-    if (!m_interactionCapabilityAgent) {
-        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateInteractionModelCapabilityAgent"));
-        return false;
-    }
     // Listen to when Request Processing Started (RPS) directive is received
     // to enter the THINKING mode (Interaction Model 1.1).
-    m_interactionCapabilityAgent->addObserver(m_dialogUXStateAggregator);
+    m_interactionModelNotifier->addObserver(m_dialogUXStateAggregator);
 
 #ifdef ENABLE_PCC
     /*
@@ -1241,9 +1225,6 @@ bool SmartScreenClient::initialize(
     m_defaultEndpointBuilder->withCapabilityConfiguration(m_visualCharacteristics);
     m_defaultEndpointBuilder->withCapabilityConfiguration(m_visualActivityTracker);
 
-    m_defaultEndpointBuilder->withCapability(m_notificationsCapabilityAgent, m_notificationsCapabilityAgent);
-    m_defaultEndpointBuilder->withCapability(m_interactionCapabilityAgent, m_interactionCapabilityAgent);
-
     if (m_equalizerCapabilityAgent) {
         m_defaultEndpointBuilder->withCapability(m_equalizerCapabilityAgent, m_equalizerCapabilityAgent);
     }
@@ -1252,11 +1233,10 @@ bool SmartScreenClient::initialize(
     m_defaultEndpointBuilder->withCapabilityConfiguration(systemCapabilityProvider);
     if (!m_directiveSequencer->addDirectiveHandler(std::move(localeHandler)) ||
         !m_directiveSequencer->addDirectiveHandler(std::move(timezoneHandler)) ||
-        !m_directiveSequencer->addDirectiveHandler(reportStateHandler) ||
 #ifdef ENABLE_REVOKE_AUTH
         !m_directiveSequencer->addDirectiveHandler(m_revokeAuthorizationHandler) ||
 #endif
-        !m_directiveSequencer->addDirectiveHandler(m_userInactivityMonitor)) {
+        !m_directiveSequencer->addDirectiveHandler(reportStateHandler)) {
         ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToRegisterSystemDirectiveHandler"));
         return false;
     }
@@ -1281,7 +1261,7 @@ bool SmartScreenClient::initialize(
             m_audioInputProcessor,
             m_speakerManager,
             m_directiveSequencer,
-            m_userInactivityMonitor,
+            userInactivityMonitor,
             m_contextManager,
             m_avsGatewayManager,
             ringtoneMediaPlayer,
@@ -1293,7 +1273,8 @@ bool SmartScreenClient::initialize(
             sharedDataStream,
 #endif
             powerResourceManager,
-            m_softwareReporterCapabilityAgent);
+            m_softwareReporterCapabilityAgent,
+            m_playbackRouter);
         for (auto& capability : externalCapabilities.first) {
             if (capability.configuration.hasValue()) {
                 m_defaultEndpointBuilder->withCapability(capability.configuration.value(), capability.directiveHandler);
@@ -1518,12 +1499,12 @@ void SmartScreenClient::TemplateRuntimeDisplayCardCleared() {
 
 void SmartScreenClient::addNotificationsObserver(
     std::shared_ptr<acsdkNotificationsInterfaces::NotificationsObserverInterface> observer) {
-    m_notificationsCapabilityAgent->addObserver(observer);
+    m_notificationsNotifierInterface->addObserver(observer);
 }
 
 void SmartScreenClient::removeNotificationsObserver(
     std::shared_ptr<acsdkNotificationsInterfaces::NotificationsObserverInterface> observer) {
-    m_notificationsCapabilityAgent->removeObserver(observer);
+    m_notificationsNotifierInterface->removeObserver(observer);
 }
 
 void SmartScreenClient::addExternalMediaPlayerObserver(
@@ -1606,8 +1587,18 @@ std::shared_ptr<avsCommon::sdkInterfaces::FocusManagerInterface> SmartScreenClie
     return m_visualFocusManager;
 }
 
-std::shared_ptr<registrationManager::RegistrationManager> SmartScreenClient::getRegistrationManager() {
+std::shared_ptr<registrationManager::RegistrationManagerInterface> SmartScreenClient::getRegistrationManager() {
     return m_registrationManager;
+}
+
+void SmartScreenClient::addRegistrationObserver(
+    const std::shared_ptr<registrationManager::RegistrationObserverInterface>& observer) {
+    m_registrationNotifier->addObserver(observer);
+}
+
+void SmartScreenClient::removeRegistrationObserver(
+    const std::shared_ptr<registrationManager::RegistrationObserverInterface>& observer) {
+    m_registrationNotifier->removeObserver(observer);
 }
 
 std::shared_ptr<acsdkEqualizer::EqualizerController> SmartScreenClient::getEqualizerController() {
@@ -1938,12 +1929,6 @@ void SmartScreenClient::handleRenderComplete(bool isAlexaPresentationPresenting)
     }
 }
 
-void SmartScreenClient::handleDropFrameCount(uint64_t dropFrameCount, bool isAlexaPresentationPresenting) {
-    if (isAlexaPresentationPresenting) {
-        m_alexaPresentation->recordDropFrameCount(dropFrameCount);
-    }
-}
-
 void SmartScreenClient::handleAPLEvent(APLClient::AplRenderingEvent event, bool isAlexaPresentationPresenting) {
     if (isAlexaPresentationPresenting) {
         m_alexaPresentation->recordAPLEvent(event);
@@ -1999,10 +1984,6 @@ SmartScreenClient::~SmartScreenClient() {
         m_shutdownObjects.pop_back();
     }
 
-    if (m_directiveSequencer) {
-        ACSDK_DEBUG5(LX("DirectiveSequencerShutdown"));
-        m_directiveSequencer->shutdown();
-    }
     if (m_alexaPresentation) {
         ACSDK_DEBUG5(LX("AlexaPresentationShutdown"));
         m_alexaPresentation->shutdown();
@@ -2035,19 +2016,6 @@ SmartScreenClient::~SmartScreenClient() {
     if (m_visualActivityTracker) {
         ACSDK_DEBUG5(LX("VisualActivityTrackerShutdown."));
         m_visualActivityTracker->shutdown();
-    }
-    if (m_notificationsCapabilityAgent) {
-        ACSDK_DEBUG5(LX("NotificationsShutdown."));
-        m_notificationsCapabilityAgent->shutdown();
-    }
-    if (m_notificationsRenderer) {
-        ACSDK_DEBUG5(LX("NotificationsRendererShutdown."));
-        m_notificationsRenderer->shutdown();
-    }
-
-    if (m_userInactivityMonitor) {
-        ACSDK_DEBUG5(LX("UserInactivityMonitorShutdown."));
-        m_userInactivityMonitor->shutdown();
     }
 
     if (m_apiGatewayCapabilityAgent) {

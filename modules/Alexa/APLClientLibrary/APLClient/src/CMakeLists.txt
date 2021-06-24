@@ -16,6 +16,7 @@ AplCoreEngineLogBridge.cpp
 AplCoreGuiRenderer.cpp
 AplCoreMetrics.cpp
 AplCoreTextMeasurement.cpp
+AplCoreLocaleMethods.cpp
 AplClientRenderer.cpp
 )
 

@@ -16,7 +16,6 @@
 #ifndef APL_CLIENT_LIBRARY_APL_CORE_GUI_RENDERER_H_
 #define APL_CLIENT_LIBRARY_APL_CORE_GUI_RENDERER_H_
 
-// TODO: Tidy up core to prevent this (ARC-917)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreorder"
 #pragma push_macro("DEBUG")

@@ -19,7 +19,6 @@
 #include <AVSCommon/Utils/Timing/Timer.h>
 
 #include <Utils/SmartScreenSDKVersion.h>
-#include <RegistrationManager/CustomerDataManager.h>
 #include "SampleApp/Messages/GUIClientMessage.h"
 
 #include "SampleApp/GUI/GUIClient.h"
@@ -73,7 +72,7 @@ static const std::string MESSAGE_TYPE_DEVICE_WINDOW_STATE("deviceWindowState");
 static const std::string MESSAGE_TYPE_RENDER_COMPLETE("renderComplete");
 
 /// The message type for display metrics event
-static const std::string MESSAGE_TYPE_DISPLAY_METRICS("displayMetrics");
+static const std::string MESSAGE_TYPE_DISPLAY_METRICS("aplDisplayMetrics");
 
 /// The message type for toggling captions.
 static const std::string MESSAGE_TYPE_TOGGLE_CAPTIONS("toggleCaptions");
@@ -157,7 +156,7 @@ static const std::string TABLE_NAME{"GUIClient"};
 static const std::string APL_MAX_VERSION_DB_KEY{"APLMaxVersion"};
 
 /// Initial APL version to use at the first run and before any  GUI client is connected.
-static const std::string INITIAL_APL_MAX_VERSION{"1.5"};
+static const std::string INITIAL_APL_MAX_VERSION{"1.6"};
 
 /// The key in our config file to find the root of GUI configuration
 static const std::string GUI_CONFIGURATION_ROOT_KEY = "gui";
@@ -326,7 +325,7 @@ static std::string getAPLMaxVersionFromStorage(const std::shared_ptr<MiscStorage
 std::shared_ptr<GUIClient> GUIClient::create(
     std::shared_ptr<MessagingServerInterface> serverImplementation,
     const std::shared_ptr<MiscStorageInterface>& miscStorage,
-    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager) {
+    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> customerDataManager) {
     if (!serverImplementation) {
         ACSDK_ERROR(LX("createFailed").d("reason", "nullServerImplementation"));
         return nullptr;
@@ -354,7 +353,7 @@ GUIClient::GUIClient(
     std::shared_ptr<MessagingServerInterface> serverImplementation,
     const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
     const std::string& APLMaxVersion,
-    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManager> customerDataManager) :
+    const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> customerDataManager) :
         RequiresShutdown{"GUIClient"},
         CustomerDataHandler{customerDataManager},
         m_serverImplementation{serverImplementation},
@@ -516,7 +515,6 @@ bool GUIClient::start() {
     m_executor.submit([this]() {
         // start the server asynchronously.
         m_serverThread = std::thread(&GUIClient::serverThread, this);
-        m_serverThread.detach();
     });
 
     return true;
@@ -549,6 +547,9 @@ void GUIClient::stop() {
         }
         m_hasServerStarted = m_initMessageReceived = m_errorState = false;
     });
+    if (m_serverThread.joinable()) {
+        m_serverThread.join();
+    }
 }
 
 void GUIClient::onMessage(const std::string& jsonPayload) {
@@ -607,7 +608,11 @@ void GUIClient::interruptCommandSequence(const std::string& token) {
     m_executor.submit([this, token]() { m_aplClientBridge->interruptCommandSequence(token); });
 }
 
-void GUIClient::onPresentationSessionChanged(const std::string& id, const std::string& skillId) {
+void GUIClient::onPresentationSessionChanged(
+    const std::string& id,
+    const std::string& skillId,
+    const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
+    const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions) {
     m_executor.submit([this, id, skillId]() { m_aplClientBridge->onPresentationSessionChanged(id, skillId); });
 }
 
@@ -958,75 +963,19 @@ void GUIClient::executeHandleRenderComplete(rapidjson::Document& message) {
 
 void GUIClient::executeHandleDisplayMetrics(rapidjson::Document& message) {
     std::string windowId;
+    std::string jsonPayload;
+
     if (!jsonUtils::retrieveValue(message, WINDOW_ID_TAG, &windowId)) {
-        ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "windowIdNotFound"));
+        ACSDK_ERROR(LX("executeHandleDisplayMetricsFailed").d("reason", "windowIdNotFound"));
         return;
     }
 
-    if (!message.HasMember(PAYLOAD_TAG)) {
-        ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "payloadNotFound"));
+    if (!jsonUtils::retrieveValue(message, PAYLOAD_TAG, &jsonPayload)) {
+        ACSDK_ERROR(LX("executeHandleDisplayMetricsFailed").d("reason", "payloadNotFound"));
         return;
     }
 
-    const auto& payload = message[PAYLOAD_TAG];
-
-    if (payload.IsArray()) {
-        std::vector<APLClient::DisplayMetric> metrics;
-        for (rapidjson::SizeType i = 0; i < payload.Size(); i++) {
-            const auto& jsonMetric = payload[i];
-            APLClient::DisplayMetric metric;
-            std::string kind;
-
-            if (!jsonUtils::retrieveValue(jsonMetric, "kind", &kind)) {
-                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "missingMetricKind"));
-                return;
-            }
-
-            if (kind == "timer") {
-                metric.kind = APLClient::DisplayMetricKind::kTimer;
-            } else if (kind == "counter") {
-                metric.kind = APLClient::DisplayMetricKind::kCounter;
-            } else {
-                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "unsupportedMetricKind"));
-                return;
-            }
-
-            if (!jsonUtils::retrieveValue(jsonMetric, "name", &metric.name)) {
-                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "missingMetricName"));
-                return;
-            }
-
-            rapidjson::Value::ConstMemberIterator iterator;
-            if (!jsonUtils::findNode(jsonMetric, "value", &iterator)) {
-                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "missingMetricValue"));
-                return;
-            }
-
-            double d_value = 0;
-            uint64_t i_value = 0;
-            if (iterator->value.IsDouble() && jsonUtils::retrieveValue(jsonMetric, "value", &d_value)) {
-                metric.value = static_cast<uint64_t>(d_value);
-            } else if (iterator->value.IsUint64() && jsonUtils::retrieveValue(jsonMetric, "value", &i_value)) {
-                metric.value = static_cast<uint64_t>(i_value);
-            } else {
-                ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "incorrectTypeOrValue"));
-                return;
-            }
-
-            metrics.emplace_back(metric);
-        }
-        m_guiManager->handleDisplayMetrics(metrics);
-        m_aplClientBridge->handleDisplayMetrics(windowId, metrics);
-    } else {
-        // Deprecated, retained for backward compatibility only while the viewhost is updated
-        uint64_t dropFrameCount = 0;
-        if (!jsonUtils::retrieveValue(payload, DROP_FRAME_COUNT_TAG, &dropFrameCount)) {
-            ACSDK_ERROR(LX("executeHandleDisplayMetrics").d("reason", "dropFrameCountNotFound"));
-            return;
-        }
-
-        m_guiManager->handleDisplayMetrics(dropFrameCount);
-    }
+    m_aplClientBridge->handleDisplayMetrics(windowId, jsonPayload);
 }
 
 void GUIClient::setObserver(const std::shared_ptr<MessagingServerObserverInterface>& observer) {
@@ -1098,7 +1047,7 @@ void GUIClient::renderDocument(const std::string& jsonPayload, const std::string
     });
 }
 
-void GUIClient::clearDocument(const std::string& token) {
+void GUIClient::clearDocument(const std::string& token, const bool focusCleared) {
     ACSDK_DEBUG5(LX("clearDocument"));
     m_executor.submit([this, token]() { m_aplClientBridge->clearDocument(token); });
 }

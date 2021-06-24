@@ -69,7 +69,6 @@ elseif(MSVC)
 
 	set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
-    #TODO: can we uncomment this instead of defining in CMakeSettings.json
 	#set_property(DIRECTORY
     #        PROPERTY
     #        CMAKE_SYSTEM_NAME WindowsStore)

@@ -133,9 +133,6 @@ private:
     /**
      * Contains @c AplDocumentState objects and methods to support the APL Backstack.
      *
-     * TODO : Replace this with public spec link when available.
-     * APL-Spec https://aplspec.aka.corp.amazon.com/release-1.3/html/extensions/backstack_extension.html
-     *
      * Note:
      * The top of the stack is {@c AplBackstack.length()} - 1.
      */

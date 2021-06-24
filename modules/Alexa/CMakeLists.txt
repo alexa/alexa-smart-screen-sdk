@@ -4,7 +4,7 @@ project(AlexaSmartScreenSDK LANGUAGES CXX)
 
 if (NOT MSVC)
 	find_package(PkgConfig)
-	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.23.0)
+	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.24.0)
 	set(ASDK_LIBRARY_DIRS "${CMAKE_PREFIX_PATH}/lib")
 	# Needs to append the correct path to AVS SDK since it's not installed
 	# to cross-compiler target sysroot
@@ -26,17 +26,20 @@ else()
 		"${ASDK_LIB_DIR}/acsdkCore.lib"
 		"${ASDK_LIB_DIR}/acsdkDefaultDeviceSettingsManager.lib"
 		"${ASDK_LIB_DIR}/acsdkDefaultInternetConnectionMonitor.lib"
+		"${ASDK_LIB_DIR}/acsdkDeviceSetup.lib"
 		"${ASDK_LIB_DIR}/acsdkDoNotDisturb.lib"
 		"${ASDK_LIB_DIR}/acsdkEqualizer.lib"
 		"${ASDK_LIB_DIR}/acsdkEqualizerImplementations.lib"
 		"${ASDK_LIB_DIR}/acsdkExternalMediaPlayer.lib"
 		"${ASDK_LIB_DIR}/acsdkExternalMediaPlayerInterfaces.lib"
+		"${ASDK_LIB_DIR}/acsdkInteractionModel.lib"
 		"${ASDK_LIB_DIR}/acsdkLibcurlHTTPContentFetcher.lib"
 		"${ASDK_LIB_DIR}/acsdkLibcurlAlexaCommunications.lib"
 		"${ASDK_LIB_DIR}/acsdkManufactory.lib"
 		"${ASDK_LIB_DIR}/acsdkMultiRoomMusic.lib"
 		"${ASDK_LIB_DIR}/acsdkNotifications.lib"
 		"${ASDK_LIB_DIR}/acsdkNullMetricRecorder.lib"
+		"${ASDK_LIB_DIR}/acsdkNullSpeechEncoder.lib"
 		"${ASDK_LIB_DIR}/acsdkNullSystemTimeZone.lib"
 		"${ASDK_LIB_DIR}/acsdkPostConnectOperationProviderRegistrar.lib"
 		"${ASDK_LIB_DIR}/acsdkShared.lib"
@@ -61,7 +64,6 @@ else()
 		"${ASDK_LIB_DIR}/DefaultClient.lib"
 		"${ASDK_LIB_DIR}/DeviceSettings.lib"
 		"${ASDK_LIB_DIR}/Endpoints.lib"
-		"${ASDK_LIB_DIR}/InteractionModel.lib"
 		"${ASDK_LIB_DIR}/InterruptModel.lib"
 		"${ASDK_LIB_DIR}/KWD.lib"
 		"${ASDK_LIB_DIR}/PlaybackController.lib"

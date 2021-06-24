@@ -21,6 +21,7 @@
 #include <memory>
 #include <queue>
 #include <string>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 
@@ -38,15 +39,19 @@
 #include <AVSCommon/Utils/RequiresShutdown.h>
 #include <AVSCommon/Utils/Threading/Executor.h>
 #include <AVSCommon/Utils/Timing/Timer.h>
+#include <AVSCommon/Utils/Timing/TimerDelegateFactory.h>
 #include <AVSCommon/Utils/Metrics/MetricRecorderInterface.h>
 #include <AVSCommon/Utils/Metrics/DataPointDurationBuilder.h>
 #include <AVSCommon/Utils/Metrics/DataPointCounterBuilder.h>
+#include <AVSCommon/Utils/Optional.h>
 
 #include <APLClient/AplRenderingEvent.h>
 #include <SmartScreenSDKInterfaces/ActivityEvent.h>
 #include <SmartScreenSDKInterfaces/AlexaPresentationObserverInterface.h>
 #include <SmartScreenSDKInterfaces/DisplayCardState.h>
 #include <SmartScreenSDKInterfaces/VisualStateProviderInterface.h>
+
+#include "TimeoutType.h"
 
 namespace alexaSmartScreenSDK {
 namespace smartScreenCapabilityAgents {
@@ -60,6 +65,18 @@ static const char SKILL_ID[] = "skillId";
 
 /// Identifier for the id in presentationSession
 static const char PRESENTATION_SESSION_ID[] = "id";
+
+/// Identifier for the grantedExtensions in presentationSession
+static const char PRESENTATION_SESSION_GRANTEDEXTENSIONS[] = "grantedExtensions";
+
+/// Identifier for the autoInitializedExtensions in presentationSession
+static const char PRESENTATION_SESSION_AUTOINITIALIZEDEXTENSIONS[] = "autoInitializedExtensions";
+
+//// Identifier for the uri in grantedExtensions or autoInitializedExtensions
+static const char PRESENTATION_SESSION_URI[] = "uri";
+
+/// Identifier for the settings in autoInitializedExtensions
+static const char PRESENTATION_SESSION_SETTINGS[] = "settings";
 
 /**
  * This class implements a @c CapabilityAgent that handles the SS SDK @c AlexaPresentation API.  The
@@ -95,7 +112,9 @@ public:
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerInterface> contextManager,
         std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface>
-            visualStateProvider = nullptr);
+            visualStateProvider = nullptr,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::timing::TimerDelegateFactoryInterface>
+            timerDelegateFactory = nullptr);
 
     /**
      * Destructor.
@@ -109,6 +128,12 @@ public:
     void handleDirective(std::shared_ptr<DirectiveInfo> info) override;
     void cancelDirective(std::shared_ptr<DirectiveInfo> info) override;
     alexaClientSDK::avsCommon::avs::DirectiveHandlerConfiguration getConfiguration() const override;
+    /// @}
+
+    /// @name CapabilityConfigurationInterface Functions
+    /// @{
+    std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityConfiguration>>
+    getCapabilityConfigurations() override;
     /// @}
 
     /// @name ChannelObserverInterface Functions
@@ -128,6 +153,13 @@ public:
     /// @{
     void onContextAvailable(const std::string& jsonContext) override;
     void onContextFailure(const alexaClientSDK::avsCommon::sdkInterfaces::ContextRequestError error) override;
+    /// @}
+
+    /// @name StateProviderInterface Functions
+    /// @{
+    void provideState(
+        const alexaClientSDK::avsCommon::avs::NamespaceAndName& stateProviderName,
+        unsigned int stateRequestToken) override;
     /// @}
 
     /**
@@ -159,12 +191,6 @@ public:
      */
     void clearExecuteCommands(const std::string& token = std::string(), const bool markAsFailed = true);
 
-    /// @name CapabilityConfigurationInterface Functions
-    /// @{
-    std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityConfiguration>>
-    getCapabilityConfigurations() override;
-    /// @}
-
     /**
      * Send @c UserEvent to AVS
      *
@@ -189,13 +215,6 @@ public:
      * function is responsible to pass the payload as it defined by AVS.
      */
     void sendRuntimeErrorEvent(const std::string& payload);
-
-    /// @name StateProviderInterface Functions
-    /// @{
-    void provideState(
-        const alexaClientSDK::avsCommon::avs::NamespaceAndName& stateProviderName,
-        unsigned int stateRequestToken) override;
-    /// @}
 
     /**
      * This function is called by the @c VisualContextProviderInterface with the visual context to be passed to AVS.
@@ -281,36 +300,6 @@ public:
     static const std::string getNonAPLDocumentToken();
 
 private:
-    /// Enum for the different events sent by the TemplateRuntime capability agent.
-    enum class AlexaPresentationEvents {
-        /// Event to be sent when an APL document is dimissed because of timeout or because of rendering a new screen.
-        APL_DISMISSED,
-
-        /**
-         *  Event sent when user interacts with a rendered GUI component. The event carries the complete component
-         * context of the render component in its payload.
-         */
-        APL_USER_EVENT,
-
-        /**
-         * Fired by devices and sent to the Alexa Platform when the device wishes to load more items for a
-         * dynamicIndexList.
-         */
-        APL_LOAD_INDEX_LIST_DATA,
-
-        /**
-         * Fired by devices and sent to the Alexa Platform when the device wishes to load more items for a
-         * dynamicTokenList.
-         */
-        APL_LOAD_TOKEN_LIST_DATA,
-
-        /**
-         * Fired by devices and sent to the Alexa Platform when the device need to notify AVS about any error
-         * returned by APL runtime.
-         */
-        APL_RUNTIME_ERROR,
-    };
-
     /// Document interaction state.
     enum class InteractionState {
         /// Interaction is going on.
@@ -335,8 +324,19 @@ private:
          *
          * @param skillId the identifier of the skill/speechlet.
          * @param id The identifier of the presentation session.
+         * @param grantedExtensions List of extensions that are granted for use by this APL document.
+         * @param autoInitializedExtensions List of extensions that are initialized in the APL runtime for this
+         * document.
          */
-        PresentationSession(std::string skillId, std::string id) : skillId{std::move(skillId)}, id{std::move(id)} {};
+        PresentationSession(
+            std::string skillId,
+            std::string id,
+            std::vector<smartScreenSDKInterfaces::GrantedExtension> grantedExtensions,
+            std::vector<smartScreenSDKInterfaces::AutoInitializedExtension> autoInitializedExtensions) :
+                skillId{std::move(skillId)},
+                id{std::move(id)},
+                grantedExtensions{std::move(grantedExtensions)},
+                autoInitializedExtensions{std::move(autoInitializedExtensions)} {};
 
         /// The identifier of the Skill/ Speechlet who sends this directive.
         std::string skillId;
@@ -344,12 +344,20 @@ private:
         /// The identifier of the presentation session.
         std::string id;
 
+        // List of extensions that are granted for use by this APL document.
+        std::vector<smartScreenSDKInterfaces::GrantedExtension> grantedExtensions;
+
+        // List of extensions that are initialized in the APL runtime for this document.
+        std::vector<smartScreenSDKInterfaces::AutoInitializedExtension> autoInitializedExtensions;
+
         bool operator==(const PresentationSession& other) const {
-            return skillId == other.skillId && id == other.id;
+            return skillId == other.skillId && id == other.id && grantedExtensions == other.grantedExtensions &&
+                   autoInitializedExtensions == other.autoInitializedExtensions;
         }
 
         bool operator!=(const PresentationSession& other) const {
-            return skillId != other.skillId || id != other.id;
+            return skillId != other.skillId || id != other.id || grantedExtensions != other.grantedExtensions ||
+                   autoInitializedExtensions != other.autoInitializedExtensions;
         }
 
         /**
@@ -361,6 +369,27 @@ private:
             rapidjson::Document presentationSession(rapidjson::kObjectType, &allocator);
             presentationSession.AddMember(SKILL_ID, skillId, allocator);
             presentationSession.AddMember(PRESENTATION_SESSION_ID, id, allocator);
+
+            rapidjson::Document grantedExtensionsDoc(rapidjson::kArrayType, &allocator);
+            grantedExtensionsDoc.SetArray();
+            for (auto grantedExtension : grantedExtensions) {
+                rapidjson::Document doc(rapidjson::kObjectType, &allocator);
+                doc.AddMember(PRESENTATION_SESSION_URI, grantedExtension.uri, allocator);
+                grantedExtensionsDoc.PushBack(doc, allocator);
+            }
+            presentationSession.AddMember(PRESENTATION_SESSION_GRANTEDEXTENSIONS, grantedExtensionsDoc, allocator);
+
+            rapidjson::Document autoInitializedExtensionsDoc(rapidjson::kArrayType, &allocator);
+            autoInitializedExtensionsDoc.SetArray();
+            for (auto autoInitializedExtension : autoInitializedExtensions) {
+                rapidjson::Document doc(rapidjson::kObjectType, &allocator);
+                doc.AddMember(PRESENTATION_SESSION_URI, autoInitializedExtension.uri, allocator);
+                doc.AddMember(PRESENTATION_SESSION_SETTINGS, autoInitializedExtension.settings, allocator);
+                autoInitializedExtensionsDoc.PushBack(doc, allocator);
+            }
+            presentationSession.AddMember(
+                PRESENTATION_SESSION_AUTOINITIALIZEDEXTENSIONS, autoInitializedExtensionsDoc, allocator);
+
             document->AddMember(PRESENTATION_SESSION_FIELD, presentationSession, allocator);
         }
 
@@ -394,7 +423,9 @@ private:
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> messageSender,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ContextManagerInterface> contextManager,
         std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface>
-            visualStateProvider = nullptr);
+            visualStateProvider = nullptr,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::timing::TimerDelegateFactoryInterface>
+            timerDelegateFactory = nullptr);
 
     // @name RequiresShutdown Functions
     /// @{
@@ -482,7 +513,7 @@ private:
      * This is an internal function that is called when the state machine is ready to notify the
      * @AlexaPresentation observers to display an APL document.
      */
-    void executeDisplayCard();
+    void executeRenderDocument();
 
     /**
      * This function handles the notification of the renderTemplateCard callbacks to all the observers.  This function
@@ -490,7 +521,7 @@ private:
      *
      * @param info The directive to be handled.
      */
-    void executeCommandEvent(std::shared_ptr<DirectiveInfo> info);
+    void executeExecuteCommand(std::shared_ptr<DirectiveInfo> info);
 
     /**
      * This function handles the notification of the processDataSourceUpdate callbacks to all the observers.  This
@@ -499,7 +530,7 @@ private:
      * @param info The directive to be handled.
      * @param sourceType Data source type.
      */
-    void dataSourceUpdateEvent(std::shared_ptr<DirectiveInfo> info, const std::string& sourceType);
+    void executeDataSourceUpdate(std::shared_ptr<DirectiveInfo> info, const std::string& sourceType);
 
     /**
      * This is an internal function that is called when the state machine is ready to notify the
@@ -508,21 +539,12 @@ private:
     void executeClearCard();
 
     /**
-     * This is an internal function to start the @c m_clearDisplayTimer.
-     *
-     * @param timeout The period of the timer.
+     * This is an internal function to start or extend the @c m_idleTimer.
      */
-    void executeStartTimer(std::chrono::milliseconds timeout);
+    void executeStartOrExtendTimer();
 
     /**
-     * This is an internal function to restart the @c m_clearDisplayTimer.
-     *
-     * @param timeout The period of the timer.
-     */
-    void executeRestartTimer(std::chrono::milliseconds timeout);
-
-    /**
-     * This is an internal function to stop the @c m_clearDisplayTimer.
+     * This is an internal function to stop the @c m_idleTimer.
      */
     void executeStopTimer();
 
@@ -537,9 +559,9 @@ private:
     void executeOnFocusChangedEvent(alexaClientSDK::avsCommon::avs::FocusState newFocus);
 
     /**
-     * This is a state machine function to handle the displayCard event.
+     * This is a state machine function to handle the renderDocument event.
      */
-    void executeDisplayCardEvent(
+    void executeRenderDocumentEvent(
         const std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityAgent::DirectiveInfo> info);
 
     /**
@@ -556,16 +578,9 @@ private:
      * @param info The directive to be handled.
      * @param sourceType Data source type.
      */
-    void executeDynamicListDataEvent(
+    void executeDataSourceUpdateEvent(
         const std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityAgent::DirectiveInfo> info,
         const std::string& sourceType);
-
-    /**
-     *
-     * Stops the execution of all pending @c ExecuteCommand directive
-     * @param markAsFailed whether to mark cleared commands as failed
-     */
-    void executeClearAllExecuteCommands(const bool markAsFailed = true);
 
     /**
      *
@@ -575,15 +590,17 @@ private:
      * (eg. Finish command). This should be left empty if we are clearing due to global triggers (eg. back navigation)
      * @param markAsFailed Whether to mark the cleared commands as failed.
      */
-    void doClearExecuteCommand(
+    void executeClearExecuteCommands(
         const std::string& reason,
         const std::string& token = std::string(),
         const bool markAsFailed = true);
-
     /**
-     * Send APL Dismissed event to AVS.
+     * Queue an AVS event to be sent when context is available
+     * @param avsNamespace namespace of the event
+     * @param name name of the event
+     * @param payload payload of the event
      */
-    void executeSendDismissedEvent();
+    void executeSendEvent(const std::string& avsNamespace, const std::string& name, const std::string& payload);
 
     /**
      * Internal function for handling @c ContextManager request for context
@@ -666,14 +683,14 @@ private:
     std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityConfiguration>>
         m_capabilityConfigurations;
 
-    /// The timeout value in ms for clearing the display card when it is no interaction received from SDK config
-    std::chrono::milliseconds m_sdkConfiguredDocumentInteractionTimeout{};
-
     /// The timeout value in ms for clearing the display card when it is no interaction
-    std::chrono::milliseconds m_documentInteractionTimeout{};
+    alexaClientSDK::avsCommon::utils::Optional<std::chrono::milliseconds> m_documentInteractionTimeout;
 
     /// The object to use for sending events.
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MessageSenderInterface> m_messageSender;
+
+    /// Window id of the last rendered window if it was an APL one. Otherwise, empty.
+    std::string m_lastTargetedWindowId;
 
     /// Token of the last template if it was an APL one. Otherwise, empty
     std::string m_lastRenderedAPLToken;
@@ -685,7 +702,7 @@ private:
     std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface> m_visualStateProvider;
 
     /// The queue of events to be sent to AVS.
-    std::queue<std::pair<AlexaPresentationEvents, std::string>> m_events;
+    std::queue<std::tuple<std::string, std::string, std::string>> m_events;
 
     /// The APL version of the runtime.
     std::string m_APLVersion;

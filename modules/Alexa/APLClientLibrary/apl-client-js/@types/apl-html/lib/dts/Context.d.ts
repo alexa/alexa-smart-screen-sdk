@@ -1,5 +1,6 @@
-/*!
+/**
  * Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ * SPDX-License-Identifier: Apache-2.0
  */
 declare namespace APL {
     export interface TextMeasure {
@@ -50,5 +51,10 @@ declare namespace APL {
         public handlePointerEvent(pointerEventType: number, x: number, y: number, pointerId: number, pointerType: number): boolean;
         public processDataSourceUpdate(payload: string, type: string): boolean;
         public handleDisplayMetrics(metrics: APL.DisplayMetric[]): void;
+        public configurationChange(configurationChange: APL.ConfigurationChange, metrics?: APL.Metrics, scalingOptions?: any): void;
+        public setFocus(direction: number, origin: APL.Rect, targetId: string): void;
+        public getFocusableAreas(): Promise<Map<string, APL.Rect>>;
+        public getFocused(): Promise<string>;
+        public reInflate(): void;
     }
 }
