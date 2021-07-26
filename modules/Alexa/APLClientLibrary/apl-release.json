@@ -6,14 +6,14 @@
         {
             "name": "APLCoreEngine",
             "source": "ssh://git.amazon.com/pkg/APLCoreEngine",
-            "description": "apl-1.6-04.28.2021",
-            "commit": "878941426a86e681eeead3343b58ab8d272884f7"
+            "description": "apl-1.6-07.15.2021",
+            "commit": "9ee9afbe1455ed1b7a10eae16f39257d877649f9"
         },
         {
             "name": "APLViewhostWeb",
             "source": "ssh://git.amazon.com/pkg/APLViewhostWeb",
-            "description": "apl-1.6-06.17.2021",
-            "commit": "2ccc95c1d82dfe20d2277d5c9bff9770f725acc6"
+            "description": "apl-1.6-07.15.2021",
+            "commit": "f67ebbaeac26f7be405a0d56fbb8dfbd736f5ae8"
         }
     ]
 }

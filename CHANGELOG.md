@@ -1,3 +1,10 @@
+### v2.7.1 released 07/23/2021:
+#### Bug fixes
+* Upgraded dependency to APL Core Library 1.6.2 Release [https://github.com/alexa/apl-core-library/releases/tag/v1.6.2]
+* Fixed issue with some video skills not playing due to AVS Video stealing audio focus before speechlet gets to finish
+* Fixed issue with APL cards not rendering due to APLCoreEngine content being corrupted during serialization
+* Fixed issue with RenderPlayerInfo card play/pause/right/left buttons not working and play button being not focused on initial render
+
 ### v2.7.0 released 06/01/2021:
 #### Enhancements
 * Upgraded dependency to Device SDK 1.24.0 [https://github.com/alexa/avs-device-sdk/tree/v1.24.0]

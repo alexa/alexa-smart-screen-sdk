@@ -1,12 +1,12 @@
 # Alexa Smart Screen SDK
 
 <p>
-    <a href="https://github.com/alexa/alexa-smart-screen-sdk/tree/v2.7.0" alt="version">
-        <img src="https://img.shields.io/badge/stable%20version-2.7.0-brightgreen" /></a>
+    <a href="https://github.com/alexa/alexa-smart-screen-sdk/tree/v2.7.1" alt="version">
+        <img src="https://img.shields.io/badge/stable%20version-2.7.1-brightgreen" /></a>
     <a href="https://github.com/alexa/avs-device-sdk/tree/v1.24.0" alt="DeviceSDK">
         <img src="https://img.shields.io/badge/avs%20device%20sdk-1.24.0-blueviolet" /></a>
-    <a href="https://github.com/alexa/apl-core-library/tree/v1.6.1" alt="APLCore">
-        <img src="https://img.shields.io/badge/apl%20core%20library-1.6.1-navy" /></a>
+    <a href="https://github.com/alexa/apl-core-library/tree/v1.6.2" alt="APLCore">
+        <img src="https://img.shields.io/badge/apl%20core%20library-1.6.2-navy" /></a>
     <a href="https://github.com/alexa/alexa-smart-screen-sdk/issues" alt="issues">
         <img src="https://img.shields.io/github/issues/alexa/alexa-smart-screen-sdk" /></a>
 </p>
