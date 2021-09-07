@@ -156,7 +156,7 @@ static const std::string TABLE_NAME{"GUIClient"};
 static const std::string APL_MAX_VERSION_DB_KEY{"APLMaxVersion"};
 
 /// Initial APL version to use at the first run and before any  GUI client is connected.
-static const std::string INITIAL_APL_MAX_VERSION{"1.6"};
+static const std::string INITIAL_APL_MAX_VERSION{"1.7"};
 
 /// The key in our config file to find the root of GUI configuration
 static const std::string GUI_CONFIGURATION_ROOT_KEY = "gui";
@@ -1226,6 +1226,8 @@ bool GUIClient::executeProcessInitResponse(const rapidjson::Document& message) {
         m_initThread.join();
     }
     executeSendGuiConfiguration();
+    // Init locale for gui layer after we've initialized
+    m_guiManager->handleLocaleChange();
     return true;
 }
 

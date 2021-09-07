@@ -63,10 +63,15 @@ target_link_libraries(SmartScreenSampleAppLib
     DeviceSettings
     SQLiteStorage
     SSSDKCommon
+    acsdkAudioInputStream
     acsdkEqualizerImplementations
     TemplateRuntime
     Utils
     "${PORTAUDIO_LIB_PATH}")
+
+if (AUTH_MANAGER)
+    target_link_libraries(SmartScreenSampleAppLib acsdkAuthorization)
+endif()
 
 if (PCC)
     target_link_libraries(SmartScreenSampleAppLib AVSCommon)

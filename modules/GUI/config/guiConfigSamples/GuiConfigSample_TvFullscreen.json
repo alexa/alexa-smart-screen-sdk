@@ -13,7 +13,8 @@
                     "sizeConfigurationId": "fullscreen",
                     "interactionMode": "tv",
                     "supportedExtensions": [
-                        "aplext:backstack:10"
+                        "aplext:backstack:10",
+                        "aplext:e2eencryption:10"
                     ]
                 }
             ],

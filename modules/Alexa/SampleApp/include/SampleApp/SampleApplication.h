@@ -32,6 +32,11 @@
 #include <CapabilitiesDelegate/CapabilitiesDelegate.h>
 #include <acsdkExternalMediaPlayer/ExternalMediaPlayer.h>
 
+#ifdef AUTH_MANAGER
+#include <acsdkAuthorization/AuthorizationManager.h>
+#include <acsdkAuthorization/LWA/LWAAuthorizationAdapter.h>
+#endif
+
 #include "ConsolePrinter.h"
 #include "SmartScreenClient/EqualizerRuntimeSetup.h"
 
@@ -299,6 +304,14 @@ private:
 #ifdef MODE_CONTROLLER
     /// The @c PeripheralEndpointModeControllerHandler used by @c InteractionManager
     std::shared_ptr<PeripheralEndpointModeControllerHandler> m_peripheralEndpointModeHandler;
+#endif
+
+#ifdef AUTH_MANAGER
+    /// The @c AuthorizationManager instance that can be used to dynamically authorize with different methods.
+    std::shared_ptr<alexaClientSDK::acsdkAuthorization::AuthorizationManager> m_authManager;
+
+    /// The adapter that supports authorizing with LWA based methods.
+    std::shared_ptr<alexaClientSDK::acsdkAuthorization::lwa::LWAAuthorizationAdapter> m_lwaAdapter;
 #endif
 
     std::string decodeHexToAscii(const std::string hexString);

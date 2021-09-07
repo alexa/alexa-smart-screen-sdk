@@ -1,3 +1,14 @@
+### v2.8.0 released 09/07/2021:
+#### Breaking Changes
+* APL Client Library has been extracted into separate GitHub repo [https://github.com/alexa/apl-client-library/tree/v1.7.2]. Users will need to pull the APL Client Library to build the Smart Screen SDK.
+
+#### Enhancements
+* Upgraded dependency to Device SDK 1.25.0 [https://github.com/alexa/avs-device-sdk/tree/v1.25.0]
+* Added support for APL 1.7 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
+* Captions support for right-to-left languages
+* Upgraded node version requirement to 14.17.4
+* Upgraded typescript version to 3.4 and refreshed the package-lock.json with new dependencies. Note that users upgrading to this version will need to remove the existing node modules from modules/GUI/js/node_modules before the build.
+
 ### v2.7.1 released 07/23/2021:
 #### Bug fixes
 * Upgraded dependency to APL Core Library 1.6.2 Release [https://github.com/alexa/apl-core-library/releases/tag/v1.6.2]
@@ -8,7 +19,7 @@
 ### v2.7.0 released 06/01/2021:
 #### Enhancements
 * Upgraded dependency to Device SDK 1.24.0 [https://github.com/alexa/avs-device-sdk/tree/v1.24.0]
-* Added support for APL 1.6 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
+* Added support for APL 1.6 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-6.html] 
 * Added support for Alexa.Presentation.APL 1.3 [https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/presentation-apl.html#version-changes]
 * Added support for timeoutType from Alexa.Presentation.APL RenderDocument directives [https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/presentation-apl.html#renderdocument]
 * Moved metric payload handling logic into APLClientLibrary
@@ -41,7 +52,7 @@
 #### Enhancements
 * Upgraded dependency to Device SDK 1.22.0 [https://github.com/alexa/avs-device-sdk/tree/v1.22.0]
 * Added support for multiple concurrent APL clients
-* Added support for APL 1.5 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
+* Added support for APL 1.5 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-5.html]
 * Ported DISABLE_DUCKING cmake configuration from Alexa-device-sdk
 * Music playback now ducks instead of pauses when APL TTS is executed
 * Updated ini patch version to 1.3.6
@@ -72,7 +83,7 @@
 * Support for APL 1.4 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-4.html]
 * Added APL Telemetry Support
 * TV Overlay Portrait is no longer supported
-* Added support for APL Extensions [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html#apl-extensions-and-the-backstack]
+* Added support for APL Extensions [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-extensions-v1-4.html]
  
 #### Bug fixes
 * Correctly handle GUI state when presenting content over attenuated PlayerInfo card

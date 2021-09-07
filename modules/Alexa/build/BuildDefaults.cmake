@@ -85,3 +85,6 @@ endif()
 
 # Setup ducking options.
 include_once(LocalDucking)
+
+# Setup AuthorizationManager
+include_once(AuthorizationManager)

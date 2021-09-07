@@ -76,6 +76,9 @@ const std::string GUI_MSG_TYPE_CLEAR_DOCUMENT("clearDocument");
 /// The message type for renderCaptions.
 const std::string GUI_MSG_TYPE_RENDER_CAPTIONS("renderCaptions");
 
+/// The message type for localeChange.
+const std::string GUI_MSG_TYPE_LOCALE_CHANGE("localeChange");
+
 /// The message type for DoNotDisturbStateChanged.
 const std::string GUI_MSG_TYPE_DND_SETTING_CHANGE("doNotDisturbSettingChanged");
 
@@ -151,6 +154,9 @@ const std::string GUI_MSG_OUTBOUND_RINGBACK_URL_TAG("outboundRingbackUrl");
 /// The isDropIn json key in the message.
 const std::string GUI_MSG_IS_DROP_IN_TAG("isDropIn");
 
+/// The locales json key in the message.
+const std::string GUI_MSG_LOCALES_TAG("locales");
+
 /**
  * The @c GUIClientMessage base class for @c Messages sent to GUI Client.
  */
@@ -169,10 +175,14 @@ public:
     /**
      * Sets the json payload for this message
      * @param payload The payload to parse and send
+     * @param tag The optional tag for the json payload.  Default is 'payload'.
      * @return this
      */
-    GUIClientMessage& setParsedPayload(const std::string& payload) {
-        mDocument.AddMember(MSG_PAYLOAD_TAG, mParsedDocument.Parse(payload), mDocument.GetAllocator());
+    GUIClientMessage& setParsedPayload(const std::string& payload, const std::string& tag = MSG_PAYLOAD_TAG) {
+        mDocument.AddMember(
+            rapidjson::Value(tag.c_str(), mDocument.GetAllocator()).Move(),
+            mParsedDocument.Parse(payload),
+            mDocument.GetAllocator());
         return *this;
     }
 
@@ -461,7 +471,17 @@ class DoNotDisturbSettingChangedMessage : public GUIClientMessage {
 public:
     explicit DoNotDisturbSettingChangedMessage(const bool payload) : GUIClientMessage(GUI_MSG_TYPE_DND_SETTING_CHANGE) {
         addMember(GUI_MSG_TYPE_DND_SETTING_TAG, payload);
-    };
+    }
+};
+
+/**
+ *  The @c LocaleChangeMessage informs the GUI Client of Alexa locale setting changes.
+ */
+class LocaleChangeMessage : public GUIClientMessage {
+public:
+    explicit LocaleChangeMessage(const std::string& payload) : GUIClientMessage(GUI_MSG_TYPE_LOCALE_CHANGE) {
+        setParsedPayload(payload, GUI_MSG_LOCALES_TAG);
+    }
 };
 
 }  // namespace messages

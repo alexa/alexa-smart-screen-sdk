@@ -41,6 +41,7 @@
 #include <SmartScreenSDKInterfaces/TemplateRuntimeObserverInterface.h>
 #include <Settings/SettingCallbacks.h>
 #include <SampleApp/DoNotDisturbSettingObserver.h>
+#include <Settings/DeviceSettingsManager.h>
 
 #ifdef ENABLE_PCC
 #include "PhoneCaller.h"
@@ -241,6 +242,8 @@ public:
     void disableLocalVideo() override;
 
     void sendDtmf(alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone dtmfTone) override;
+
+    void handleLocaleChange() override;
     /// }
 
     /// @name FocusManagerObserverInterface methods

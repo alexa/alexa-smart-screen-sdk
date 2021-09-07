@@ -126,6 +126,8 @@ void JsonUIManager::onAuthStateChange(AuthObserverInterface::State newState, Aut
 
         m_executor.submit([this, newError]() {
             switch (m_authState) {
+                case AuthObserverInterface::State::AUTHORIZING:
+                    break;
                 case AuthObserverInterface::State::UNINITIALIZED:
                     break;
                 case AuthObserverInterface::State::REFRESHED:
@@ -154,6 +156,9 @@ void JsonUIManager::onAuthStateChange(AuthObserverInterface::State newState, Aut
                 break;
             case AuthObserverInterface::State::UNRECOVERABLE_ERROR:
                 authState = "ERROR";
+                break;
+            case AuthObserverInterface::State::AUTHORIZING:
+                authState = "AUTHORIZING";
                 break;
         }
 
@@ -312,6 +317,10 @@ void JsonUIManager::onConnectionOpened() {
 void JsonUIManager::onConnectionClosed() {
     m_executor.submit([]() { ConsolePrinter::prettyPrint("Message Server Connection Closed."); });
     m_executor.submit([this]() { reportAlexaState(); });
+}
+
+void JsonUIManager::printMessage(const std::string& message) {
+    m_executor.submit([message]() { ConsolePrinter::prettyPrint(message); });
 }
 
 void JsonUIManager::printESPDataOverrideNotSupported() {

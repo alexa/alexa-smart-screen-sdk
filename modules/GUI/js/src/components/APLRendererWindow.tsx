@@ -249,7 +249,7 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
 
     const environment : IEnvironment = {
       agentName: 'SmartScreenSDK',
-      agentVersion: '2.3',
+      agentVersion: '2.8',
       disallowVideo: this.windowConfig.disallowVideo,
       allowOpenUrl: this.windowConfig.allowOpenUrl,
       animationQuality: this.windowConfig.animationQuality

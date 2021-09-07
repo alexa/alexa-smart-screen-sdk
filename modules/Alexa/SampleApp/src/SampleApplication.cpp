@@ -13,12 +13,15 @@
  * permissions and limitations under the License.
  */
 
+#include <acsdkAudioInputStream/AudioInputStreamFactory.h>
+#include <acsdkAudioInputStream/CompatibleAudioFormat.h>
 #include <acsdkManufactory/Manufactory.h>
 #include <ACL/Transport/HTTP2TransportFactory.h>
 #include <ACL/Transport/PostConnectSequencerFactory.h>
 #include <AVSCommon/AVS/CapabilitySemantics/CapabilitySemantics.h>
 #include <AVSCommon/AVS/Initialization/InitializationParametersBuilder.h>
 #include <AVSCommon/SDKInterfaces/PowerResourceManagerInterface.h>
+#include <AVSCommon/Utils/LibcurlUtils/HttpPost.h>
 #include <AVSCommon/Utils/LibcurlUtils/LibcurlHTTP2ConnectionFactory.h>
 #include <AVSCommon/Utils/UUIDGeneration/UUIDGeneration.h>
 #include <AVSGatewayManager/AVSGatewayManager.h>
@@ -31,6 +34,14 @@
 #include "SampleApp/SampleApplication.h"
 #include "SampleApp/SampleApplicationComponent.h"
 #include "SampleApp/SmartScreenCaptionPresenter.h"
+
+#ifdef AUTH_MANAGER
+#include <acsdkAuthorization/AuthorizationManager.h>
+#include <acsdkAuthorization/LWA/LWAAuthorizationAdapter.h>
+#include <acsdkAuthorization/LWA/SQLiteLWAAuthorizationStorage.h>
+#include <acsdkAuthorizationInterfaces/AuthorizationManagerInterface.h>
+#include <acsdkSampleApplicationCBLAuthRequester/SampleApplicationCBLAuthRequester.h>
+#endif
 
 #ifdef ENABLE_REVOKE_AUTH
 #include "SampleApp/RevokeAuthorizationObserver.h"
@@ -184,12 +195,6 @@ static const std::string DEFAULT_WEBSOCKET_INTERFACE = "127.0.0.1";
 /// WebSocket port to listen on.
 static const int DEFAULT_WEBSOCKET_PORT = 8933;
 
-/// The sample rate of microphone audio data.
-static const unsigned int SAMPLE_RATE_HZ = 16000;
-
-/// The number of audio channels.
-static const unsigned int NUM_CHANNELS = 1;
-
 /// The size of each word within the stream.
 static const size_t WORD_SIZE = 2;
 
@@ -202,9 +207,6 @@ static const unsigned int AUDIO_MEDIAPLAYER_POOL_SIZE_DEFAULT = 2;
 
 /// The amount of audio data to keep in the ring buffer.
 static const std::chrono::seconds AMOUNT_OF_AUDIO_DATA_IN_BUFFER = std::chrono::seconds(15);
-
-/// The size of the ring buffer.
-static const size_t BUFFER_SIZE_IN_SAMPLES = (SAMPLE_RATE_HZ)*AMOUNT_OF_AUDIO_DATA_IN_BUFFER.count();
 
 /// Key for the root node value containing configuration values for SampleApp.
 static const std::string SAMPLE_APP_CONFIG_KEY("sampleApp");
@@ -915,7 +917,8 @@ bool SampleApplication::initialize(
     }
 
     auto schemaStringInAscii = decodeHexToAscii(SCHEMA_HEX);
-    auto schemaStream = std::stringstream(schemaStringInAscii);
+    std::stringstream schemaStream;
+    schemaStream << schemaStringInAscii;
 
     if (schemaStream.good()) {
         rapidjson::IStreamWrapper isw(schemaStream);
@@ -980,7 +983,7 @@ bool SampleApplication::initialize(
     }
     m_speakMediaPlayer = speakerMediaInterfaces->mediaPlayer;
 
-    int poolSize;
+    int poolSize = AUDIO_MEDIAPLAYER_POOL_SIZE_DEFAULT;
     sampleAppConfig.getInt(AUDIO_MEDIAPLAYER_POOL_SIZE_KEY, &poolSize, AUDIO_MEDIAPLAYER_POOL_SIZE_DEFAULT);
     std::vector<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::SpeakerInterface>> audioSpeakers;
 
@@ -1240,11 +1243,23 @@ bool SampleApplication::initialize(
     alexaClientSDK::avsCommon::utils::uuidGeneration::setSalt(
         deviceInfo->getClientId() + deviceInfo->getDeviceSerialNumber());
 
+    std::shared_ptr<avsCommon::sdkInterfaces::AuthDelegateInterface> authDelegate;
+
+#ifdef AUTH_MANAGER
+    m_authManager = acsdkAuthorization::AuthorizationManager::create(miscStorage, customerDataManager);
+    if (!m_authManager) {
+        ACSDK_CRITICAL(LX("Failed to create AuthorizationManager!"));
+        return false;
+    }
+
+    m_shutdownRequiredList.push_back(m_authManager);
+    authDelegate = m_authManager;
+#else
     // Creating the AuthDelegate - this component takes care of LWA and authorization of the client.
     auto authDelegateStorage = authorization::cblAuthDelegate::SQLiteCBLAuthDelegateStorage::create(config);
-    std::shared_ptr<avsCommon::sdkInterfaces::AuthDelegateInterface> authDelegate =
-        authorization::cblAuthDelegate::CBLAuthDelegate::create(
-            config, customerDataManager, std::move(authDelegateStorage), userInterfaceManager, nullptr, deviceInfo);
+    authDelegate = authorization::cblAuthDelegate::CBLAuthDelegate::create(
+        config, customerDataManager, std::move(authDelegateStorage), userInterfaceManager, nullptr, deviceInfo);
+#endif
 
     if (!authDelegate) {
         ACSDK_CRITICAL(LX("Creation of AuthDelegate failed!"));
@@ -1300,8 +1315,8 @@ bool SampleApplication::initialize(
         ACSDK_CRITICAL(LX("Creation of AVSGatewayManagerStorage failed"));
         return false;
     }
-    auto avsGatewayManager =
-        avsGatewayManager::AVSGatewayManager::create(std::move(avsGatewayManagerStorage), customerDataManager, config);
+    auto avsGatewayManager = avsGatewayManager::AVSGatewayManager::create(
+        std::move(avsGatewayManagerStorage), customerDataManager, config, authDelegate);
     if (!avsGatewayManager) {
         ACSDK_CRITICAL(LX("Creation of AVSGatewayManager failed"));
         return false;
@@ -1370,20 +1385,6 @@ bool SampleApplication::initialize(
         deviceProtocolTracer);
 
     /*
-     * Creating the buffer (Shared Data Stream) that will hold user audio data. This is the main input into the SDK.
-     */
-    size_t bufferSize = alexaClientSDK::avsCommon::avs::AudioInputStream::calculateBufferSize(
-        BUFFER_SIZE_IN_SAMPLES, WORD_SIZE, MAX_READERS);
-    auto buffer = std::make_shared<alexaClientSDK::avsCommon::avs::AudioInputStream::Buffer>(bufferSize);
-    std::shared_ptr<alexaClientSDK::avsCommon::avs::AudioInputStream> sharedDataStream =
-        alexaClientSDK::avsCommon::avs::AudioInputStream::create(buffer, WORD_SIZE, MAX_READERS);
-
-    if (!sharedDataStream) {
-        ACSDK_CRITICAL(LX("Failed to create shared data stream!"));
-        return false;
-    }
-
-    /*
      * Create the BluetoothDeviceManager to communicate with the Bluetooth stack.
      */
     std::unique_ptr<avsCommon::sdkInterfaces::bluetooth::BluetoothDeviceManagerInterface> bluetoothDeviceManager;
@@ -1410,13 +1411,20 @@ bool SampleApplication::initialize(
     bluetoothDeviceManager = bluetoothImplementations::blueZ::BlueZBluetoothDeviceManager::create(eventBus);
 #endif
 
-    alexaClientSDK::avsCommon::utils::AudioFormat compatibleAudioFormat;
-    compatibleAudioFormat.sampleRateHz = SAMPLE_RATE_HZ;
-    compatibleAudioFormat.sampleSizeInBits = WORD_SIZE * CHAR_BIT;
-    compatibleAudioFormat.numChannels = NUM_CHANNELS;
-    compatibleAudioFormat.endianness = alexaClientSDK::avsCommon::utils::AudioFormat::Endianness::LITTLE;
-    compatibleAudioFormat.encoding = alexaClientSDK::avsCommon::utils::AudioFormat::Encoding::LPCM;
-    compatibleAudioFormat.dataSigned = false;
+    /*
+     * Creating the buffer (Shared Data Stream) that will hold user audio data. This is the main input into the SDK.
+     */
+    std::shared_ptr<alexaClientSDK::avsCommon::utils::AudioFormat> compatibleAudioFormat =
+        alexaClientSDK::acsdkAudioInputStream::CompatibleAudioFormat::getCompatibleAudioFormat();
+
+    std::shared_ptr<alexaClientSDK::avsCommon::avs::AudioInputStream> sharedDataStream =
+        alexaClientSDK::acsdkAudioInputStream::AudioInputStreamFactory::createAudioInputStream(
+            compatibleAudioFormat, WORD_SIZE, MAX_READERS, AMOUNT_OF_AUDIO_DATA_IN_BUFFER);
+
+    if (!sharedDataStream) {
+        ACSDK_CRITICAL(LX("Failed to create shared data stream!"));
+        return false;
+    }
 
     /*
      * Creating each of the audio providers. An audio provider is a simple package of data consisting of the stream
@@ -1431,7 +1439,7 @@ bool SampleApplication::initialize(
 
     alexaClientSDK::capabilityAgents::aip::AudioProvider tapToTalkAudioProvider(
         sharedDataStream,
-        compatibleAudioFormat,
+        *compatibleAudioFormat,
         alexaClientSDK::capabilityAgents::aip::ASRProfile::NEAR_FIELD,
         tapAlwaysReadable,
         tapCanOverride,
@@ -1444,7 +1452,7 @@ bool SampleApplication::initialize(
 
     alexaClientSDK::capabilityAgents::aip::AudioProvider holdToTalkAudioProvider(
         sharedDataStream,
-        compatibleAudioFormat,
+        *compatibleAudioFormat,
         alexaClientSDK::capabilityAgents::aip::ASRProfile::CLOSE_TALK,
         holdAlwaysReadable,
         holdCanOverride,
@@ -1458,7 +1466,7 @@ bool SampleApplication::initialize(
 
     alexaClientSDK::capabilityAgents::aip::AudioProvider wakeWordAudioProvider(
         sharedDataStream,
-        compatibleAudioFormat,
+        *compatibleAudioFormat,
         alexaClientSDK::capabilityAgents::aip::ASRProfile::NEAR_FIELD,
         wakeAlwaysReadable,
         wakeCanOverride,
@@ -1481,7 +1489,7 @@ bool SampleApplication::initialize(
         return false;
     }
     std::shared_ptr<applicationUtilities::resources::audio::MicrophoneInterface> micWrapper =
-        audioInjector->getMicrophone(sharedDataStream, compatibleAudioFormat);
+        audioInjector->getMicrophone(sharedDataStream, *compatibleAudioFormat);
 #elif defined(UWP_BUILD)
     std::shared_ptr<alexaSmartScreenSDK::sssdkCommon::NullMicrophone> micWrapper =
         std::make_shared<alexaSmartScreenSDK::sssdkCommon::NullMicrophone>(sharedDataStream);
@@ -1611,6 +1619,7 @@ bool SampleApplication::initialize(
     client->addAlexaDialogStateObserver(m_guiManager);
     client->addAudioPlayerObserver(m_guiManager);
     client->addAudioPlayerObserver(m_aplClientBridge);
+    client->addExternalMediaPlayerObserver(m_aplClientBridge);
     client->addCallStateObserver(m_guiManager);
     client->addFocusManagersObserver(m_guiManager);
     client->addAudioInputProcessorObserver(m_guiManager);
@@ -1623,7 +1632,7 @@ bool SampleApplication::initialize(
 
     m_keywordDetector = alexaClientSDK::kwd::KeywordDetectorProvider::create(
         sharedDataStream,
-        compatibleAudioFormat,
+        *compatibleAudioFormat,
         {keywordObserver},
         std::unordered_set<
             std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::KeyWordDetectorStateObserverInterface>>(),
@@ -1694,6 +1703,29 @@ bool SampleApplication::initialize(
     authDelegate->addAuthObserver(m_guiClient);
     client->addRegistrationObserver(m_guiClient);
     m_capabilitiesDelegate->addCapabilitiesObserver(m_guiClient);
+
+#ifdef AUTH_MANAGER
+    m_authManager->setRegistrationManager(client->getRegistrationManager());
+
+    auto httpPost = avsCommon::utils::libcurlUtils::HttpPost::createHttpPostInterface();
+    m_lwaAdapter = acsdkAuthorization::lwa::LWAAuthorizationAdapter::create(
+        configPtr,
+        std::move(httpPost),
+        deviceInfo,
+        acsdkAuthorization::lwa::SQLiteLWAAuthorizationStorage::createLWAAuthorizationStorageInterface(configPtr));
+
+    if (!m_lwaAdapter) {
+        ACSDK_CRITICAL(LX("Failed to create LWA Adapter!"));
+        return false;
+    }
+
+    m_authManager->add(m_lwaAdapter);
+
+    auto cblRequest = acsdkSampleApplicationCBLAuthRequester::SampleApplicationCBLAuthRequester::
+        createCBLAuthorizationObserverInterface(userInterfaceManager);
+
+    m_lwaAdapter->authorizeUsingCBL(cblRequest);
+#endif
 
     m_guiManager->setDoNotDisturbSettingObserver(m_guiClient);
     m_guiManager->configureSettingsNotifications();
@@ -1887,6 +1919,13 @@ bool SampleApplication::addControllersToPeripheralEndpoint(
         return false;
     }
     peripheralEndpointBuilder->withPowerController(m_peripheralEndpointPowerHandler, true, true);
+
+    if (diagnostics) {
+        auto deviceProperties = diagnostics->getDevicePropertyAggregator();
+        if (deviceProperties) {
+            m_peripheralEndpointPowerHandler->addObserver(deviceProperties);
+        }
+    }
 #endif
 
 #ifdef TOGGLE_CONTROLLER

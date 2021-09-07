@@ -22,6 +22,10 @@ There are additional sample device configurations for the GUI in the /guiConfigS
     "contentCacheReusePeriodInSeconds": "{{STRING}}",
     "contentCacheMaxSize": "{{STRING}}"
   },
+  "alexaPresentationCapabilityAgent": {
+    "minStateReportIntervalMs": {{NUMBER}},
+    "stateReportCheckIntervalMs": {{NUMBER}}
+  },
   "gui": {
     "appConfig": {
       "description":"{{STRING}}",
@@ -47,10 +51,11 @@ There are additional sample device configurations for the GUI in the /guiConfigS
 }
 ```
 
-| Parameter     | Type                              | Required  | Description
-| ------------- |-------                            |:-----:    | ----- |
-| sampleApp     | [SampleApp](#sampleapp-parameters)| Yes       | Config for SDK SampleApp. 
-| gui           | [GUI](#gui-parameters)            | Yes       | Config for GUI App and Device Visual Characteristic Capabilities. 
+| Parameter                         | Type                                                                              | Required  | Description
+| -------------                     |-------                                                                            |:-----:    | ----- |
+| sampleApp                         | [SampleApp](#sampleapp-parameters)                                                | Yes       | Config for SDK SampleApp. 
+| alexaPresentationCapabilityAgent  | [AlexaPresentationCapabilityAgent](#alexapresentationcapabilityagent-parameters)  | No        | Config for Alexa Presentation Capability Agent. 
+| gui                               | [GUI](#gui-parameters)                                                            | Yes       | Config for GUI App and Device Visual Characteristic Capabilities. 
 
 # SampleApp Parameters
 
@@ -77,6 +82,21 @@ Config parameters for the SmartScreenSDK SampleApp.  Handles configuration of  [
 | contentCacheReusePeriodInSeconds  | string    | No        | `"600"`           | The number of seconds to reuse a cached package.
 | contentCacheMaxSize               | string    | No        | `"50"`            | The max size for the cache of imported packages.
 
+# AlexaPresentationCapabilityAgent Parameters
+
+Config parameters for the Alexa Presentation Capability Agent. Handles configuration of state reporting for APL context [RenderedDocumentState](https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/presentation-apl.html#rendereddocumentstate). Use of these parameters will cause the Alexa Presentation CA to proactively report states to the cloud even when there are no scheduled events. This behavior is disabled when these parameters are not set or when the state report check interval is set to `0`.
+
+```
+"alexaPresentationCapabilityAgent": {
+    "minStateReportIntervalMs": {{NUMBER}},
+    "stateReportCheckIntervalMs": {{NUMBER}}
+}
+```
+
+| Parameter                   | Type      | Required  | Default     | Description
+| -------------               |-------    |:--------: |-----        | ----- |
+| minStateReportIntervalMs    | number    | No        | `600`       | The minimum state reporting interval in milliseconds for the AlexaPresentation CA.
+| stateReportCheckIntervalMs  | number    | No        | `0`         | The interval between checks for context changes.
 
 # GUI Parameters
 

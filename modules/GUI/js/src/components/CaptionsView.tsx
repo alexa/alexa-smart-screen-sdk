@@ -15,6 +15,10 @@
 
 import * as React from 'react';
 import './captionsView.css';
+import {LocaleManager} from '../lib/utils/localeManager';
+
+type DirectionProperty = import('csstype').Property.Direction;
+type TextAlignProperty = import('csstype').Property.TextAlign;
 
 interface ICaptionsViewProps {
     captionsMessage : any;
@@ -26,26 +30,36 @@ export class CaptionsView extends React.Component<ICaptionsViewProps, ICaptionsV
 
     constructor(props : ICaptionsViewProps) {
         super(props);
-
     }
 
     public render() {
+        let textAlign : TextAlignProperty = 'left';
+        let direction : DirectionProperty = 'ltr';
+        switch (LocaleManager.getLocaleLayoutDirection()) {
+            case 'RTL':
+                textAlign = 'right';
+                direction = 'rtl';
+                break;
+            default:
+                break;
+        }
         return (
             <div id='captionsScrim' style={{
                 opacity: 1,
                 visibility : 'visible'}}>
-                <div id='captionsView'>
-                    { this.props.captionsMessage ? CaptionsView.renderCaptionLines(this.props.captionsMessage) : ''}
+                <div id='captionsView' style={{textAlign}}>
+                    { this.props.captionsMessage ? CaptionsView.renderCaptionLines(
+                        this.props.captionsMessage, direction) : ''}
                 </div>
             </div>
         );
     }
-    private static renderCaptionLines(captionFrame : any) {
+    private static renderCaptionLines(captionFrame : any, direction : DirectionProperty) {
         // this is each caption line, and can contain it's own styling
         return captionFrame.captionLines.map((item : any, index : number) => (
-            <div key={index} style={{backgroundColor: 'black', padding : '1%'}}>
+            <p key={index} style={{direction, backgroundColor: 'black', padding : '1%'}}>
                 {item.text}
-            </div>
+            </p>
         ));
     }
     public shouldComponentUpdate(nextProps : ICaptionsViewProps) {

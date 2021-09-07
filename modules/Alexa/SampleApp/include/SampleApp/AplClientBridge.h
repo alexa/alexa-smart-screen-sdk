@@ -17,6 +17,7 @@
 #define ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_APLCLIENTBRIDGE_H_
 
 #include <acsdkAudioPlayerInterfaces/AudioPlayerObserverInterface.h>
+#include <acsdkExternalMediaPlayerInterfaces/ExternalMediaPlayerObserverInterface.h>
 #include <AVSCommon/Utils/LibcurlUtils/HTTPContentFetcherFactory.h>
 #include <AVSCommon/Utils/Configuration/ConfigurationNode.h>
 
@@ -28,6 +29,7 @@
 #include <APLClient/Extensions/Backstack/AplBackstackExtensionObserver.h>
 #include <APLClient/Extensions/AudioPlayer/AplAudioPlayerExtension.h>
 #include <APLClient/Extensions/AudioPlayer/AplAudioPlayerExtensionObserverInterface.h>
+#include <APLClient/Extensions/E2EEncryption/AplE2EEncryptionExtension.h>
 #include <APLClient/AplRenderingEvent.h>
 #include "GUI/GUIManager.h"
 #include "CachingDownloadManager.h"
@@ -48,6 +50,7 @@ class AplClientBridge
         , public smartScreenSDKInterfaces::MessagingServerObserverInterface
         , public smartScreenSDKInterfaces::VisualStateProviderInterface
         , public alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface
+        , public alexaClientSDK::acsdkExternalMediaPlayerInterfaces::ExternalMediaPlayerObserverInterface
         , public APLClient::Extensions::Backstack::AplBackstackExtensionObserverInterface
         , public APLClient::Extensions::AudioPlayer::AplAudioPlayerExtensionObserverInterface
         , public alexaClientSDK::avsCommon::utils::RequiresShutdown
@@ -127,6 +130,19 @@ public:
     /// @name AudioPlayerObserverInterface methods
     /// @{
     void onPlayerActivityChanged(alexaClientSDK::avsCommon::avs::PlayerActivity state, const Context& context) override;
+    /// }
+
+    /// @name ExternalMediaPlayerObserverInterface methods
+    /// @{
+    void onLoginStateProvided(
+        const std::string& playerId,
+        alexaClientSDK::acsdkExternalMediaPlayerInterfaces::ObservableSessionProperties sessionStateProperties)
+        override;
+
+    void onPlaybackStateProvided(
+        const std::string& playerId,
+        alexaClientSDK::acsdkExternalMediaPlayerInterfaces::ObservablePlaybackStateProperties playbackStateProperties)
+        override;
     /// }
 
     /// @name AplBackstackExtensionObserverInterface Functions

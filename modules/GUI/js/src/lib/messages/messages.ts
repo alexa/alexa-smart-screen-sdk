@@ -74,7 +74,26 @@ export type AuthorizationState =
     'UNINITIALIZED'
     | 'REFRESHED'
     | 'EXPIRED'
-    | 'ERROR';
+    | 'ERROR'
+    | 'AUTHORIZING';
+
+export type LocaleType =
+    'de-DE'
+    | 'en-AU'
+    | 'en-CA'
+    | 'en-GB'
+    | 'en-IN'
+    | 'en-US'
+    | 'es-ES'
+    | 'es-MX'
+    | 'es-US'
+    | 'fr-CA'
+    | 'fr-FR'
+    | 'hi-IN'
+    | 'it-IT'
+    | 'ja-JP'
+    | 'pt-BR'
+    | 'ar-SA';
 
 export type InboundMessageType =
     'initRequest'
@@ -93,7 +112,8 @@ export type InboundMessageType =
     | 'aplCore'
     | 'renderCaptions'
     | 'doNotDisturbSettingChanged'
-    | 'callStateChange';
+    | 'callStateChange'
+    | 'localeChange';
 
 export interface IBaseInboundMessage {
     type : InboundMessageType;
@@ -175,6 +195,10 @@ export interface IRenderCaptionsMessage extends IBaseInboundMessage {
 
 export interface IDoNotDisturbSettingChangedMessage extends IBaseInboundMessage {
     doNotDisturbSettingEnabled : boolean;
+}
+
+export interface ILocaleChangeMessage extends IBaseInboundMessage {
+    locales : LocaleType[];
 }
 
 export type OutboundMessageType =

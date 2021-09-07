@@ -19,6 +19,7 @@
 #include <AVSCommon/AVS/PlaybackButtons.h>
 #include <AVSCommon/SDKInterfaces/FocusManagerInterface.h>
 #include <Settings/SettingObserverInterface.h>
+#include <SampleApp/Messages/GUIClientMessage.h>
 
 #include "SampleApp/GUI/GUIManager.h"
 
@@ -831,11 +832,41 @@ bool GUIManager::configureSettingsNotifications() {
                                 m_settingsManager->getValue<settings::DO_NOT_DISTURB>(false).second);
                         }
                     });
+
+                callback &= m_callbacks->add<alexaClientSDK::settings::DeviceSettingsIndex::LOCALE>(
+                    [this](
+                        const settings::DeviceLocales& value,
+                        alexaClientSDK::settings::SettingNotifications notifications) { handleLocaleChange(); });
                 return callback;
             })
             .get();
 
     return future;
+}
+
+void GUIManager::handleLocaleChange() {
+    auto localeSetting = m_ssClient->getSettingsManager()->getValue<settings::DeviceSettingsIndex::LOCALE>();
+    if (!localeSetting.first) {
+        ACSDK_WARN(LX(__func__).m("Invalid locales array from settings."));
+        return;
+    }
+    auto locales = localeSetting.second;
+    rapidjson::Document document;
+    document.SetArray();
+
+    auto& allocator = document.GetAllocator();
+    for (const auto& locale : locales) {
+        document.PushBack(rapidjson::Value().SetString(locale.c_str(), locale.length(), allocator), allocator);
+    }
+
+    rapidjson::StringBuffer strbuf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
+    document.Accept(writer);
+
+    auto localeStr = strbuf.GetString();
+    ACSDK_DEBUG3(LX(__func__).d("LocaleChanged", localeStr));
+    auto message = messages::LocaleChangeMessage(localeStr);
+    m_guiClient->sendMessage(message);
 }
 
 void GUIManager::setDoNotDisturbSettingObserver(

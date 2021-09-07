@@ -329,14 +329,14 @@ private:
          * document.
          */
         PresentationSession(
-            std::string skillId,
-            std::string id,
-            std::vector<smartScreenSDKInterfaces::GrantedExtension> grantedExtensions,
-            std::vector<smartScreenSDKInterfaces::AutoInitializedExtension> autoInitializedExtensions) :
-                skillId{std::move(skillId)},
-                id{std::move(id)},
-                grantedExtensions{std::move(grantedExtensions)},
-                autoInitializedExtensions{std::move(autoInitializedExtensions)} {};
+            const std::string& skillId,
+            const std::string& id,
+            const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
+            const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions) :
+                skillId{skillId},
+                id{id},
+                grantedExtensions{grantedExtensions},
+                autoInitializedExtensions{autoInitializedExtensions} {};
 
         /// The identifier of the Skill/ Speechlet who sends this directive.
         std::string skillId;

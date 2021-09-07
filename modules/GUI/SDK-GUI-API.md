@@ -109,7 +109,8 @@ type AuthorizationState =
     'UNINITIALIZED'
     | 'REFRESHED'
     | 'EXPIRED'
-    | 'ERROR';
+    | 'ERROR'
+    | 'AUTHORIZING';
     
 {
     type: 'authorizationChange',
@@ -235,6 +236,18 @@ enum CallState {
   inboundRingtoneUrl : string,
   outboundRingbackUrl : string,
   isDropIn : boolean
+}
+```
+
+## LocaleChange
+This message is sent to the client when the Alexa locale settings change as a result of a [config](https://developer.amazon.com/en-US/docs/alexa/avs-device-sdk/alexa-client-sdk-config-json.html#parameters) setting or [SetLocales](https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/system.html#setlocales) directive.
+The payload is an array of supported locales. On devices that support [multi-locale](https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/system.html#localecombinations) mode, the first locale in the array is the primary locale.  In single-locale scenarios the locales array will only contain one locale.
+```javascript
+type LocaleType = 'de-DE', 'en-AU', 'en-CA', 'en-GB', 'en-IN', 'en-US', 'es-ES', 'es-MX', 'es-US', 'fr-CA', 'fr-FR', 'hi-IN', 'it-IT', 'ja-JP', 'pt-BR', 'ar-SA'
+
+{
+    type: 'localeChange',
+    locales: LocaleType[]    
 }
 ```
 

@@ -450,6 +450,7 @@ AlexaPresentation::AlexaPresentation(
     std::shared_ptr<avsCommon::sdkInterfaces::timing::TimerDelegateFactoryInterface> timerDelegateFactory) :
         CapabilityAgent{ALEXA_PRESENTATION_NAMESPACE, exceptionSender},
         RequiresShutdown{"AlexaPresentation"},
+        m_idleTimer{timerDelegateFactory},
         m_focus{FocusState::NONE},
         m_state{smartScreenSDKInterfaces::State::IDLE},
         m_dialogUxState{DialogUXState::IDLE},
@@ -464,8 +465,7 @@ AlexaPresentation::AlexaPresentation(
         m_minStateReportInterval{DEFAULT_MIN_STATE_REPORT_INTERVAL_MS},
         m_stateReportPending{false},
         m_documentRendered{false},
-        m_presentationSession{},
-        m_idleTimer{timerDelegateFactory} {
+        m_presentationSession{} {
     m_executor = std::make_shared<alexaClientSDK::avsCommon::utils::threading::Executor>();
     m_capabilityConfigurations.insert(getAlexaPresentationCapabilityConfiguration());
 }
@@ -653,10 +653,10 @@ void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveI
                 doc[PRESENTATION_SESSION_GRANTEDEXTENSIONS].IsArray()) {
                 auto grantExtensionArray = doc[PRESENTATION_SESSION_GRANTEDEXTENSIONS].GetArray();
                 for (auto& itr : grantExtensionArray) {
-                    auto grantedExtension = new smartScreenSDKInterfaces::GrantedExtension();
                     if (itr.HasMember(PRESENTATION_SESSION_URI) && itr[PRESENTATION_SESSION_URI].IsString()) {
-                        grantedExtension->uri = itr[PRESENTATION_SESSION_URI].GetString();
-                        grantedExtensions.push_back(*grantedExtension);
+                        auto grantedExtension = smartScreenSDKInterfaces::GrantedExtension();
+                        grantedExtension.uri = itr[PRESENTATION_SESSION_URI].GetString();
+                        grantedExtensions.push_back(std::move(grantedExtension));
                     } else {
                         ACSDK_WARN(LX("handleRenderDocumentDirectiveInExecutor").m("Error parsing grantedExtensions"));
                     }
@@ -671,12 +671,12 @@ void AlexaPresentation::handleRenderDocumentDirective(std::shared_ptr<DirectiveI
                 doc[PRESENTATION_SESSION_AUTOINITIALIZEDEXTENSIONS].IsArray()) {
                 auto autoInitializedExtensionArray = doc[PRESENTATION_SESSION_AUTOINITIALIZEDEXTENSIONS].GetArray();
                 for (auto& itr : autoInitializedExtensionArray) {
-                    auto autoInitializedExtension = new smartScreenSDKInterfaces::AutoInitializedExtension();
                     if (itr.HasMember(PRESENTATION_SESSION_URI) && itr[PRESENTATION_SESSION_URI].IsString() &&
                         itr.HasMember(PRESENTATION_SESSION_SETTINGS) && itr[PRESENTATION_SESSION_SETTINGS].IsString()) {
-                        autoInitializedExtension->uri = itr[PRESENTATION_SESSION_URI].GetString();
-                        autoInitializedExtension->settings = itr[PRESENTATION_SESSION_SETTINGS].GetString();
-                        autoInitializedExtensions.push_back(*autoInitializedExtension);
+                        auto autoInitializedExtension = smartScreenSDKInterfaces::AutoInitializedExtension();
+                        autoInitializedExtension.uri = itr[PRESENTATION_SESSION_URI].GetString();
+                        autoInitializedExtension.settings = itr[PRESENTATION_SESSION_SETTINGS].GetString();
+                        autoInitializedExtensions.push_back(std::move(autoInitializedExtension));
                     } else {
                         ACSDK_WARN(
                             LX("handleRenderDocumentDirectiveInExecutor").m("Error parsing autoInitializedExtensions"));
@@ -1593,13 +1593,16 @@ void AlexaPresentation::resetMetricsEvent(MetricEvent metricEvent) {
 
 std::string AlexaPresentation::getSkillIdFromAPLToken(const std::string& aplToken) {
     std::string skillId;
-    std::regex rgx(".*#TID#([a-zA-Z0-9-_\\.]+[a-zA-Z0-9]):.*");
-    std::smatch match;
+    try {
+        std::regex rgx(".*#TID#([a-zA-Z0-9-_\\.]+[a-zA-Z0-9]):.*");
+        std::smatch match;
 
-    if (std::regex_search(aplToken.begin(), aplToken.end(), match, rgx) &&
-        match.size() > 1)  // Magic # we discard the first literal and goto the value
-        skillId = match[1].str();
-
+        if (std::regex_search(aplToken.begin(), aplToken.end(), match, rgx) &&
+            match.size() > 1)  // Magic # we discard the first literal and goto the value
+            skillId = match[1].str();
+    } catch (const std::regex_error& e) {
+        ACSDK_ERROR(LX(__func__).d("reason", e.what()));
+    }
     return skillId;
 }
 

@@ -4,7 +4,7 @@ project(AlexaSmartScreenSDK LANGUAGES CXX)
 
 if (NOT MSVC)
 	find_package(PkgConfig)
-	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.24.0)
+	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.25.0)
 	set(ASDK_LIBRARY_DIRS "${CMAKE_PREFIX_PATH}/lib")
 	# Needs to append the correct path to AVS SDK since it's not installed
 	# to cross-compiler target sysroot

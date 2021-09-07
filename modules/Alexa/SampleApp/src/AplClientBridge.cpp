@@ -74,6 +74,9 @@ void AplClientBridge::initializeRenderer(const std::string& windowId, std::set<s
                         std::make_shared<AudioPlayer::AplAudioPlayerExtension>(shared_from_this());
                     extensions.emplace(audioPlayerExtension);
                     m_audioPlayerExtensions.push_back(audioPlayerExtension);
+                } else if (APLClient::Extensions::E2EEncryption::URI == uri) {
+                    auto e2eEncryptionExtension = std::make_shared<E2EEncryption::AplE2EEncryptionExtension>();
+                    extensions.emplace(e2eEncryptionExtension);
                 }
             }
 
@@ -262,7 +265,7 @@ void AplClientBridge::onUpdateTimer() {
         }
 
         if (m_guiManager && alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING == m_playerActivityState) {
-            double audioItemOffset = m_guiManager->getAudioItemOffset().count();
+            int audioItemOffset = m_guiManager->getAudioItemOffset().count();
             for (const auto& audioPlayerExtension : m_audioPlayerExtensions) {
                 audioPlayerExtension->updatePlaybackProgress(audioItemOffset);
             }
@@ -433,6 +436,36 @@ void AplClientBridge::onPlayerActivityChanged(
         for (const auto& audioPlayerExtension : m_audioPlayerExtensions) {
             audioPlayerExtension->updatePlayerActivity(
                 playerActivityToString(m_playerActivityState), context.offset.count());
+        }
+    });
+}
+
+void AplClientBridge::onLoginStateProvided(
+    const std::string& playerId,
+    const alexaClientSDK::acsdkExternalMediaPlayerInterfaces::ObservableSessionProperties sessionStateProperties) {
+    // Unused ExternalMediaPlayerObserverInterface function.
+}
+
+void AplClientBridge::onPlaybackStateProvided(
+    const std::string& playerId,
+    const alexaClientSDK::acsdkExternalMediaPlayerInterfaces::ObservablePlaybackStateProperties
+        playbackStateProperties) {
+    m_executor.submit([this, playbackStateProperties]() {
+        if (playbackStateProperties.state == "IDLE") {
+            m_playerActivityState = alexaClientSDK::avsCommon::avs::PlayerActivity::IDLE;
+        } else if (playbackStateProperties.state == "STOPPED") {
+            m_playerActivityState = alexaClientSDK::avsCommon::avs::PlayerActivity::STOPPED;
+        } else if (playbackStateProperties.state == "FINISHED") {
+            m_playerActivityState = alexaClientSDK::avsCommon::avs::PlayerActivity::FINISHED;
+        } else if (playbackStateProperties.state == "PLAYING") {
+            m_playerActivityState = alexaClientSDK::avsCommon::avs::PlayerActivity::PLAYING;
+        } else if (playbackStateProperties.state == "PAUSED") {
+            m_playerActivityState = alexaClientSDK::avsCommon::avs::PlayerActivity::PAUSED;
+        }
+
+        int audioItemOffset = m_guiManager->getAudioItemOffset().count();
+        for (const auto& audioPlayerExtension : m_audioPlayerExtensions) {
+            audioPlayerExtension->updatePlayerActivity(playbackStateProperties.state, audioItemOffset);
         }
     });
 }

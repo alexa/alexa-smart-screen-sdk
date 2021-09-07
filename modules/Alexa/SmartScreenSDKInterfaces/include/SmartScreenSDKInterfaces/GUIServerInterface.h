@@ -260,6 +260,11 @@ public:
      * @param failed the indication if document terminated due to failure.
      */
     virtual void handleDocumentTerminated(const std::string& token, bool failed) = 0;
+
+    /**
+     * Handle Locale Change
+     */
+    virtual void handleLocaleChange() = 0;
 };
 
 }  // namespace smartScreenSDKInterfaces

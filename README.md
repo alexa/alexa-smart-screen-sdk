@@ -1,12 +1,14 @@
 # Alexa Smart Screen SDK
 
 <p>
-    <a href="https://github.com/alexa/alexa-smart-screen-sdk/tree/v2.7.1" alt="version">
-        <img src="https://img.shields.io/badge/stable%20version-2.7.1-brightgreen" /></a>
-    <a href="https://github.com/alexa/avs-device-sdk/tree/v1.24.0" alt="DeviceSDK">
-        <img src="https://img.shields.io/badge/avs%20device%20sdk-1.24.0-blueviolet" /></a>
-    <a href="https://github.com/alexa/apl-core-library/tree/v1.6.2" alt="APLCore">
-        <img src="https://img.shields.io/badge/apl%20core%20library-1.6.2-navy" /></a>
+    <a href="https://github.com/alexa/alexa-smart-screen-sdk/tree/v2.8.0" alt="version">
+        <img src="https://img.shields.io/badge/stable%20version-2.8.0-brightgreen" /></a>
+    <a href="https://github.com/alexa/avs-device-sdk/tree/v1.25.0" alt="DeviceSDK">
+        <img src="https://img.shields.io/badge/avs%20device%20sdk-1.25.0-blueviolet" /></a>
+    <a href="https://github.com/alexa/apl-core-library/tree/v1.7.1" alt="APLCore">
+        <img src="https://img.shields.io/badge/apl%20core%20library-1.7.1-navy" /></a>
+    <a href="https://github.com/alexa/apl-client-library/tree/v1.7.2" alt="APLClientLibrary">
+        <img src="https://img.shields.io/badge/apl%20client%20library-1.7.2-blue" /></a>
     <a href="https://github.com/alexa/alexa-smart-screen-sdk/issues" alt="issues">
         <img src="https://img.shields.io/github/issues/alexa/alexa-smart-screen-sdk" /></a>
 </p>
@@ -21,6 +23,7 @@ The Alexa Smart Screen SDK package in this GitHub repo includes:
 The Alexa Smart Screen SDK depends on the following additional GitHub repos:
 * [AVS Device SDK](https://github.com/alexa/avs-device-sdk/wiki)
 * [APL Core Library](https://github.com/alexa/apl-core-library)
+* [APL Client Library](https://github.com/alexa/apl-client-library)
 
 ## Get Started
 

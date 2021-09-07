@@ -4,7 +4,7 @@
   "description": "Reference UI for AVS SDK",
   "main": "index.js",
   "engines": {
-    "node": ">=14.0"
+    "node": ">=14.17.4"
   },
   "scripts": {
     "lint": "tslint --project tsconfig.json -c tslint.json 'src/**/*.ts' 'src/**/*.tsx'",
@@ -14,7 +14,7 @@
   "author": "Amazon",
   "license": "Apache 2.0",
   "dependencies": {
-    "@types/node": "^10.9.4",
+    "@types/node": "^14.17.4",
     "@types/react-dom": "^16.0.6",
     "apl-client": "file:../../Alexa/APLClientLibrary/apl-client-js",
     "loglevel": "^1.6.3",
@@ -25,7 +25,7 @@
     "ts-loader": "^4.4.1",
     "tslint": "^5.11.0",
     "tslint-loader": "^3.6.0",
-    "typescript": "^2.9.2",
+    "typescript": "^3.4",
     "webpack": "^5.28.0"
   },
   "devDependencies": {

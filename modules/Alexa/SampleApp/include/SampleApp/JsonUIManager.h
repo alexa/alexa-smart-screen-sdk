@@ -19,11 +19,12 @@
 #include <memory>
 #include <string>
 
+#include <acsdkNotificationsInterfaces/NotificationsObserverInterface.h>
+#include <acsdkSampleApplicationInterfaces/UIManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/AuthObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/CapabilitiesObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ConnectionStatusObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/DialogUXStateObserverInterface.h>
-#include <acsdkNotificationsInterfaces/NotificationsObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/SingleSettingObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/SpeakerInterface.h>
 #include <AVSCommon/SDKInterfaces/SpeakerManagerObserverInterface.h>
@@ -46,7 +47,8 @@ namespace sampleApp {
  */
 class JsonUIManager
         : public smartScreenSDKInterfaces::UIManagerInterface
-        , public smartScreenSDKInterfaces::MessagingServerObserverInterface {
+        , public smartScreenSDKInterfaces::MessagingServerObserverInterface
+        , public alexaClientSDK::acsdkSampleApplicationInterfaces::UIManagerInterface {
 public:
     /**
      * Constructor.
@@ -104,6 +106,11 @@ public:
     /// @{
     void onConnectionOpened() override;
     void onConnectionClosed() override;
+    /// }
+
+    /// @name UIManagerInterface Functions
+    /// @{
+    void printMessage(const std::string& message) override;
     /// }
 
     /**

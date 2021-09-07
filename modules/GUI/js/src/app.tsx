@@ -39,6 +39,7 @@ import {
     IGuiConfigurationMessage,
     IInitRequest,
     IInitResponse,
+    ILocaleChangeMessage,
     INavigationReportMessage,
     IOnFocusChangedMessage,
     IOnFocusChangedReceivedConfirmationMessage,
@@ -64,15 +65,16 @@ import {resolveDeviceAppConfig, resolveDeviceWindowState} from './lib/config/Gui
 import {IWindowState} from './lib/config/visualCharacteristics/IWindowState';
 import {UWPWebViewClient} from './lib/messages/UWPClient';
 import {CaptionsView} from './components/CaptionsView';
+import {LocaleManager} from './lib/utils/localeManager';
 
 const HOST = 'localhost';
 const PORT = 8933;
 
 /// Maximum APL version supported by the runtime.
-const APL_MAX_VERSION = '1.6';
+const APL_MAX_VERSION = '1.7';
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.7';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.8';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
@@ -325,6 +327,14 @@ export class App extends React.Component<any, IAppState> {
         this.setState({});
     }
 
+    protected handleLocaleChangeMessage(message : ILocaleChangeMessage) {
+        /**
+         * Use to implement UI changes when Alexa locale changes:
+         * https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/system.html#setlocales
+         */
+        LocaleManager.setLocales(message.locales);
+    }
+
     protected onClientMessage(message : IBaseInboundMessage) {
         switch (message.type) {
             case 'initRequest': {
@@ -390,6 +400,10 @@ export class App extends React.Component<any, IAppState> {
             }
             case 'doNotDisturbSettingChanged': {
                 this.handleDoNotDisturbSettingChanged(message);
+                break;
+            }
+            case 'localeChange': {
+                this.handleLocaleChangeMessage(message as ILocaleChangeMessage);
                 break;
             }
             default: {
@@ -653,6 +667,10 @@ export class App extends React.Component<any, IAppState> {
     protected lastKeyDownCode : string;
 
     private handleKeyDown(event : any) {
+        if (USE_UWP_CLIENT) {
+            this.convertUwpKeyboardEvent(event);
+        }
+
         // Only handle key down events once
         if (event.code === this.lastKeyDownCode) {
             return;
@@ -690,6 +708,10 @@ export class App extends React.Component<any, IAppState> {
     }
 
     private handleKeyUp(event : any) {
+        if (USE_UWP_CLIENT) {
+            this.convertUwpKeyboardEvent(event);
+        }
+
         this.lastKeyDownCode = undefined;
 
         switch (event.code) {
@@ -739,5 +761,32 @@ export class App extends React.Component<any, IAppState> {
 
     public componentDidMount() {
         this.client.connect();
+    }
+
+    private convertUwpKeyboardEvent(event : any) {
+        /**
+         * Since KeyboardEvents emitted by UWP WebView do not have code property populated,
+         * we have to populate them manually
+         */
+        switch (event.key) {
+            case this.deviceAppConfig.deviceKeys.talkKey.key :
+                event.code = this.deviceAppConfig.deviceKeys.talkKey.code;
+                break;
+            case this.deviceAppConfig.deviceKeys.exitKey.key:
+                event.code = this.deviceAppConfig.deviceKeys.exitKey.code;
+                break;
+            case this.deviceAppConfig.deviceKeys.backKey.key:
+                event.code = this.deviceAppConfig.deviceKeys.backKey.code;
+                break;
+            case this.deviceAppConfig.deviceKeys.toggleCaptionsKey.key:
+                event.code = this.deviceAppConfig.deviceKeys.toggleCaptionsKey.code;
+                break;
+            case this.deviceAppConfig.deviceKeys.toggleDoNotDisturbKey.key:
+                event.code = this.deviceAppConfig.deviceKeys.toggleDoNotDisturbKey.code;
+                break;
+            default : {
+                break;
+            }
+        }
     }
 }
