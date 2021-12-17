@@ -1,5 +1,4 @@
 add_definitions("-DACSDK_LOG_MODULE=sampleApp")
-set(SampleApp_SOURCES)
 list(APPEND SampleApp_SOURCES
     AplClientBridge.cpp
     ConnectionObserver.cpp
@@ -19,6 +18,10 @@ list(APPEND SampleApp_SOURCES
     SmartScreenCaptionPresenter.cpp
     SmartScreenCaptionStateManager.cpp
     TelemetrySink.cpp)
+
+if (RTCSC)
+    list(APPEND SampleApp_SOURCES Extensions/LiveView/AplLiveViewExtension.cpp)
+endif()
 
 if (PORTAUDIO)
     list(APPEND SampleApp_SOURCES PortAudioMicrophoneWrapper.cpp)
@@ -50,7 +53,7 @@ target_include_directories(SmartScreenSampleAppLib PUBLIC
     "${PORTAUDIO_INCLUDE_DIR}"
     "${Utils_SOURCE_DIR}/include"
     "${Communication_SOURCE_DIR}/include"
-    "${APLClient_SOURCE_DIR}/include")
+    "${APLCLIENT_INCLUDE_DIRS}")
 
 target_link_libraries(SmartScreenSampleAppLib
     "${ASDK_LDFLAGS}"
@@ -65,9 +68,15 @@ target_link_libraries(SmartScreenSampleAppLib
     SSSDKCommon
     acsdkAudioInputStream
     acsdkEqualizerImplementations
+    acsdkCrypto
+    acsdkPkcs11
     TemplateRuntime
     Utils
     "${PORTAUDIO_LIB_PATH}")
+
+if (RTCSC)
+    target_link_libraries(SmartScreenSampleAppLib LiveViewControllerCapabilityAgent)
+endif()
 
 if (AUTH_MANAGER)
     target_link_libraries(SmartScreenSampleAppLib acsdkAuthorization)
@@ -112,6 +121,10 @@ target_include_directories(SmartScreenSampleAppLib PUBLIC
         "${ASIO_INCLUDE_DIR}"
         "${WEBSOCKETPP_INCLUDE_DIR}")
 
+if (CRYPTO_FOUND AND PKCS11)
+    target_compile_definitions(SmartScreenSampleAppLib PRIVATE ENABLE_PKCS11)
+endif()
+
 # Currently only allow non SSL websocket with debug builds
 if(DISABLE_WEBSOCKET_SSL)
     string(TOLOWER ${CMAKE_BUILD_TYPE} LOWERCASE_CMAKE_BUILD_TYPE)
@@ -132,6 +145,7 @@ endif()
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     target_link_libraries(SmartScreenSampleAppLib
         "-rpath ${ASDK_LIBRARY_DIRS}"
+        "-rpath ${APLCLIENT_LIBRARY_DIRS}"
         "-framework CoreAudio"
         "-framework AudioToolbox" 
         "-framework AudioUnit" 
@@ -140,15 +154,8 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     target_link_libraries(SmartScreenSampleAppLib
       rt m pthread asound atomic
-      "-Wl,-rpath,${ASDK_LIBRARY_DIRS}")
-endif()
-
-if(NOT YOGA_INCLUDE_DIR)
-    message(FATAL_ERROR "Yoga include dir is required")
-endif()
-
-if(NOT YOGA_LIB_DIR)
-    message(FATAL_ERROR "Yoga lib dir is required")
+      "-Wl,-rpath,${ASDK_LIBRARY_DIRS}"
+      "-Wl,-rpath,${APLCLIENT_LIBRARY_DIRS}")
 endif()
 
 

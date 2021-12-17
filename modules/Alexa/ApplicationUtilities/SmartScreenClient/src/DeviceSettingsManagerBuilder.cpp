@@ -125,7 +125,7 @@ DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withSpeechConfirmati
 
 DeviceSettingsManagerBuilder& DeviceSettingsManagerBuilder::withTimeZoneSetting(
     std::shared_ptr<avsCommon::sdkInterfaces::SystemTimeZoneInterface> systemTimeZone) {
-    std::function<bool(const TimeZoneSetting::ValueType&)> applyFunction;
+    std::function<bool(const TimeZoneSetting::ValueType&)> applyFunction = nullptr;
     if (systemTimeZone) {
         applyFunction = [systemTimeZone](const TimeZoneSetting::ValueType& value) {
             return systemTimeZone->setTimezone(value);

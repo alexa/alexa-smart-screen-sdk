@@ -221,7 +221,7 @@ std::unique_ptr<SmartScreenClient> SmartScreenClient::create(
     std::shared_ptr<acsdkAlerts::storage::AlertStorageInterface> alertStorage,
     std::shared_ptr<certifiedSender::MessageStorageInterface> messageStorage,
     std::shared_ptr<acsdkNotificationsInterfaces::NotificationsStorageInterface> notificationsStorage,
-    std::unique_ptr<settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
+    std::shared_ptr<settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
     std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface> bluetoothStorage,
     std::shared_ptr<avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
     std::unordered_set<std::shared_ptr<avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
@@ -672,6 +672,16 @@ bool SmartScreenClient::initialize(
         return false;
     }
 
+    m_bluetoothLocal = manufactory->get<std::shared_ptr<acsdkBluetoothInterfaces::BluetoothLocalInterface>>();
+    if (!m_bluetoothLocal) {
+#ifdef BLUETOOTH_ENABLED
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateBluetoothLocal"));
+        return false;
+#else
+        ACSDK_DEBUG5(LX("nullBluetooth").m("Bluetooth disabled"));
+#endif
+    }
+
     m_bluetoothNotifier = manufactory->get<std::shared_ptr<acsdkBluetoothInterfaces::BluetoothNotifierInterface>>();
     if (!m_bluetoothNotifier) {
 #ifdef BLUETOOTH_ENABLED
@@ -1009,6 +1019,20 @@ bool SmartScreenClient::initialize(
     m_dialogUXStateAggregator->addObserver(m_alexaPresentation);
     m_alexaPresentation->setAPLMaxVersion(APLMaxVersion);
 
+#ifdef ENABLE_RTCSC
+    /*
+     * Creating the LiveViewControllerCapabilityAgent Capability Agent - This component is the Capability Agent that
+     * implements the Alexa.Camera.LiveViewControllerCapabilityAgent interface.
+     */
+    m_liveViewController =
+        alexaSmartScreenSDK::smartScreenCapabilityAgents::liveViewController::LiveViewControllerCapabilityAgent::create(
+            m_visualFocusManager, m_connectionManager, m_contextManager, m_exceptionSender);
+    if (!m_liveViewController) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreateLiveViewControllerCapabilityAgent"));
+        return false;
+    }
+#endif
+
     auto renderPlayerInfoCardsProviderRegistrar =
         manufactory->get<std::shared_ptr<avsCommon::sdkInterfaces::RenderPlayerInfoCardsProviderRegistrarInterface>>();
     if (!renderPlayerInfoCardsProviderRegistrar) {
@@ -1029,7 +1053,6 @@ bool SmartScreenClient::initialize(
         return false;
     }
     m_dialogUXStateAggregator->addObserver(m_templateRuntime);
-    addAlexaPresentationObserver(m_templateRuntime);
 
     if (externalCapabilitiesBuilder) {
         externalCapabilitiesBuilder->withTemplateRunTime(m_templateRuntime);
@@ -1222,6 +1245,9 @@ bool SmartScreenClient::initialize(
 
     m_defaultEndpointBuilder->withCapability(m_alexaPresentation, m_alexaPresentation);
     m_defaultEndpointBuilder->withCapability(m_templateRuntime, m_templateRuntime);
+#ifdef ENABLE_RTCSC
+    m_defaultEndpointBuilder->withCapability(m_liveViewController, m_liveViewController);
+#endif
     m_defaultEndpointBuilder->withCapabilityConfiguration(m_visualCharacteristics);
     m_defaultEndpointBuilder->withCapabilityConfiguration(m_visualActivityTracker);
 
@@ -1274,7 +1300,8 @@ bool SmartScreenClient::initialize(
 #endif
             powerResourceManager,
             m_softwareReporterCapabilityAgent,
-            m_playbackRouter);
+            m_playbackRouter,
+            m_endpointRegistrationManager);
         for (auto& capability : externalCapabilities.first) {
             if (capability.configuration.hasValue()) {
                 m_defaultEndpointBuilder->withCapability(capability.configuration.value(), capability.directiveHandler);
@@ -1399,18 +1426,30 @@ void SmartScreenClient::onUserEvent(
 void SmartScreenClient::forceExit() {
     ACSDK_DEBUG5(LX(__func__).m("Force Exit"));
     clearActiveExecuteCommandsDirective();
-    clearCard();
+    clearPresentations();
+    clearPlayerInfoCard();
     stopAllActivities();
     forceClearDialogChannelFocus();
 }
 
-void SmartScreenClient::clearCard() {
+void SmartScreenClient::clearPresentations() {
     m_alexaPresentation->clearCard();
     m_templateRuntime->clearCard();
+#ifdef ENABLE_RTCSC
+    m_liveViewController->clearLiveView();
+#endif
 }
 
 void SmartScreenClient::clearAPLCard() {
     m_alexaPresentation->clearCard();
+}
+
+void SmartScreenClient::forceDisplayPlayerInfoCard() {
+    m_templateRuntime->forceDisplayPlayerInfoCard();
+}
+
+void SmartScreenClient::clearPlayerInfoCard() {
+    m_templateRuntime->forceClearPlayerInfoCard();
 }
 
 void SmartScreenClient::stopForegroundActivity() {
@@ -1782,6 +1821,18 @@ void SmartScreenClient::removeCallStateObserver(
     }
 }
 
+void SmartScreenClient::addDtmfObserver(std::shared_ptr<avsCommon::sdkInterfaces::DtmfObserverInterface> observer) {
+    if (m_callManager) {
+        m_callManager->addDtmfObserver(observer);
+    }
+}
+
+void SmartScreenClient::removeDtmfObserver(std::shared_ptr<avsCommon::sdkInterfaces::DtmfObserverInterface> observer) {
+    if (m_callManager) {
+        m_callManager->removeDtmfObserver(observer);
+    }
+}
+
 std::shared_ptr<EndpointBuilderInterface> SmartScreenClient::createEndpointBuilder() {
     return alexaClientSDK::endpoints::EndpointBuilder::create(
         m_deviceInfo, m_contextManager, m_exceptionSender, m_alexaMessageSender);
@@ -1889,7 +1940,6 @@ void SmartScreenClient::handleVisualContext(uint64_t token, std::string payload)
 
 void SmartScreenClient::handleRenderDocumentResult(const std::string& token, bool result, std::string error) {
     m_alexaPresentation->processRenderDocumentResult(token, result, error);
-    m_templateRuntime->processPresentationResult(token);
 }
 
 void SmartScreenClient::handleExecuteCommandsResult(const std::string& token, bool result, std::string error) {
@@ -1974,6 +2024,10 @@ void SmartScreenClient::registerExternalMediaPlayerAdapterHandler(
 
 std::shared_ptr<acsdkShutdownManagerInterfaces::ShutdownManagerInterface> SmartScreenClient::getShutdownManager() {
     return m_shutdownManager;
+}
+
+std::shared_ptr<acsdkBluetoothInterfaces::BluetoothLocalInterface> SmartScreenClient::getBluetoothLocal() {
+    return m_bluetoothLocal;
 }
 
 SmartScreenClient::~SmartScreenClient() {
@@ -2112,6 +2166,28 @@ void SmartScreenClient::removeDialogChannelObserverInterface(
     const std::shared_ptr<ChannelObserverInterface>& observer) {
     m_dialogChannelObserverInterfaces.erase(observer);
 }
+
+#ifdef ENABLE_RTCSC
+void SmartScreenClient::addLiveViewControllerCapabilityAgentObserver(
+    std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::LiveViewControllerCapabilityAgentObserverInterface>
+        observer) {
+    m_liveViewController->addObserver(observer);
+}
+
+void SmartScreenClient::removeLiveViewControllerCapabilityAgentObserver(
+    std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::LiveViewControllerCapabilityAgentObserverInterface>
+        observer) {
+    m_liveViewController->removeObserver(observer);
+}
+
+void SmartScreenClient::setCameraMicrophoneState(bool enabled) {
+    m_liveViewController->setMicrophoneState(enabled);
+}
+
+void SmartScreenClient::clearLiveView() {
+    m_liveViewController->clearLiveView();
+}
+#endif
 
 }  // namespace smartScreenClient
 }  // namespace alexaSmartScreenSDK

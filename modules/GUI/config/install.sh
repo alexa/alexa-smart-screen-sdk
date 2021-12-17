@@ -142,8 +142,8 @@ function installTools {
     pushd ${INSTALL_BASE}/${DEPENDENCIES_DIR}
         wget https://raw.githubusercontent.com/alexa/avs-device-sdk/${DEVICE_SDK_CLONE_TAG}/tools/Install/genConfig.sh -O genConfig.sh
         chmod +x genConfig.sh
-        wget https://github.com/zaphoyd/websocketpp/archive/0.8.1.tar.gz -O websocketpp-0.8.1.tar.gz
-        tar -xvzf websocketpp-0.8.1.tar.gz
+        wget https://github.com/zaphoyd/websocketpp/archive/0.8.2.tar.gz -O websocketpp-0.8.2.tar.gz
+        tar -xvzf websocketpp-0.8.2.tar.gz
     popd
 
     pushd ${DEVICE_SDK_THIRD_PARTY_PATH}
@@ -232,7 +232,7 @@ function cloneSmartScreenSDK {
 function buildSmartScreenSDK {
 	pushd $BUILD_PATH
         cmake -DCMAKE_PREFIX_PATH=${DEVICE_SDK_INSTALL_PATH} \
-        -DWEBSOCKETPP_INCLUDE_DIR=${DEPENDENCIES_PATH}/websocketpp-0.8.1 \
+        -DWEBSOCKETPP_INCLUDE_DIR=${DEPENDENCIES_PATH}/websocketpp-0.8.2 \
         -DDISABLE_WEBSOCKET_SSL=ON \
         -DGSTREAMER_MEDIA_PLAYER=ON \
         -DCMAKE_BUILD_TYPE=DEBUG \

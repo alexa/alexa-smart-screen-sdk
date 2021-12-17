@@ -14,6 +14,7 @@
  */
 
 import { IBaseOutboundMessage, IAlexaStateChangedMessage, AlexaState, IBaseInboundMessage } from './messages';
+import { ICallStateChangeMessage, CallState } from './messages';
 import { ILogger, LoggerFactory } from 'apl-client';
 
 /// Max backoff value for reconnect attempts.
@@ -104,6 +105,12 @@ export class Client implements IClient {
         this.logger.error('error');
         const stateChangedMessage : IAlexaStateChangedMessage = {type: 'alexaStateChanged', state: AlexaState.UNKNOWN};
         this.onMessage(stateChangedMessage);
+        // Forcibly shutdown Comms in case of an error
+        const callStateChangedMessage : ICallStateChangeMessage = {
+            type: 'callStateChange',
+            callState: CallState.UNKNOWN
+        };
+        this.onMessage(callStateChangedMessage);
     }
 
     constructor(config : IClientConfig) {
@@ -114,7 +121,6 @@ export class Client implements IClient {
     }
 
     protected wsOnMessage(event : MessageEvent) {
-        this.logger.info('received message');
         let message : IBaseInboundMessage = undefined;
         try {
             message = JSON.parse(event.data);

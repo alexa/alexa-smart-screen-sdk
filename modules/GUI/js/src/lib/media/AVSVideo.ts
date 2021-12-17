@@ -25,10 +25,12 @@ import {
     Video,
     VideoHolder
 } from 'apl-client';
-import { FocusManager } from '../focus/FocusManager';
+import { IFocusManager } from '../focus/IFocusManager';
 import { ChannelName } from '../focus/ChannelName';
 import { FocusState } from '../focus/FocusState';
-import { ActivityTracker } from '../activity/ActivityTracker';
+import { IActivityTracker } from '../activity/IActivityTracker';
+import { AVSInterface } from '../focus/AVSInterface';
+import { ContentType } from '../focus/ContentType';
 
 /// Default volume value for the player.
 const DEFAULT_VOLUME = 1;
@@ -40,12 +42,20 @@ const LOW_VOLUME = 0.2;
  * Factory class which creates AVSVideo objects
  */
 export class AVSVideoFactory implements IVideoFactory {
-    private focusManager : FocusManager;
-    private activityTracker : ActivityTracker;
+    private readonly focusManager : IFocusManager;
+    private readonly activityTracker : IActivityTracker;
+    private readonly avsInterface : AVSInterface;
+    private readonly contentType : ContentType;
 
-    constructor(focusManager : FocusManager, activityTracker : ActivityTracker) {
+    constructor(
+        avsInterface : AVSInterface,
+        contentType : ContentType,
+        focusManager : IFocusManager,
+        activityTracker : IActivityTracker) {
         this.focusManager = focusManager;
         this.activityTracker = activityTracker;
+        this.avsInterface = avsInterface;
+        this.contentType = contentType;
     }
 
     public create(renderer : APLRenderer,
@@ -55,7 +65,15 @@ export class AVSVideoFactory implements IVideoFactory {
         if ((renderer.options as IAPLOptions).environment.disallowVideo) {
             return new VideoHolder(renderer, component, factory, parent);
         } else {
-            return new AVSVideo(this.focusManager, this.activityTracker, renderer, component, factory, parent);
+            return new AVSVideo(
+                this.avsInterface,
+                this.contentType,
+                this.focusManager,
+                this.activityTracker,
+                renderer,
+                component,
+                factory,
+                parent);
         }
     }
 }
@@ -64,14 +82,18 @@ export class AVSVideoFactory implements IVideoFactory {
  * A Video component which adds AVS focus support
  */
 export class AVSVideo extends Video {
-    private focusManager : FocusManager;
+    private focusManager : IFocusManager;
     private focusToken : number;
     private playbackFocusResolver : { resolve : Function, reject : Function };
-    private activityTracker : ActivityTracker;
+    private activityTracker : IActivityTracker;
     private activityToken : number;
+    private readonly avsInterface : AVSInterface;
+    private readonly contentType : ContentType;
 
-    constructor(focusManager : FocusManager,
-                activityTracker : ActivityTracker,
+    constructor(avsInterface : AVSInterface,
+                contentType : ContentType,
+                focusManager : IFocusManager,
+                activityTracker : IActivityTracker,
                 renderer : APLRenderer,
                 component : APL.Component,
                 factory : FactoryFunction,
@@ -79,6 +101,8 @@ export class AVSVideo extends Video {
         super(renderer, component, factory, parent);
         this.focusManager = focusManager;
         this.activityTracker = activityTracker;
+        this.avsInterface = avsInterface;
+        this.contentType = contentType;
     }
 
     /**
@@ -144,7 +168,7 @@ export class AVSVideo extends Video {
                     this.playbackFocusResolver = undefined;
                 }
             };
-            this.focusToken = this.focusManager.acquireFocus(channel, {
+            this.focusToken = this.focusManager.acquireFocus(this.avsInterface, channel, this.contentType, {
                 focusChanged : this.processFocusChanged.bind(this)
             });
         }));

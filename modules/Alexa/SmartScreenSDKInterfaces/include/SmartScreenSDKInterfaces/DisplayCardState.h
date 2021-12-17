@@ -78,7 +78,9 @@ enum class NonPlayerInfoDisplayType {
     /// Presenting a RenderTemplate Card.
     RENDER_TEMPLATE,
     /// Presenting an APL Document.
-    ALEXA_PRESENTATION
+    ALEXA_PRESENTATION,
+    /// Presenting a LiveView.
+    LIVE_VIEW
 };
 
 }  // namespace smartScreenSDKInterfaces

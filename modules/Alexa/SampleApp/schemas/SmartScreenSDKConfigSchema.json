@@ -642,6 +642,30 @@
               "configurations"
             ]
           }
+        },
+        "liveViewControllerOptions": {
+          "type": "object",
+          "properties": {
+            "physicalMicButtonHint": {
+              "type": "object",
+              "properties": {
+                "micButtonHintType": {
+                  "type": "string",
+                  "enum": [
+                    "Text",
+                    "Image",
+                    "AVG"
+                  ]
+                },
+                "micButtonHintSource": {
+                  "type": "string"
+                }
+              }
+            },
+            "viewingDeviceMicUnsupported": {
+              "type": "boolean"
+            }
+          }
         }
       },
       "required": [

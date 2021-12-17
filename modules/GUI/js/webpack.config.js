@@ -59,7 +59,7 @@ module.exports = (env) => {
                     ]
                 },
                 {
-                    test: /\.(png|jpg|gif|wav)$/,
+                    test: /\.(png|jpg|gif|wav|woff|woff2|eot|ttf|otf)$/,
                     type: 'asset/resource'
                 }
             ]
@@ -69,7 +69,8 @@ module.exports = (env) => {
             new HtmlWebpackPlugin(),
             new webpack.DefinePlugin({
                 DISABLE_WEBSOCKET_SSL: JSON.stringify(env.DISABLE_WEBSOCKET_SSL === 'true'),
-                USE_UWP_CLIENT: JSON.stringify(env.USE_UWP_CLIENT === 'true')
+                USE_UWP_CLIENT: JSON.stringify(env.USE_UWP_CLIENT === 'true'),
+                RTCSC_ENABLED: JSON.stringify(env.RTCSC_ENABLED === 'true')
             })
         ]
     };

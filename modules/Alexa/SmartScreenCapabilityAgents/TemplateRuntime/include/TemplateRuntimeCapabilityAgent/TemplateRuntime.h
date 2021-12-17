@@ -36,7 +36,6 @@
 #include <AVSCommon/Utils/Timing/Timer.h>
 
 #include "SmartScreenSDKInterfaces/ActivityEvent.h"
-#include "SmartScreenSDKInterfaces/AlexaPresentationObserverInterface.h"
 #include "SmartScreenSDKInterfaces/AudioPlayerInfo.h"
 #include "SmartScreenSDKInterfaces/DisplayCardState.h"
 #include "SmartScreenSDKInterfaces/TemplateRuntimeObserverInterface.h"
@@ -64,7 +63,6 @@ class TemplateRuntime
         , public alexaClientSDK::avsCommon::sdkInterfaces::RenderPlayerInfoCardsObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::CapabilityConfigurationInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface
-        , public alexaSmartScreenSDK::smartScreenSDKInterfaces::AlexaPresentationObserverInterface
         , public std::enable_shared_from_this<TemplateRuntime> {
 public:
     /**
@@ -138,26 +136,6 @@ public:
     getCapabilityConfigurations() override;
     /// @}
 
-    /// @name AlexaPresentationObserverInterface Functions
-    /// @{
-    void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
-
-    void clearDocument(const std::string& token, const bool focusCleared) override;
-
-    void executeCommands(const std::string& jsonPayload, const std::string& token) override;
-
-    void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
-        override;
-
-    void interruptCommandSequence(const std::string& token) override;
-
-    void onPresentationSessionChanged(
-        const std::string& id,
-        const std::string& skillId,
-        const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
-        const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions) override;
-    /// @}
-
     /**
      * This function adds an observer to @c TemplateRuntime so that it will get notified for renderTemplateCard or
      * renderPlayerInfoCard.
@@ -186,6 +164,16 @@ public:
     void clearCard();
 
     /**
+     * This function forces display of the player info card if available, and regains visual focus.
+     */
+    void forceDisplayPlayerInfoCard();
+
+    /**
+     * This function force clears the playerInfo card regardless of state or focus.
+     */
+    void forceClearPlayerInfoCard();
+
+    /**
      * Process activity change event.
      *
      * @param source The source of the activity event
@@ -200,13 +188,6 @@ public:
      * be done prior to this call.
      */
     void setExecutor(const std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor>& executor);
-
-    /**
-     * Process result of renderTemplate OR renderPlayerInfo directive.
-     *
-     * @param token document presentationToken.
-     */
-    void processPresentationResult(const std::string& token);
 
 private:
     /**
@@ -476,6 +457,12 @@ private:
     /// The timeout value in ms for clearing the display card when it is no interaction
     std::chrono::milliseconds m_templateCardInteractionTimeout{};
 
+    /// Token for tracking the active player info card.
+    std::string m_playerInfoCardToken;
+
+    /// Token for tracking the active render template card.
+    std::string m_renderTemplateCardToken;
+
     /**
      * The @c Executor which queues up operations from asynchronous API calls.
      *
@@ -483,9 +470,6 @@ private:
      *     before the Executor Thread Variables are destroyed.
      */
     std::shared_ptr<alexaClientSDK::avsCommon::utils::threading::Executor> m_executor;
-
-    std::string m_playerInfoCardToken;
-    std::string m_nonPlayerInfoCardToken;
 };
 
 }  // namespace templateRuntime

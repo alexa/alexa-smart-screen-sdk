@@ -43,7 +43,7 @@
 #include "SampleApplicationReturnCodes.h"
 
 #ifdef KWD
-#include <KWD/AbstractKeywordDetector.h>
+#include <acsdkKWDImplementations/AbstractKeywordDetector.h>
 #endif
 
 #ifdef GSTREAMER_MEDIA_PLAYER
@@ -71,15 +71,13 @@ public:
      * Create a SampleApplication.
      *
      * @param configFiles The vector of configuration files.
-     * @param pathToInputFolder The path to the inputs folder containing data files needed by this application.
      * @param logLevel The level of logging to enable.  If this parameter is an empty string, the SDK's default
      *     logging level will be used.
-     * @param An optional @c DiagnosticsInterface object to provide diagnostics on the SDK.
+     * @param diagnostics An optional @c DiagnosticsInterface object to provide diagnostics on the SDK.
      * @return A new @c SampleApplication, or @c nullptr if the operation failed.
      */
     static std::unique_ptr<SampleApplication> create(
         const std::vector<std::string>& configFiles,
-        const std::string& pathToInputFolder,
         const std::string& logLevel = "",
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics =
             nullptr);
@@ -102,6 +100,13 @@ public:
         return m_guiManager;
     }
 #endif
+    /**
+     * Exposes the default client.
+     *
+     * @return Returns a reference to the @c SmartScreenClient.
+     */
+    std::shared_ptr<smartScreenClient::SmartScreenClient> getSmartScreenClient();
+
     /**
      * Method to create mediaPlayers for the optional music provider adapters plugged into the SDK.
      *
@@ -154,15 +159,13 @@ private:
      * Initialize a SampleApplication.
      *
      * @param configFiles The vector of configuration files.
-     * @param pathToInputFolder The path to the inputs folder containing data files needed by this application.
      * @param logLevel The level of logging to enable.  If this parameter is an empty string, the SDK's default
      *     logging level will be used.
-     * @param An optional @c DiagnosticsInterface object to provide diagnostics on the SDK.
+     * @param diagnostics An optional @c DiagnosticsInterface object to provide diagnostics on the SDK.
      * @return @c true if initialization succeeded, else @c false.
      */
     bool initialize(
         const std::vector<std::string>& configFiles,
-        const std::string& pathToInputFolder,
         const std::string& logLevel,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics);
 
@@ -209,6 +212,9 @@ private:
 
     /// Object to manage lifecycle of Alexa Client SDK initialization.
     std::shared_ptr<alexaClientSDK::avsCommon::avs::initialization::AlexaClientSDKInit> m_sdkInit;
+
+    /// The @c SmartScreenClient which "glues" together all other modules.
+    std::shared_ptr<smartScreenClient::SmartScreenClient> m_client;
 
     /// The @c GUIClient
     std::shared_ptr<gui::GUIClient> m_guiClient;
@@ -273,7 +279,7 @@ private:
 
 #ifdef KWD
     /// The Wakeword Detector which can wake up the client using audio input.
-    std::unique_ptr<alexaClientSDK::kwd::AbstractKeywordDetector> m_keywordDetector;
+    std::shared_ptr<alexaClientSDK::acsdkKWDImplementations::AbstractKeywordDetector> m_keywordDetector;
 #endif
 
 #if defined(ANDROID_MEDIA_PLAYER) || defined(ANDROID_MICROPHONE)

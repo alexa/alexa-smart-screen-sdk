@@ -909,10 +909,10 @@ void AlexaPresentation::executeRenderDocumentCallbacks(bool isClearCard) {
     for (auto& observer : m_observers) {
         if (isClearCard) {
             m_presentationSession = {};
-            observer->clearDocument(m_lastRenderedAPLToken, true);
+            observer->clearDocument(m_lastRenderedAPLToken);
         } else {
             if (dismissPrevious && m_lastTargetedWindowId != windowId) {
-                observer->clearDocument(m_lastRenderedAPLToken, false);
+                observer->clearDocument(m_lastRenderedAPLToken);
             }
             observer->renderDocument(m_lastDisplayedDirective->directive->getPayload(), newToken, windowId);
             if (m_renderReceivedTime.time_since_epoch().count() != 0) {
@@ -1398,15 +1398,16 @@ void AlexaPresentation::processRenderDocumentResult(
         if (result) {
             setHandlingCompleted(m_lastDisplayedDirective);
             executeProactiveStateReport();
+
+            if (DialogUXState::IDLE == m_dialogUxState && InteractionState::INACTIVE == m_documentInteractionState) {
+                executeStartOrExtendTimer();
+            }
         } else {
             sendExceptionEncounteredAndReportFailed(m_lastDisplayedDirective, "Renderer failed: " + error);
             resetMetricsEvent(MetricEvent::RENDER_DOCUMENT);
             endMetricsEvent(MetricEvent::RENDER_DOCUMENT, ACTIVITY_RENDER_DOCUMENT_FAIL);
             notifyAbort();
-        }
-
-        if (DialogUXState::IDLE == m_dialogUxState && InteractionState::INACTIVE == m_documentInteractionState) {
-            executeStartOrExtendTimer();
+            executeClearCardEvent();
         }
     });
 }

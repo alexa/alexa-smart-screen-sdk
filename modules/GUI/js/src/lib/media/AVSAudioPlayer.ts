@@ -14,31 +14,42 @@
  */
 
 import { AudioPlayer, IAudioEventListener, IAudioContextProvider, DefaultAudioContextProvider } from 'apl-client';
-import { FocusManager } from '../focus/FocusManager';
+import { IFocusManager } from '../focus/IFocusManager';
 import { FocusState } from '../focus/FocusState';
 import { ChannelName } from '../focus/ChannelName';
-import { ActivityTracker } from '../activity/ActivityTracker';
+import { IActivityTracker } from '../activity/IActivityTracker';
+import { AVSInterface } from '../focus/AVSInterface';
+import { ContentType } from '../focus/ContentType';
 
 /**
  * Provides an implementation of the AudioPlayer which adds AVS focus support
  */
 export class AVSAudioPlayer extends AudioPlayer {
 
-    private focusManager : FocusManager;
+    private focusManager : IFocusManager;
     private focusToken : number;
     private playbackFocusResolver : { resolve : Function, reject : Function };
-    private activityTracker : ActivityTracker;
+    private activityTracker : IActivityTracker;
     private activityToken : number;
     private audioContextProvider : IAudioContextProvider = new DefaultAudioContextProvider();
     private playing : boolean = false;
+    private readonly avsInterface : AVSInterface;
+    private readonly channelName : ChannelName;
+    private readonly contentType : ContentType;
 
     public constructor(
-      focusManager : FocusManager,
-      activityTracker : ActivityTracker,
-      eventListener : IAudioEventListener) {
+        avsInterface : AVSInterface,
+        channelName : ChannelName,
+        contentType : ContentType,
+        focusManager : IFocusManager,
+        activityTracker : IActivityTracker,
+        eventListener : IAudioEventListener) {
         super(eventListener);
         this.focusManager = focusManager;
         this.activityTracker = activityTracker;
+        this.avsInterface = avsInterface;
+        this.channelName = channelName;
+        this.contentType = contentType;
     }
 
     /**
@@ -52,9 +63,9 @@ export class AVSAudioPlayer extends AudioPlayer {
             this.playing = true;
             this.playWithContext(id, audioContext);
         }).catch((reason? : any) => {
-          console.log('AVSAudioPlayer:play failed with reason: ' + reason);
-          this.releaseFocus();
-          this.flush();
+            console.log('AVSAudioPlayer:play failed with reason: ' + reason);
+            this.releaseFocus();
+            this.flush();
         });
     }
 
@@ -103,7 +114,7 @@ export class AVSAudioPlayer extends AudioPlayer {
         }
         return new Promise<void>(((resolve, reject) => {
             this.playbackFocusResolver = { resolve, reject };
-            this.focusToken = this.focusManager.acquireFocus(ChannelName.DIALOG, {
+            this.focusToken = this.focusManager.acquireFocus(this.avsInterface, this.channelName, this.contentType, {
                 focusChanged : this.processFocusChanged.bind(this)
             });
         }));

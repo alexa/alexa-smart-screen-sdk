@@ -46,7 +46,11 @@ There are additional sample device configurations for the GUI in the /guiConfigS
       {{Alexa.Presentation.APL.Video}},
       {{Alexa.Display.Window}},
       {{Alexa.Display}}
-    ]
+    ],
+    "liveViewControllerOptions: {
+      "physicalMicButtonHint":{{PhysicalMicButtonHint}},
+      "viewingDeviceMicUnsupported":{{BOOLEAN}}
+    }
   }
 }
 ```
@@ -123,14 +127,19 @@ Config parameters used to define the device's reported visual characteristic cap
       {{Alexa.Presentation.APL.Video}},
       {{Alexa.Display.Window}},
       {{Alexa.Display}}
-    ]
+    ],
+    "liveViewControllerOptions: {
+      "physicalMicButtonHint":{{PhysicalMicButtonHint}},
+      "viewingDeviceMicUnsupported":{{BOOLEAN}}
+    }
 }
 ```
 
-| Parameter             | Type                                                          | Required  | Description
-| -------------         |-------                                                        |:-----:    | ----- |
-| appConfig             | [appConfig](#appconfig-parameters)                            | Yes       | Config for GUI App functionality and windows. 
-| visualCharacteristics | [visualCharacteristics](#visual-characteristics-parameters)   | Yes       | Config for device-reported visual characteristics.
+| Parameter                 | Type                                                                    | Required  | Description
+| -------------             |-------                                                                  |:-----:    | ----- |
+| appConfig                 | [appConfig](#appconfig-parameters)                                      | Yes       | Config for GUI App functionality and windows. 
+| visualCharacteristics     | [visualCharacteristics](#visual-characteristics-parameters)             | Yes       | Config for device-reported visual characteristics.
+| liveViewControllerOptions | [liveViewControllerOptions](#liveviewcontroller-options-parameters)   | No        | Config for Live View Controller UI options.
 
 ## AppConfig Parameters
 Parameters for GUI App and APL window functionality.
@@ -191,3 +200,25 @@ Config for device reported visual characteristic capabilities. All config object
 | [Alexa.Display.Window](https://developer.amazon.com/docs/alexa-voice-service/display-window.html)                 | Yes       | A definition of the possible windows that may be created on this device's display. A display can contain multiple windows.
 | [Alexa.InteractionMode](https://developer.amazon.com/docs/alexa-voice-service/interaction-mode.html)              | Yes       | A definition of the ways that a user can interact with this device.
 | [Alexa.Presentation.APL.Video](https://developer.amazon.com/docs/alexa-voice-service/presentation-apl-video.html) | Yes       | A definition of the supported video codecs and playback abilities supported by the APL runtime on the device, which may differ from video codecs supported elsewhere on the device.
+
+## LiveViewController Options Parameters
+Config for optional control of the LiveView Camera UI.
+- Only relevant to devices that support live view cameras.
+
+| Parameter                   | Type                                                              | Required  | Description
+| -------------               |-------                                                            |:-----:    | ----- |
+| physicalMicButtonHint       | [Physical Mic Button Hint](#physical-mic-button-hint-parameters)  | No        | When included, a localized hint element will be rendered in the live view camera UI indicating to the user what physical button element must be pressed to interact with the camera mic.
+| viewingDeviceMicUnsupported | boolean                                                           | No        | Optional flag, that when true, communicates to the live view camera UI that the viewing device does not support mic access for camera.  UI will not display any mic affordance or messaging.
+
+### Physical Mic Button Hint Parameters
+Config for live view camera physical mic button hint.
+
+- Used by devices with physical mic ingress to display a hint on the live view camera UI for camera mic interactions.
+- Hint string is defined and localized by the UI, and the hint element is incorporated inline.
+- Hint element type can be either Text, [APL AVG](https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-avg-format.html), or bitmap Image.
+- Hint format `Press <HINT ELEMENT> to talk to the camera` (localized for device Alexa locale).
+
+| Parameter             | Type                                | Required  | Description
+| -------------         |-------                              |:-----:    | ----- |
+| micButtonHintType     | string</br>`'Text'`</br>`'Image'`</br>`'AVG'`  | No        | Property defining the 'type' of mic button hint element to render in the hint string.<br/><br/>`'Text'`: Use a string name for the mic button (developer must localize as required).<br/>`'Image'`: Use a 1:1 aspect ratio bitmap image for the mic button.<br/>`'AVG'`: Use a 1:1 aspect ratio [Alexa Vector Graphic](https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-avg-format.html) for the mic button.
+| micButtonHintSource   | string                              | No        | String source value for the mic button element.  Varies by defined type.<br/><br/>`Text`: String name of the mic button (developer must localize as required).<br/>`Image`: URL to a 1:1 aspect ratio [bitmap image](https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-image.html#source-sources) source file for the mic button.  Must be hosted on a [CORS enabled](https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-support-for-your-skill.html#support-cors) CDN.<br/>`AVG`: URL to a 1:1 aspect ratio [Alexa Vector Graphic](https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-avg-format.html) source file for the mic button.  Must be hosted on a [CORS enabled](https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-support-for-your-skill.html#support-cors) CDN.

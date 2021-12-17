@@ -1,14 +1,12 @@
 # Alexa Smart Screen SDK
 
 <p>
-    <a href="https://github.com/alexa/alexa-smart-screen-sdk/tree/v2.8.0" alt="version">
-        <img src="https://img.shields.io/badge/stable%20version-2.8.0-brightgreen" /></a>
-    <a href="https://github.com/alexa/avs-device-sdk/tree/v1.25.0" alt="DeviceSDK">
-        <img src="https://img.shields.io/badge/avs%20device%20sdk-1.25.0-blueviolet" /></a>
-    <a href="https://github.com/alexa/apl-core-library/tree/v1.7.1" alt="APLCore">
-        <img src="https://img.shields.io/badge/apl%20core%20library-1.7.1-navy" /></a>
-    <a href="https://github.com/alexa/apl-client-library/tree/v1.7.2" alt="APLClientLibrary">
-        <img src="https://img.shields.io/badge/apl%20client%20library-1.7.2-blue" /></a>
+    <a href="https://github.com/alexa/alexa-smart-screen-sdk/tree/v2.9.0" alt="version">
+        <img src="https://img.shields.io/badge/stable%20version-2.9.0-brightgreen" /></a>
+    <a href="https://github.com/alexa/avs-device-sdk/tree/v1.26.0" alt="DeviceSDK">
+        <img src="https://img.shields.io/badge/avs%20device%20sdk-1.26.0-blueviolet" /></a>
+    <a href="https://github.com/alexa/apl-client-library/tree/v1.8.1" alt="APLClientLibrary">
+        <img src="https://img.shields.io/badge/apl%20client%20library-1.8.1-blue" /></a>
     <a href="https://github.com/alexa/alexa-smart-screen-sdk/issues" alt="issues">
         <img src="https://img.shields.io/github/issues/alexa/alexa-smart-screen-sdk" /></a>
 </p>
@@ -22,7 +20,6 @@ The Alexa Smart Screen SDK package in this GitHub repo includes:
 
 The Alexa Smart Screen SDK depends on the following additional GitHub repos:
 * [AVS Device SDK](https://github.com/alexa/avs-device-sdk/wiki)
-* [APL Core Library](https://github.com/alexa/apl-core-library)
 * [APL Client Library](https://github.com/alexa/apl-client-library)
 
 ## Get Started
@@ -50,16 +47,13 @@ This diagram illustrates the data flows between components that comprise the Ale
 * **TemplateRuntime** - The interface for PlayerInfo and Template cards (such as music cards and other static cards).
 * **VisualCharacteristics** - The interface for reporting the physical properties of visual display devices (such as screen resolution, window size, and supported interaction modes).
 
-**APL Core Client Reference Implementation**: This is the Alexa Smart Screen SDK's sample app. It has two components: a sample app and a Javascript-based GUI client app.
+**Smart Screen Sample Application**: This is the Alexa Smart Screen SDK's sample app. It has two components: a sample app and a Javascript-based GUI client app.
 
 * **GUIManager**: Interface between the capability agents and the GUI
 * **GUIClient**: Manages messages between the GUI and the rest of the sample app
-* **APLCoreTextMeasurement**: Handles text measurement requests from the APL Core Library
-* **APLCoreConnectionManager**: Manages the currently rendered APL document
-* **APLCoreGUIRenderer**: Handles the creation of APL documents
 * **WebSocketServer**: Reference implementation of a WebSocket-based messaging interface
 
-**APL Core Library Engine**: An abstract engine for Alexa Presentation Language (APL) that manages not only APL document parsing and layout inflation, but also event handling, commands, and the rendering workflow.
+**APL Client**: An Inter-process Communication (IPC) based APL Runtime which implements the APL Core Engine and the IPC APL Web ViewHost to render APL payloads.
 
 **HTML Rendering Engine**: A Javascript-based GUI client app and APL view host that render the visual experience on the device.
 

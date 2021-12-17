@@ -4,12 +4,16 @@ project(AlexaSmartScreenSDK LANGUAGES CXX)
 
 if (NOT MSVC)
 	find_package(PkgConfig)
-	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.25.0)
+	pkg_check_modules(ASDK REQUIRED AlexaClientSDK=1.26.0)
 	set(ASDK_LIBRARY_DIRS "${CMAKE_PREFIX_PATH}/lib")
 	# Needs to append the correct path to AVS SDK since it's not installed
 	# to cross-compiler target sysroot
 	set(ASDK_INCLUDE_DIRS "${ASDK_INCLUDE_DIRS}" "${CMAKE_PREFIX_PATH}/include")
 	set(ASDK_LDFLAGS "${ASDK_LDFLAGS}" "-L${CMAKE_PREFIX_PATH}/lib")
+
+	set(APLCLIENT_LIBRARY_DIRS "${APL_CLIENT_INSTALL_PATH}/lib")
+	set(APLCLIENT_INCLUDE_DIRS "${APLCLIENT_INCLUDE_DIRS}" "${APL_CLIENT_INSTALL_PATH}/include")
+	set(APLCLIENT_LDFLAGS "${APLCLIENT_LDFLAGS}" "-L${APLCLIENT_LIBRARY_DIRS}")
 else()
 	# No package manager support in MSVC yet. Emulating the same results
 	set(ASDK_INCLUDE_DIRS "${ASDK_INSTALL_PATH}/include")
@@ -78,6 +82,9 @@ else()
 		"${ASDK_LIB_DIR}/SystemSoundPlayer.lib"
 		"${ASDK_LIB_DIR}/TemplateRuntime.lib")
 
+	set(APLCLIENT_LIBRARY_DIRS "${APL_CLIENT_INSTALL_PATH}/lib")
+	set(APLCLIENT_INCLUDE_DIRS "${APLCLIENT_INCLUDE_DIRS}" "${APL_CLIENT_INSTALL_PATH}/include")
+	set(APLCLIENT_LDFLAGS "${APLCLIENT_LDFLAGS}" "-L${APLCLIENT_LIBRARY_DIRS}")
 endif()
 
 include(build/BuildDefaults.cmake)
@@ -91,7 +98,6 @@ add_subdirectory("ThirdParty")
 add_subdirectory("SmartScreenCapabilityAgents")
 add_subdirectory("SmartScreenSDKInterfaces")
 add_subdirectory("ApplicationUtilities")
-add_subdirectory("APLClientLibrary")
 if (NOT MSVC)
 	# For UWP SampleApp files are built as part of UWPSampleApp
 	add_subdirectory("SampleApp")

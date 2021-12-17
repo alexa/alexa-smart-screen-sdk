@@ -15,13 +15,14 @@
 
 import * as React from 'react';
 
-import {APLRendererWindow, APLRendererWindowState, WebsocketConnectionWrapper} from './components/APLRendererWindow';
+import {APLRendererWindow, WebsocketConnectionWrapper} from './components/APLRendererWindow';
 import {SampleHome} from './components/SampleHome';
 import {NavigationEvent} from './lib/messages/NavigationEvent';
 import {Client, IClient, IClientConfig} from './lib/messages/client';
 import {
     AlexaState,
     CallState,
+    CameraState,
     IActivityReportMessage,
     IAlexaStateChangedMessage,
     IAPLCoreMessage,
@@ -30,9 +31,11 @@ import {
     IBaseInboundMessage,
     IBaseOutboundMessage,
     ICallStateChangeMessage,
+    ICameraStateChangedMessage,
     IClearDocumentMessage,
     IDeviceWindowStateMessage,
     IDoNotDisturbSettingChangedMessage,
+    IDtmfTonesSentMessage,
     IFocusAcquireRequestMessage,
     IFocusReleaseRequestMessage,
     IFocusResponseMessage,
@@ -43,16 +46,19 @@ import {
     INavigationReportMessage,
     IOnFocusChangedMessage,
     IOnFocusChangedReceivedConfirmationMessage,
+    IRenderCameraMessage,
     IRenderCaptionsMessage,
     IRenderPlayerInfoMessage,
     IRenderStaticDocumentMessage,
     IRenderTemplateMessage,
     IRequestAuthorizationMessage,
+    IVideoCallingConfigMessage,
     OutboundMessageType
 } from './lib/messages/messages';
-import {PlayerInfoWindow, RENDER_PLAYER_INFO_WINDOW_ID} from './components/PlayerInfoWindow';
-import {CommsWindow} from './components/CommsWindow';
+import {PlayerInfoWindow} from './components/PlayerInfoWindow';
+import {LiveViewCameraWindow} from './components/LiveViewCameraWindow';
 import {resolveRenderTemplate} from './lib/displayCards/AVSDisplayCardHelpers';
+import {CommsWindow, ICommsParameters} from './components/CommsWindow';
 import {SDKLogTransport} from './lib/messages/sdkLogTransport';
 import {ILogger, LoggerFactory} from 'apl-client';
 import {FocusManager} from './lib/focus/FocusManager';
@@ -66,15 +72,13 @@ import {IWindowState} from './lib/config/visualCharacteristics/IWindowState';
 import {UWPWebViewClient} from './lib/messages/UWPClient';
 import {CaptionsView} from './components/CaptionsView';
 import {LocaleManager} from './lib/utils/localeManager';
+import {ContentType} from './lib/focus/ContentType';
 
 const HOST = 'localhost';
 const PORT = 8933;
 
-/// Maximum APL version supported by the runtime.
-const APL_MAX_VERSION = '1.7';
-
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.8';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.9';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
@@ -90,7 +94,11 @@ export interface IAppState {
     updateActiveAPLRendererWindow : boolean;
     captionsMessage : IRenderCaptionsMessage;
     doNotDisturbSettingEnabled : boolean;
+    renderCameraMessage : IRenderCameraMessage;
+    cameraState : CameraState;
     clearWindow : boolean;
+    videoCallingConfig : string;
+    commsParameters : ICommsParameters;
 }
 
 export class App extends React.Component<any, IAppState> {
@@ -147,10 +155,16 @@ export class App extends React.Component<any, IAppState> {
         const initRequestMessage : IInitRequest = message as IInitRequest;
         this.logger.debug(`message: ${JSON.stringify(initRequestMessage)}`);
         let smartScreenSDKVer = initRequestMessage.smartScreenSDKVersion;
-        this.logger.debug(`APL version: ${APL_MAX_VERSION} SDKVer: ${smartScreenSDKVer}`);
 
         const isSupported : boolean = (this.compareVersions(SMART_SCREEN_SDK_MIN_VERSION, smartScreenSDKVer) <= 0);
-        this.sendInitResponse(isSupported, APL_MAX_VERSION);
+        this.sendInitResponse(isSupported);
+    }
+
+    protected handleVideoCallingConfigMessage(message : IBaseInboundMessage) {
+        const videoCallingConfigMessage : IVideoCallingConfigMessage = message as IVideoCallingConfigMessage;
+        this.setState({
+            videoCallingConfig : videoCallingConfigMessage.videoCallingConfig
+        });
     }
 
     protected handleRenderCaptions(message : IBaseInboundMessage) {
@@ -191,6 +205,26 @@ export class App extends React.Component<any, IAppState> {
         const renderPlayerInfoMessage : IRenderPlayerInfoMessage = message as IRenderPlayerInfoMessage;
         this.setState({
             playerInfoMessage : renderPlayerInfoMessage
+        });
+    }
+
+    protected handleRenderCameraMessage(message : IBaseInboundMessage) {
+        const cameraMessage : IRenderCameraMessage = message as IRenderCameraMessage;
+        this.setState({
+            renderCameraMessage : cameraMessage
+        });
+    }
+
+    protected handleClearCameraMessage() {
+        this.setState({
+            renderCameraMessage : undefined
+        });
+    }
+
+    protected handleCameraStateChanged(message : IBaseInboundMessage) {
+        const cameraMessage : ICameraStateChangedMessage = message as ICameraStateChangedMessage;
+        this.setState({
+            cameraState : cameraMessage.cameraState
         });
     }
 
@@ -239,6 +273,15 @@ export class App extends React.Component<any, IAppState> {
         });
     }
 
+    protected handleDtmfTonesSentMessage(dtmfTonesSentMessage : IDtmfTonesSentMessage) {
+        this.setState({
+            commsParameters : {
+                dtmfTones : dtmfTonesSentMessage.dtmfTones,
+                dtmfUpdate : 1 - this.state.commsParameters.dtmfUpdate
+            }
+          });
+    }
+
     protected handleRequestAuthorization(requestAuthorizationMessage : IRequestAuthorizationMessage) {
         /**
          * Use to present CBL authorization.
@@ -284,7 +327,7 @@ export class App extends React.Component<any, IAppState> {
         const focusChanged : IOnFocusChangedMessage = message as IOnFocusChangedMessage;
         // Message received, notify C++ bridge, then process
         this.sendOnFocusChangedReceivedConfirmation(focusChanged.token);
-        this.focusManager.processFocusChanged(focusChanged.token, focusChanged.channelState);
+        this.focusManager.processFocusChanged(focusChanged.token, focusChanged.focusState);
     }
 
     protected handleGuiConfigurationMessage(message : IBaseInboundMessage) {
@@ -341,6 +384,10 @@ export class App extends React.Component<any, IAppState> {
                 this.handleInitRequest(message);
                 break;
             }
+            case 'videoCallingConfig': {
+                this.handleVideoCallingConfigMessage(message);
+                break;
+            }
             case 'guiConfiguration': {
                 this.handleGuiConfigurationMessage(message);
                 break;
@@ -357,8 +404,12 @@ export class App extends React.Component<any, IAppState> {
                 this.handleAlexaStateChangedMessage(message);
                 break;
             }
-             case 'callStateChange': {
+            case 'callStateChange': {
                 this.handleCallStateChangeMessage(message);
+                break;
+            }
+            case 'dtmfTonesSent': {
+                this.handleDtmfTonesSentMessage(message as IDtmfTonesSentMessage);
                 break;
             }
             case 'focusResponse': {
@@ -396,6 +447,18 @@ export class App extends React.Component<any, IAppState> {
             }
             case 'renderCaptions': {
                 this.handleRenderCaptions(message);
+                break;
+            }
+            case 'renderCamera': {
+                this.handleRenderCameraMessage(message as IRenderCameraMessage);
+                break;
+            }
+            case 'clearCamera': {
+                this.handleClearCameraMessage();
+                break;
+            }
+            case 'cameraStateChanged': {
+                this.handleCameraStateChanged(message as ICameraStateChangedMessage);
                 break;
             }
             case 'doNotDisturbSettingChanged': {
@@ -460,36 +523,46 @@ export class App extends React.Component<any, IAppState> {
             updateActiveAPLRendererWindow : false,
             targetWindowId : undefined,
             captionsMessage : undefined,
+            renderCameraMessage: undefined,
+            cameraState: CameraState.UNKNOWN,
             doNotDisturbSettingEnabled : undefined,
-            clearWindow: false
+            clearWindow: false,
+            videoCallingConfig: undefined,
+            commsParameters : {
+                dtmfTones : undefined,
+                dtmfUpdate : 0
+            }
         };
 
         this.eventListenersAdded = false;
     }
 
-    protected sendInitResponse(isSupported : boolean, APLMaxVersion : string) {
+    protected sendInitResponse(isSupported : boolean) {
         const message : IInitResponse = {
             type : 'initResponse',
-            isSupported,
-            APLMaxVersion
+            isSupported
         };
 
         this.client.sendMessage(message);
     }
 
-    protected sendFocusAcquireRequest(channelName : string, token : number) {
+    protected sendFocusAcquireRequest(
+        avsInterface : string, channelName : string, contentType : ContentType, token : number) {
         const message : IFocusAcquireRequestMessage = {
             type : 'focusAcquireRequest',
             token,
-            channelName
+            avsInterface,
+            channelName,
+            contentType
         };
         this.client.sendMessage(message);
     }
 
-    protected sendFocusReleaseRequest(channelName : string, token : number) {
+    protected sendFocusReleaseRequest(avsInterface : string, channelName : string, token : number) {
         const message : IFocusReleaseRequestMessage = {
             type : 'focusReleaseRequest',
             token,
+            avsInterface,
             channelName
         };
         this.client.sendMessage(message);
@@ -573,7 +646,7 @@ export class App extends React.Component<any, IAppState> {
             playerInfoMessage={this.state.playerInfoMessage}
             targetWindowId={this.state.targetWindowId}
             refreshRenderer={
-                this.state.targetWindowId === RENDER_PLAYER_INFO_WINDOW_ID &&
+                this.state.targetWindowId === this.deviceAppConfig.renderPlayerInfoWindowConfig.id &&
                 this.state.updateActiveAPLRendererWindow}
             windowConfig={this.deviceAppConfig.renderPlayerInfoWindowConfig}
             client={this.aplConnection}
@@ -582,10 +655,27 @@ export class App extends React.Component<any, IAppState> {
             aplCoreMessageHandlerCallback={this.setAPLCoreMessageHandler.bind(this)}
           />;
 
+        // LiveViewCameraWindow
+        const liveViewCameraWindow = <LiveViewCameraWindow
+            renderCameraMessage={this.state.renderCameraMessage}
+            cameraState={this.state.cameraState}
+            refreshRenderer={
+                this.state.targetWindowId === this.deviceAppConfig.liveViewUIWindowConfig.id &&
+                this.state.updateActiveAPLRendererWindow}
+            windowConfig={this.deviceAppConfig.liveViewUIWindowConfig}
+            client={this.aplConnection}
+            aplCoreMessageHandlerCallback={this.setAPLCoreMessageHandler.bind(this)}
+            focusManager={this.focusManager}
+            activityTracker={this.activityTracker}
+        />;
+
         // Comms Window
         const commsWindow = <CommsWindow
             callStateInfo = {this.state.callStateInfo}
             client={this.client}
+            locale={LocaleManager.getPrimaryLocale()}
+            videoCallingConfig={this.state.videoCallingConfig}
+            commsParameters={this.state.commsParameters}
             />;
 
         // Create APL Renderer Windows from GUI App Config
@@ -616,6 +706,7 @@ export class App extends React.Component<any, IAppState> {
                     deviceAppConfig={this.deviceAppConfig}
                 />
                 {playerInfo}
+                {liveViewCameraWindow}
                 {commsWindow}
                 {aplRendererWindows}
                 <VoiceChrome

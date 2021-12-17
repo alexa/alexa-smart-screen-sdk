@@ -82,11 +82,23 @@ const std::string GUI_MSG_TYPE_LOCALE_CHANGE("localeChange");
 /// The message type for DoNotDisturbStateChanged.
 const std::string GUI_MSG_TYPE_DND_SETTING_CHANGE("doNotDisturbSettingChanged");
 
+/// The message type for RenderCamera.
+const std::string GUI_MSG_TYPE_RENDER_CAMERA("renderCamera");
+
+/// The message type for ClearCamera.
+const std::string GUI_MSG_TYPE_CLEAR_CAMERA("clearCamera");
+
+/// The message type for CameraStateChanged.
+const std::string GUI_MSG_TYPE_CAMERA_STATE_CHANGED("cameraStateChanged");
+
 /// The doNotDisturbEnabled json key in the message.
 const std::string GUI_MSG_TYPE_DND_SETTING_TAG("doNotDisturbSettingEnabled");
 
 /// The SSSDK version key in the message.
 const std::string GUI_MSG_SMART_SCREEN_SDK_VERSION_TAG("smartScreenSDKVersion");
+
+/// The camera state string in the message.
+const std::string GUI_MSG_CAMERA_STATE_TAG("cameraState");
 
 /// The window json key in the message.
 const std::string GUI_MSG_WINDOW_ID_TAG("windowId");
@@ -94,8 +106,8 @@ const std::string GUI_MSG_WINDOW_ID_TAG("windowId");
 /// The result json key in the message.
 const std::string GUI_MSG_RESULT_TAG("result");
 
-/// The channelState json key in the message.
-const std::string GUI_MSG_CHANNEL_STATE_TAG("channelState");
+/// The focusState json key in the message.
+const std::string GUI_MSG_FOCUS_STATE_TAG("focusState");
 
 /// The auth url json key in the message.
 const std::string GUI_MSG_AUTH_URL_TAG("url");
@@ -117,6 +129,9 @@ const char GUI_MSG_AUDIO_PLAYER_STATE_TAG[] = "audioPlayerState";
 
 /// The audioOffset json key in the message.
 const char GUI_MSG_AUDIO_OFFSET_TAG[] = "audioOffset";
+
+/// The message type for videoCallingConfig.
+const std::string GUI_MSG_TYPE_VIDEO_CALLING_CONFIG("videoCallingConfig");
 
 /// The message type for callStateChange.
 const std::string GUI_MSG_TYPE_CALL_STATE_CHANGE("callStateChange");
@@ -154,8 +169,17 @@ const std::string GUI_MSG_OUTBOUND_RINGBACK_URL_TAG("outboundRingbackUrl");
 /// The isDropIn json key in the message.
 const std::string GUI_MSG_IS_DROP_IN_TAG("isDropIn");
 
+/// The message type for dtmfTonesSent.
+const std::string GUI_MSG_TYPE_DTMF_TONES_SENT("dtmfTonesSent");
+
+/// The dtmfTones json key in the message.
+const std::string GUI_MSG_DTMF_TONES_TAG("dtmfTones");
+
 /// The locales json key in the message.
 const std::string GUI_MSG_LOCALES_TAG("locales");
+
+/// The live view ui options json key in the message.
+const std::string GUI_MSG_LIVEVIEW_OPTIONS_TAG("liveViewControllerOptions");
 
 /**
  * The @c GUIClientMessage base class for @c Messages sent to GUI Client.
@@ -229,6 +253,22 @@ public:
 
 #ifdef ENABLE_COMMS
 /**
+ * The @c VideoCallingConfigMessage contains the video calling configurations.
+ */
+class VideoCallingConfigMessage : public GUIClientMessage {
+public:
+    /**
+     * Constructor.
+     *
+     * @param videoCallingConfigJsonString The videoCallingConfig string in commsConfig.json.
+     */
+    VideoCallingConfigMessage(std::string videoCallingConfigJsonString) :
+            GUIClientMessage(GUI_MSG_TYPE_VIDEO_CALLING_CONFIG) {
+        addMember(GUI_MSG_TYPE_VIDEO_CALLING_CONFIG, videoCallingConfigJsonString);
+    }
+};
+
+/**
  * The @c CallStateChangeMessage contains information for communicating call state info to the GUI Client.
  */
 class CallStateChangeMessage : public GUIClientMessage {
@@ -256,6 +296,18 @@ public:
         addMember(GUI_MSG_IS_DROP_IN_TAG, callStateInfo.isDropIn);
     }
 };
+
+class DtmfTonesSentMessage : public GUIClientMessage {
+public:
+    /**
+     * Constructor.
+     *
+     * @param dtmfTones The dtmf tones that have been sent
+     */
+    DtmfTonesSentMessage(const std::string& dtmfTones) : GUIClientMessage(GUI_MSG_TYPE_DTMF_TONES_SENT) {
+        addMember(GUI_MSG_DTMF_TONES_TAG, dtmfTones);
+    }
+};
 #endif
 
 /**
@@ -281,7 +333,7 @@ public:
 };
 
 /**
- * The @c FocusChangedMessage provides the GUI Client with Focus state changes on corresponding channel.
+ * The @c FocusChangedMessage provides the GUI Client with Focus state changes for the corresponding token.
  */
 class FocusChangedMessage : public GUIClientMessage {
 public:
@@ -289,12 +341,12 @@ public:
      * Constructor.
      *
      * @param token The requestor token.
-     * @param channelState The channel focus state.
+     * @param focusState The channel focus state.
      */
     FocusChangedMessage(unsigned token, alexaClientSDK::avsCommon::avs::FocusState focusState) :
             GUIClientMessage(GUI_MSG_TYPE_ON_FOCUS_CHANGED) {
         setToken(token);
-        addMember(GUI_MSG_CHANNEL_STATE_TAG, focusStateToString(focusState));
+        addMember(GUI_MSG_FOCUS_STATE_TAG, focusStateToString(focusState));
     }
 };
 
@@ -396,9 +448,11 @@ public:
     /**
      * Constructor.
      *
+     * @param token The token for for RenderTemplate.
      * @param jsonPayload The RenderTemplate payload.
      */
-    RenderTemplateMessage(std::string jsonPayload) : GUIClientMessage(GUI_MSG_TYPE_RENDER_TEMPLATE) {
+    RenderTemplateMessage(std::string token, std::string jsonPayload) : GUIClientMessage(GUI_MSG_TYPE_RENDER_TEMPLATE) {
+        addMember(MSG_TOKEN_TAG, token);
         setParsedPayload(jsonPayload);
     }
 };
@@ -413,12 +467,17 @@ public:
     /**
      * Constructor.
      *
+     * @param token The token for for RenderPlayerInfo.
      * @param jsonPayload The RenderPlayerInfo payload.
-     * @param audioPlayerInfo @c The smartScreenSDKInterfaces::AudioPlayerInfo object containing player state and offet
+     * @param audioPlayerInfo @c The smartScreenSDKInterfaces::AudioPlayerInfo object containing player state and offset
      * values.
      */
-    RenderPlayerInfoMessage(std::string jsonPayload, smartScreenSDKInterfaces::AudioPlayerInfo audioPlayerInfo) :
+    RenderPlayerInfoMessage(
+        std::string token,
+        std::string jsonPayload,
+        smartScreenSDKInterfaces::AudioPlayerInfo audioPlayerInfo) :
             GUIClientMessage(GUI_MSG_TYPE_RENDER_PLAYER_INFO) {
+        addMember(MSG_TOKEN_TAG, token);
         addMember(GUI_MSG_AUDIO_PLAYER_STATE_TAG, playerActivityToString(audioPlayerInfo.audioPlayerState));
         addMember(GUI_MSG_AUDIO_OFFSET_TAG, audioPlayerInfo.offset.count());
         setParsedPayload(jsonPayload);
@@ -481,6 +540,50 @@ class LocaleChangeMessage : public GUIClientMessage {
 public:
     explicit LocaleChangeMessage(const std::string& payload) : GUIClientMessage(GUI_MSG_TYPE_LOCALE_CHANGE) {
         setParsedPayload(payload, GUI_MSG_LOCALES_TAG);
+    }
+};
+
+/**
+ *  The @c RenderCameraMessage informs the GUI Client to render Camera UI.
+ */
+class RenderCameraMessage : public GUIClientMessage {
+public:
+    /**
+     * Constructor.
+     *
+     * @param payload The RenderCameraMessage payload.
+     * @param options @c The smartScreenSDKInterfaces::AudioPlayerInfo object containing player state and offet
+     * values.
+     */
+    explicit RenderCameraMessage(const std::string& payload, const std::string& options) :
+            GUIClientMessage(GUI_MSG_TYPE_RENDER_CAMERA) {
+        setParsedPayload(payload);
+        setParsedPayload(options, GUI_MSG_LIVEVIEW_OPTIONS_TAG);
+    }
+};
+
+/**
+ *  The @c ClearCameraMessage informs the GUI Client to clear Camera UI.
+ */
+class ClearCameraMessage : public GUIClientMessage {
+public:
+    explicit ClearCameraMessage() : GUIClientMessage(GUI_MSG_TYPE_CLEAR_CAMERA) {
+    }
+};
+
+/**
+ *  The @c CameraStateChangedMessage informs the GUI Client camera state changes.
+ */
+class CameraStateChangedMessage : public GUIClientMessage {
+public:
+    /**
+     * Constructor.
+     *
+     * @param cameraStateStr The camera state string
+     */
+    explicit CameraStateChangedMessage(const std::string& cameraStateStr) :
+            GUIClientMessage(GUI_MSG_TYPE_CAMERA_STATE_CHANGED) {
+        addMember(GUI_MSG_CAMERA_STATE_TAG, cameraStateStr);
     }
 };
 

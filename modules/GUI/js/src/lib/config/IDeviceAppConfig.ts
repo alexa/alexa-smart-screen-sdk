@@ -33,9 +33,6 @@ export enum AudioInputInitiator {
     WAKEWORD = 'WAKEWORD'
 }
 
-/** Uri for AplAudioPlayerExtension */
-export const AplAudioPlayerExtensionUri = 'aplext:audioplayer:10';
-
 /**
  * Type which designates the on-screeen position of the window.
  */
@@ -146,6 +143,8 @@ export interface IDeviceAppConfig extends IAppConfig {
     renderTemplateWindowId : string;
     /** Unique config for PlayerInfo APLRendererWindow */
     renderPlayerInfoWindowConfig : IAPLRendererWindowConfig;
+    /** Unique config LiveView UI APLRendererWindow */
+    liveViewUIWindowConfig : IAPLRendererWindowConfig;
     /** Z-Ordered array of configs for APLRendererWindows */
     rendererWindowConfigs : IAPLRendererWindowConfig[];
 }

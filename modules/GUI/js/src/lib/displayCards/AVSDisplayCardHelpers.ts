@@ -49,7 +49,7 @@ const RENDER_PLAYER_INFO_KEY : string = 'RenderPlayerInfo';
 export const resolveRenderTemplate =
     (message : IRenderTemplateMessage, windowId : string) : IRenderStaticDocumentMessage => {
     return createRenderStaticDocumentMessage(
-        message.payload.token,
+        message.token,
         windowId,
         AVSDisplayCards,
         message.payload,
@@ -72,7 +72,7 @@ export const resolveRenderPlayerInfo =
         mediaOffsetInMilliseconds: message.audioOffset
     };
     return createRenderStaticDocumentMessage(
-        RENDER_PLAYER_INFO_KEY,
+        message.token,
         windowId,
         AVSDisplayCards,
         payload,

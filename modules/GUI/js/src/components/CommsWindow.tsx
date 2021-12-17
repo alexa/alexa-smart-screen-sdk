@@ -19,13 +19,21 @@ import * as React from 'react';
 import './commsWindow.css';
 
 import {IClient} from '../lib/messages/client';
-import {ICallStateChangeMessage} from '../lib/messages/messages';
+import {ICallStateChangeMessage, LocaleType} from '../lib/messages/messages';
 
 export const RENDER_COMMS_WINDOW_ID = 'renderCommsWindow';
 
+export interface ICommsParameters {
+    dtmfTones : string | undefined;
+    dtmfUpdate : number;
+}
+
 interface ICommsWindowProps {
-        callStateInfo : ICallStateChangeMessage;
-        client : IClient;
+    callStateInfo : ICallStateChangeMessage;
+    client : IClient;
+    locale : LocaleType;
+    videoCallingConfig : string;
+    commsParameters : ICommsParameters;
 }
 
 export class CommsWindow extends React.Component<ICommsWindowProps> {

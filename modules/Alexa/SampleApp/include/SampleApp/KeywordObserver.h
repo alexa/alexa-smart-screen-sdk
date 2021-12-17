@@ -23,6 +23,8 @@
 #include <AVSCommon/SDKInterfaces/KeyWordObserverInterface.h>
 #include <SmartScreenClient/SmartScreenClient.h>
 
+#include <acsdkKWDImplementations/AbstractKeywordDetector.h>
+
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
@@ -31,6 +33,20 @@ namespace sampleApp {
  */
 class KeywordObserver : public alexaClientSDK::avsCommon::sdkInterfaces::KeyWordObserverInterface {
 public:
+    /**
+     * Creates a KeywordObserver and registers as an observer to a KeywordDetector.
+     *
+     * @param client The default SDK client.
+     * @param audioProvider The audio provider from which to stream audio data from.
+     * @param keywordDetector The @c AbstractKeywordDetector to self register to as an observer.
+     *
+     * @return a @c KeywordObserver.
+     */
+    static std::shared_ptr<KeywordObserver> create(
+        std::shared_ptr<smartScreenClient::SmartScreenClient> client,
+        alexaClientSDK::capabilityAgents::aip::AudioProvider audioProvider,
+        std::shared_ptr<alexaClientSDK::acsdkKWDImplementations::AbstractKeywordDetector> keywordDetector);
+
     /**
      * Constructor.
      *

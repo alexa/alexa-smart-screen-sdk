@@ -95,11 +95,14 @@ static const std::string MESSAGE_TYPE_SEND_DTMF("sendDtmf");
 /// The message type for toggling DoNotDisturb.
 static const std::string MESSAGE_TYPE_TOGGLE_DONOTDISTURB("toggleDoNotDisturb");
 
+/// The message type for enabling or disabling camera microphone.
+static const std::string MESSAGE_TYPE_SET_CAMERA_MICROPHONE_STATE("setCameraMicrophoneState");
+
+/// The message type for indicating camera first frame rendered.
+static const std::string MESSAGE_TYPE_CAMERA_FIRST_FRAME_RENDERED("cameraFirstFrameRendered");
+
 /// Key for isSupported.
 static const std::string IS_SUPPORTED_TAG("isSupported");
-
-/// Key for APL max version.
-static const std::string APL_MAX_VERSION_TAG("APLMaxVersion");
 
 /// The type json key in the message.
 static const std::string TYPE_TAG("type");
@@ -143,20 +146,8 @@ static const std::string INSTANCES_TAG("instances");
 /// The id json key in the message.
 static const std::string ID_TAG("id");
 
-/// Interface name to use for focus requests.
-static const std::string APL_INTERFACE("Alexa.Presentation.APL");
-
-/// Storage component name.
-static const std::string COMPONENT_NAME{"GUIClient"};
-
-/// Storage table name.
-static const std::string TABLE_NAME{"GUIClient"};
-
-/// Storage key name for APLMaxVersion entry.
-static const std::string APL_MAX_VERSION_DB_KEY{"APLMaxVersion"};
-
-/// Initial APL version to use at the first run and before any  GUI client is connected.
-static const std::string INITIAL_APL_MAX_VERSION{"1.7"};
+/// The state json key in the message.
+static const std::string ENABLED_TAG("enabled");
 
 /// The key in our config file to find the root of GUI configuration
 static const std::string GUI_CONFIGURATION_ROOT_KEY = "gui";
@@ -167,6 +158,9 @@ static const std::string VISUALCHARACTERISTICS_CONFIGURATION_ROOT_KEY = "visualC
 /// The key in our config file to find the root of app configuration
 static const std::string APPCONFIG_CONFIGURATION_ROOT_KEY = "appConfig";
 
+/// The key in our config file to find the optional live view controller ui configuration
+static const std::string LIVEVIEWCONTROLLEROPTIONS_CONFIGURATION_ROOT_KEY = "liveViewControllerOptions";
+
 /// The key in our config file to find the root of windows configuration
 static const std::string WINDOWS_CONFIGURATION_ROOT_KEY = "windows";
 
@@ -176,7 +170,26 @@ static const std::string WINDOW_ID_KEY{"id"};
 /// The for the supported extension from window configuration
 static const std::string SUPPORTED_EXTN_KEY{"supportedExtensions"};
 
+/// APL Window ID for PlayerInfo
 static const std::string RENDER_PLAYER_INFO_WINDOW_ID{"renderPlayerInfo"};
+
+/// APL Window ID for LiveView UI
+static const std::string LIVE_VIEW_UI_WINDOW_ID{"liveViewUI"};
+
+/// AVS interface json key
+static const std::string AVS_INTERFACE_KEY{"avsInterface"};
+
+/// Channel name json key
+static const std::string CHANNEL_NAME_KEY{"channelName"};
+
+/// Content type json key
+static const std::string CONTENT_TYPE_KEY{"contentType"};
+
+/// Mixable content type id
+static const std::string MIXABLE_CONTENT_TYPE_KEY{"MIXABLE"};
+
+/// Nonmixable content type id
+static const std::string NONMIXABLE_CONTENT_TYPE_KEY{"NONMIXABLE"};
 
 /// One second Autorelease timeout
 static const std::chrono::seconds AUTORELEASE_DURATION{1};
@@ -222,6 +235,11 @@ static const std::string FALLBACK_WINDOW_ID_MESSAGE{". Falling back to device de
 
 static const std::string DEFAULT_PARAM_VALUE = "{}";
 
+#ifdef ENABLE_COMMS
+/// Key for the video calling configuration root in the config file.
+static const std::string VIDEO_CALLING_CONFIGURATION_ROOT_KEY = "videoCallingConfig";
+#endif
+
 /// Mapping of DTMF enum to characters for Comms dial tones
 static const std::map<std::string, alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>
     DTMF_TONE_STRING_TO_ENUM_MAP = {
@@ -239,6 +257,36 @@ static const std::map<std::string, alexaClientSDK::avsCommon::sdkInterfaces::Cal
         {"#", alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_POUND},
 };
 
+std::string mapDTMFTonetype(alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone dtmfTone) {
+    switch (dtmfTone) {
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_ZERO:
+            return "0";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_ONE:
+            return "1";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_TWO:
+            return "2";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_THREE:
+            return "3";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_FOUR:
+            return "4";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_FIVE:
+            return "5";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_SIX:
+            return "6";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_SEVEN:
+            return "7";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_EIGHT:
+            return "8";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_NINE:
+            return "9";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_STAR:
+            return "*";
+        case alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone::DTMF_POUND:
+            return "#";
+    }
+    return "";
+}
+
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 namespace gui {
@@ -251,77 +299,6 @@ using namespace smartScreenSDKInterfaces;
 using namespace smartScreenCapabilityAgents::alexaPresentation;
 using namespace smartScreenCapabilityAgents::templateRuntime;
 
-/**
- * Save APLMaxVersion persistently.
- *
- * @param miscStorage - Storage interface which used to save.
- * @param APLMaxVersion - The value to save.
- * @return @c true for success. @c false otherwise.
- */
-static bool saveAPLMaxVersionInStorage(
-    const std::shared_ptr<MiscStorageInterface>& miscStorage,
-    const std::string& APLMaxVersion) {
-    if (!miscStorage->put(COMPONENT_NAME, TABLE_NAME, APL_MAX_VERSION_DB_KEY, APLMaxVersion)) {
-        ACSDK_ERROR(LX("saveAPLMaxVersionInStorage").m("Could not set new value"));
-        return false;
-    }
-
-    ACSDK_DEBUG1(LX("saveAPLMaxVersionInStorage").m("succeeded"));
-
-    return true;
-}
-
-/**
- * Open and initialize the storage interface.
- * @param miscStorage The storage handle.
- * @return @c true for success. @c false otherwise.
- */
-static bool openStorage(const std::shared_ptr<MiscStorageInterface>& miscStorage) {
-    if (!miscStorage->isOpened() && !miscStorage->open()) {
-        ACSDK_DEBUG3(LX("openStorage").m("Couldn't open misc database. Creating."));
-
-        if (!miscStorage->createDatabase()) {
-            ACSDK_ERROR(LX("openStorageFailed").m("Could not create misc database."));
-            return false;
-        }
-    }
-
-    bool guiClientTableExists = false;
-    if (!miscStorage->tableExists(COMPONENT_NAME, TABLE_NAME, &guiClientTableExists)) {
-        ACSDK_ERROR(LX("openStorageFailed").m("Could not get table information misc database."));
-        return false;
-    }
-
-    if (!guiClientTableExists) {
-        ACSDK_DEBUG3(LX("openStorage").d("table doesn't exist", TABLE_NAME));
-        if (!miscStorage->createTable(
-                COMPONENT_NAME,
-                TABLE_NAME,
-                MiscStorageInterface::KeyType::STRING_KEY,
-                MiscStorageInterface::ValueType::STRING_VALUE)) {
-            ACSDK_ERROR(LX("openStorageFailed")
-                            .d("reason", "Could not create table")
-                            .d("table", TABLE_NAME)
-                            .d("component", COMPONENT_NAME));
-            return false;
-        }
-        if (!saveAPLMaxVersionInStorage(miscStorage, INITIAL_APL_MAX_VERSION)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-static std::string getAPLMaxVersionFromStorage(const std::shared_ptr<MiscStorageInterface>& miscStorage) {
-    std::string APLMaxVersion;
-    if (!miscStorage->get(COMPONENT_NAME, TABLE_NAME, APL_MAX_VERSION_DB_KEY, &APLMaxVersion)) {
-        ACSDK_ERROR(LX("getAPLMaxVersionFromStorageFailed").d("reason", "storage failure"));
-    }
-    ACSDK_DEBUG3(LX(__func__).d("APLMaxVersion", APLMaxVersion));
-    return APLMaxVersion;
-}
-
 std::shared_ptr<GUIClient> GUIClient::create(
     std::shared_ptr<MessagingServerInterface> serverImplementation,
     const std::shared_ptr<MiscStorageInterface>& miscStorage,
@@ -330,29 +307,18 @@ std::shared_ptr<GUIClient> GUIClient::create(
         ACSDK_ERROR(LX("createFailed").d("reason", "nullServerImplementation"));
         return nullptr;
     }
-    if (!openStorage(miscStorage)) {
-        ACSDK_ERROR(LX("createFailed").d("reason", "nullMiscStorage"));
-        return nullptr;
-    }
 
     if (!customerDataManager) {
         ACSDK_ERROR(LX("createFailed").d("reason", "nullCustomerDataManager"));
         return nullptr;
     }
-    std::string APLMaxVersion = getAPLMaxVersionFromStorage(miscStorage);
-    if (APLMaxVersion.empty()) {
-        ACSDK_ERROR(LX("createFailed").d("reason", "couldn't find saved APLMaxVersion"));
-        return nullptr;
-    }
 
-    return std::shared_ptr<GUIClient>(
-        new GUIClient(serverImplementation, miscStorage, APLMaxVersion, customerDataManager));
+    return std::shared_ptr<GUIClient>(new GUIClient(serverImplementation, miscStorage, customerDataManager));
 }
 
 GUIClient::GUIClient(
     std::shared_ptr<MessagingServerInterface> serverImplementation,
     const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
-    const std::string& APLMaxVersion,
     const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> customerDataManager) :
         RequiresShutdown{"GUIClient"},
         CustomerDataHandler{customerDataManager},
@@ -360,9 +326,7 @@ GUIClient::GUIClient(
         m_hasServerStarted{false},
         m_initMessageReceived{false},
         m_errorState{false},
-        m_APLMaxVersion{APLMaxVersion},
         m_shouldRestart{false},
-        m_miscStorage{miscStorage},
         m_limitedInteraction{false},
         m_captionManager{SmartScreenCaptionStateManager(miscStorage)} {
     m_messageHandlers.emplace(
@@ -419,6 +383,15 @@ GUIClient::GUIClient(
         m_guiManager->handleToggleDoNotDisturbEvent();
     });
 
+#ifdef ENABLE_RTCSC
+    m_messageHandlers.emplace(MESSAGE_TYPE_SET_CAMERA_MICROPHONE_STATE, [this](rapidjson::Document& payload) {
+        executeSetCameraMicrophoneState(payload);
+    });
+    m_messageHandlers.emplace(MESSAGE_TYPE_CAMERA_FIRST_FRAME_RENDERED, [this](rapidjson::Document& payload) {
+        executeCameraFirstFrameRendered();
+    });
+#endif
+
     initGuiConfigs();
 }
 
@@ -430,7 +403,6 @@ void GUIClient::doShutdown() {
     m_aplClientBridge.reset();
     m_messageListener.reset();
     m_observer.reset();
-    m_miscStorage.reset();
     m_serverImplementation.reset();
 
     std::lock_guard<std::mutex> lock{m_mapMutex};
@@ -450,32 +422,40 @@ void GUIClient::setGUIManager(
     });
 }
 
-void GUIClient::setAplClientBridge(std::shared_ptr<AplClientBridge> aplClientBridge) {
+void GUIClient::setAplClientBridge(std::shared_ptr<AplClientBridge> aplClientBridge, bool aplVersionChanged) {
     ACSDK_DEBUG3(LX(__func__));
-    m_executor.submit([this, aplClientBridge]() {
+    m_executor.submit([this, aplClientBridge, aplVersionChanged]() {
         m_aplClientBridge = aplClientBridge;
+        if (aplVersionChanged) {
+            m_shouldRestart = true;
+        }
         initializeAllRenderers();
     });
 }
 
 bool GUIClient::acquireFocus(
+    std::string avsInterface,
     std::string channelName,
+    alexaClientSDK::avsCommon::avs::ContentType contentType,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
     ACSDK_DEBUG5(LX(__func__));
 
     return m_executor
-        .submit([this, channelName, channelObserver]() {
-            return executeAcquireFocus(channelName, channelObserver, APL_INTERFACE);
+        .submit([this, avsInterface, channelName, contentType, channelObserver]() {
+            return executeAcquireFocus(avsInterface, channelName, contentType, channelObserver);
         })
         .get();
 }
 
 bool GUIClient::releaseFocus(
+    std::string avsInterface,
     std::string channelName,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
     ACSDK_DEBUG5(LX(__func__));
     return m_executor
-        .submit([this, channelName, channelObserver]() { return executeReleaseFocus(channelName, channelObserver); })
+        .submit([this, avsInterface, channelName, channelObserver]() {
+            return executeReleaseFocus(avsInterface, channelName, channelObserver);
+        })
         .get();
 }
 
@@ -485,19 +465,27 @@ void GUIClient::sendCallStateInfo(
     ACSDK_DEBUG5(LX(__func__));
     m_executor.submit([this, callStateInfo]() { executeSendCallStateInfo(callStateInfo); });
 }
+
+void GUIClient::notifyDtmfTonesSent(
+    const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>& dtmfTones) {
+    ACSDK_DEBUG5(LX(__func__));
+    m_executor.submit([this, dtmfTones]() { executeNotifyDtmfTonesSent(dtmfTones); });
+}
 #endif
 
 bool GUIClient::executeAcquireFocus(
+    std::string avsInterface,
     std::string channelName,
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
-    std::string avsInterface) {
-    return m_guiManager->handleFocusAcquireRequest(channelName, channelObserver, avsInterface);
+    alexaClientSDK::avsCommon::avs::ContentType contentType,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
+    return m_guiManager->handleFocusAcquireRequest(avsInterface, channelName, contentType, channelObserver);
 }
 
 bool GUIClient::executeReleaseFocus(
+    std::string avsInterface,
     std::string channelName,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
-    return m_guiManager->handleFocusReleaseRequest(channelName, channelObserver);
+    return m_guiManager->handleFocusReleaseRequest(avsInterface, channelName, channelObserver);
 }
 
 bool GUIClient::isReady() {
@@ -640,6 +628,32 @@ void GUIClient::executeHandleDisableLocalVideo(rapidjson::Document& message) {
     m_guiManager->disableLocalVideo();
 }
 
+#ifdef ENABLE_RTCSC
+void GUIClient::executeSetCameraMicrophoneState(rapidjson::Document& message) {
+    ACSDK_DEBUG5(LX(__func__));
+
+    if (!message.HasMember(ENABLED_TAG)) {
+        ACSDK_ERROR(LX("setCameraMicrophoneStateFailed").d("reason", "json payload does not contain enabled"));
+        return;
+    }
+
+    if (!message[ENABLED_TAG].IsBool()) {
+        ACSDK_ERROR(LX("setCameraMicrophoneStateFailed").d("reason", "enabled is not boolean"));
+        return;
+    }
+
+    bool state{message[ENABLED_TAG].GetBool()};
+    m_guiManager->handleSetCameraMicrophoneState(state);
+}
+
+void GUIClient::executeCameraFirstFrameRendered() {
+    ACSDK_DEBUG5(LX(__func__));
+    if (m_aplLiveViewExtension) {
+        m_aplLiveViewExtension->onCameraFirstFrameRendered();
+    }
+}
+#endif
+
 void GUIClient::executeHandleSendDtmf(rapidjson::Document& message) {
     std::string dtmfString;
     if (!jsonUtils::retrieveValue(message, DTMF_TONE_TAG, &dtmfString)) {
@@ -658,20 +672,40 @@ void GUIClient::executeHandleSendDtmf(rapidjson::Document& message) {
 }
 
 void GUIClient::executeHandleFocusAcquireRequest(rapidjson::Document& message) {
-    ACSDK_CRITICAL(LX("handleFocusAcquireRequest"));
-    APLToken token = 0;
+    ACSDK_CRITICAL(LX(__func__));
+    std::string avsInterface;
+    if (!jsonUtils::retrieveValue(message, AVS_INTERFACE_KEY, &avsInterface)) {
+        ACSDK_ERROR(LX("handleFocusAcquireRequestFailed").d("reason", "avsInterfaceNotFound"));
+        return;
+    }
+
+    GUIToken token = 0;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleFocusAcquireRequestFailed").d("reason", "tokenNotFound"));
         return;
     }
 
     std::string channelName;
-    if (!jsonUtils::retrieveValue(message, "channelName", &channelName)) {
+    if (!jsonUtils::retrieveValue(message, CHANNEL_NAME_KEY, &channelName)) {
         ACSDK_ERROR(LX("handleFocusAcquireRequestFailed").d("reason", "channelNameNotFound"));
         return;
     }
 
-    executeProcessFocusAcquireRequest(token, channelName, APL_INTERFACE);
+    alexaClientSDK::avsCommon::avs::ContentType contentType = alexaClientSDK::avsCommon::avs::ContentType::UNDEFINED;
+    std::string contentTypeStr;
+    if (!jsonUtils::retrieveValue(message, CONTENT_TYPE_KEY, &contentTypeStr)) {
+        ACSDK_WARN(LX(__func__).d("reason", "contentTypeUndefined"));
+    } else {
+        if (contentTypeStr == MIXABLE_CONTENT_TYPE_KEY) {
+            contentType = alexaClientSDK::avsCommon::avs::ContentType::MIXABLE;
+        } else if (contentTypeStr == NONMIXABLE_CONTENT_TYPE_KEY) {
+            contentType = alexaClientSDK::avsCommon::avs::ContentType::NONMIXABLE;
+        } else {
+            ACSDK_WARN(LX(__func__).d("reason", "contentTypeInvalid").d("contentType", contentTypeStr));
+        }
+    }
+
+    executeFocusAcquireRequest(token, avsInterface, channelName, contentType);
 }
 
 void GUIClient::executeHandleLogEvent(rapidjson::Document& message) {
@@ -696,23 +730,18 @@ void GUIClient::executeHandleLogEvent(rapidjson::Document& message) {
     m_rendererLogBridge.log(level, component, logMessage);
 }
 
-void GUIClient::executeProcessFocusAcquireRequest(
-    const APLToken token,
-    const std::string& channelName,
-    const std::string& avsInterface) {
-    executeFocusAcquireRequest(token, channelName, avsInterface);
-}
-
 void GUIClient::executeFocusAcquireRequest(
-    const APLToken token,
+    const GUIToken token,
+    const std::string& avsInterface,
     const std::string& channelName,
-    const std::string& avsInterface) {
+    alexaClientSDK::avsCommon::avs::ContentType contentType) {
     bool result = true;
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> focusObserver;
     {
         std::lock_guard<std::mutex> lock{m_mapMutex};
         if (m_focusObservers.count(token) == 0) {
-            m_focusObservers[token] = std::make_shared<ProxyFocusObserver>(token, shared_from_this(), channelName);
+            m_focusObservers[token] =
+                std::make_shared<ProxyFocusObserver>(avsInterface, token, shared_from_this(), channelName);
             focusObserver = m_focusObservers[token];
         } else {
             result = false;
@@ -725,7 +754,7 @@ void GUIClient::executeFocusAcquireRequest(
         return;
     }
 
-    result = executeAcquireFocus(channelName, focusObserver, avsInterface);
+    result = executeAcquireFocus(avsInterface, channelName, contentType, focusObserver);
     if (!result) {
         ACSDK_ERROR(
             LX("executeFocusAcquireRequestFail").d("token", token).d("reason", "acquireChannel returned false"));
@@ -737,22 +766,31 @@ void GUIClient::executeFocusAcquireRequest(
 }
 
 void GUIClient::executeHandleFocusReleaseRequest(rapidjson::Document& message) {
-    APLToken token = 0;
+    std::string avsInterface;
+    if (!jsonUtils::retrieveValue(message, AVS_INTERFACE_KEY, &avsInterface)) {
+        ACSDK_ERROR(LX("handleFocusReleaseRequestFailed").d("reason", "avsInterfaceNotFound"));
+        return;
+    }
+
+    GUIToken token = 0;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleFocusReleaseRequestFailed").d("reason", "tokenNotFound"));
         return;
     }
 
     std::string channelName;
-    if (!jsonUtils::retrieveValue(message, "channelName", &channelName)) {
+    if (!jsonUtils::retrieveValue(message, CHANNEL_NAME_KEY, &channelName)) {
         ACSDK_ERROR(LX("handleFocusReleaseRequestFailed").d("reason", "channelNameNotFound"));
         return;
     }
 
-    executeFocusReleaseRequest(token, channelName);
+    executeFocusReleaseRequest(token, avsInterface, channelName);
 }
 
-void GUIClient::executeFocusReleaseRequest(const APLToken token, const std::string& channelName) {
+void GUIClient::executeFocusReleaseRequest(
+    const GUIToken token,
+    const std::string& avsInterface,
+    const std::string& channelName) {
     bool result = true;
 
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> focusObserver;
@@ -772,7 +810,7 @@ void GUIClient::executeFocusReleaseRequest(const APLToken token, const std::stri
         return;
     }
 
-    result = executeReleaseFocus(channelName, focusObserver);
+    result = executeReleaseFocus(avsInterface, channelName, focusObserver);
     if (!result) {
         ACSDK_ERROR(
             LX("executeFocusReleaseRequestFail").d("token", token).d("reason", "releaseChannel returned false"));
@@ -782,13 +820,13 @@ void GUIClient::executeFocusReleaseRequest(const APLToken token, const std::stri
     executeSendFocusResponse(token, true);
 }
 
-void GUIClient::executeSendFocusResponse(const APLToken token, const bool result) {
+void GUIClient::executeSendFocusResponse(const GUIToken token, const bool result) {
     auto message = messages::FocusResponseMessage(token, result);
     sendMessage(message);
 }
 
 void GUIClient::executeHandleOnFocusChangedReceivedConfirmation(rapidjson::Document& message) {
-    APLToken token = 0;
+    GUIToken token = 0;
     if (!jsonUtils::retrieveValue(message, TOKEN_TAG, &token)) {
         ACSDK_ERROR(LX("handleOnFocusChangedReceivedConfirmationFailed").d("reason", "tokenNotFound"));
         return;
@@ -1017,9 +1055,10 @@ void GUIClient::onConnectionClosed() {
 }
 
 void GUIClient::renderTemplateCard(
+    const std::string& token,
     const std::string& jsonPayload,
     alexaClientSDK::avsCommon::avs::FocusState focusState) {
-    auto message = messages::RenderTemplateMessage(jsonPayload);
+    auto message = messages::RenderTemplateMessage(token, jsonPayload);
     sendMessage(message);
 }
 
@@ -1047,27 +1086,22 @@ void GUIClient::renderDocument(const std::string& jsonPayload, const std::string
     });
 }
 
-void GUIClient::clearDocument(const std::string& token, const bool focusCleared) {
-    ACSDK_DEBUG5(LX("clearDocument"));
+void GUIClient::clearDocument(const std::string& token) {
+    ACSDK_DEBUG5(LX(__func__).d("token", token));
     m_executor.submit([this, token]() { m_aplClientBridge->clearDocument(token); });
 }
 
 void GUIClient::clearData() {
     ACSDK_DEBUG5(LX(__func__));
-    if (!m_miscStorage->clearTable(COMPONENT_NAME, TABLE_NAME)) {
-        ACSDK_ERROR(LX("clearTableFailed").d("reason", "unable to clear the table from the database"));
-    }
-    if (!m_miscStorage->deleteTable(COMPONENT_NAME, TABLE_NAME)) {
-        ACSDK_ERROR(LX("deleteTableFailed").d("reason", "unable to delete the table from the database"));
-    }
 }
 
 void GUIClient::renderPlayerInfoCard(
+    const std::string& token,
     const std::string& jsonPayload,
     smartScreenSDKInterfaces::AudioPlayerInfo info,
     alexaClientSDK::avsCommon::avs::FocusState focusState,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) {
-    auto message = messages::RenderPlayerInfoMessage(jsonPayload, info);
+    auto message = messages::RenderPlayerInfoMessage(token, jsonPayload, info);
     sendMessage(message);
 }
 
@@ -1101,14 +1135,34 @@ bool GUIClient::handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfa
     return false;
 }
 
-std::string GUIClient::getMaxAPLVersion() {
-    return m_APLMaxVersion;
+void GUIClient::handleASRProfileChanged(alexaClientSDK::capabilityAgents::aip::ASRProfile asrProfile) {
+#ifdef ENABLE_RTCSC
+    if (m_aplLiveViewExtension) {
+        m_executor.submit(
+            [this, asrProfile]() { m_aplLiveViewExtension->setAsrProfile(asrProfileToString(asrProfile)); });
+    }
+#endif
 }
+
+#ifdef ENABLE_RTCSC
+void GUIClient::handleCameraMicrophoneStateChanged(bool enabled) {
+    if (m_aplLiveViewExtension) {
+        m_aplLiveViewExtension->setCameraMicrophoneState(enabled);
+    }
+}
+
+void GUIClient::handleChangeCameraMicStateRequest(bool enabled) {
+    m_executor.submit([this, enabled]() { m_guiManager->handleSetCameraMicrophoneState(enabled); });
+}
+
+void GUIClient::handleCameraExitRequest() {
+    m_executor.submit([this]() { m_guiManager->handleClearLiveView(); });
+}
+#endif
 
 void GUIClient::onLogout() {
     m_shouldRestart = true;
     m_cond.notify_all();
-    clearData();
 }
 
 SampleAppReturnCode GUIClient::run() {
@@ -1156,6 +1210,10 @@ void GUIClient::initGuiConfigs() {
 
     /// Get the ConfigurationNode contains appConfig.
     m_guiAppConfig = configurationGui[APPCONFIG_CONFIGURATION_ROOT_KEY];
+
+#ifdef ENABLE_RTCSC
+    m_liveViewControllerOptionsConfig = configurationGui[LIVEVIEWCONTROLLEROPTIONS_CONFIGURATION_ROOT_KEY];
+#endif
 }
 
 void GUIClient::executeSendGuiConfiguration() {
@@ -1173,6 +1231,10 @@ void GUIClient::executeSendGuiConfiguration() {
 
     writeMessage(payloadWithHeader);
 #endif
+
+#ifdef ENABLE_COMMS
+    executeSendVideoCallingConfig();
+#endif
 }
 
 #ifdef ENABLE_COMMS
@@ -1181,6 +1243,31 @@ void GUIClient::executeSendCallStateInfo(
     auto message = messages::CallStateChangeMessage(callStateInfo);
     sendMessage(message);
 }
+
+void GUIClient::executeSendVideoCallingConfig() {
+    /// Get the root ConfigurationNode.
+    auto configurationRoot = alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode::getRoot();
+    if (configurationRoot) {
+        /// Get videoCallingConfig node
+        auto videoCallingConfigRoot = configurationRoot[VIDEO_CALLING_CONFIGURATION_ROOT_KEY];
+        if (videoCallingConfigRoot) {
+            auto message = messages::VideoCallingConfigMessage(videoCallingConfigRoot.serialize());
+            sendMessage(message);
+        }
+    }
+}
+
+void GUIClient::executeNotifyDtmfTonesSent(
+    const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>& dtmfTones) {
+    std::string dtmfTonesString;
+    auto it = dtmfTones.begin();
+    for (; it != dtmfTones.end(); it++) {
+        dtmfTonesString.append(mapDTMFTonetype(*it));
+    }
+    auto message = messages::DtmfTonesSentMessage(dtmfTonesString);
+    sendMessage(message);
+}
+
 #endif
 
 bool GUIClient::executeProcessInitResponse(const rapidjson::Document& message) {
@@ -1192,35 +1279,16 @@ bool GUIClient::executeProcessInitResponse(const rapidjson::Document& message) {
         return false;
     }
 
-    std::string newAPLMaxVersion;
-    if (!jsonUtils::retrieveValue(message, APL_MAX_VERSION_TAG, &newAPLMaxVersion)) {
-        ACSDK_ERROR(LX("processInitResponseFailed").d("reason", "APLVersionNotFound"));
-        m_errorState = true;
-
-        return false;
-    }
-
     if (!isSupported) {
         ACSDK_ERROR(LX("processInitResponseFailed")
                         .d("reason", "Not Supported SDK")
-                        .d("SDKVersion", alexaClientSDK::avsCommon::utils::sdkVersion::getCurrentVersion())
-                        .d("APL Version", m_APLMaxVersion));
+                        .d("SDKVersion", alexaClientSDK::avsCommon::utils::sdkVersion::getCurrentVersion()));
 
         // Don't get into error state, so GUI client can connect with supported version.
         return false;
     }
 
     m_initMessageReceived = true;
-    if (newAPLMaxVersion != m_APLMaxVersion) {
-        ACSDK_DEBUG1(
-            LX("executeProcessInitResponse").d("old maxAPL", m_APLMaxVersion).d("new max APL", newAPLMaxVersion));
-        saveAPLMaxVersionInStorage(m_miscStorage, newAPLMaxVersion);
-
-        // Restart in order to call Capabilities API with the new APLMAxVersion
-        m_shouldRestart = true;
-    }
-
-    ACSDK_INFO(LX("executeProcessInitResponse").d("APL Max Version", m_APLMaxVersion));
     m_cond.notify_all();
     if (m_initThread.joinable()) {
         m_initThread.join();
@@ -1246,22 +1314,29 @@ void GUIClient::onCapabilitiesStateChange(
 }
 
 GUIClient::ProxyFocusObserver::ProxyFocusObserver(
-    const APLToken token,
+    std::string avsInterface,
+    const GUIToken token,
     std::shared_ptr<GUIClient> guiClient,
-    const std::string& channelName) :
-        m_token{token}, m_focusBridge{guiClient}, m_channelName{channelName} {
+    std::string channelName) :
+        m_avsInterface{std::move(avsInterface)},
+        m_token{token},
+        m_focusBridge{std::move(guiClient)},
+        m_channelName{std::move(channelName)} {
 }
 
 void GUIClient::ProxyFocusObserver::onFocusChanged(
     alexaClientSDK::avsCommon::avs::FocusState newFocus,
     alexaClientSDK::avsCommon::avs::MixingBehavior behavior) {
     if (newFocus != alexaClientSDK::avsCommon::avs::FocusState::NONE) {
-        m_focusBridge->startAutoreleaseTimer(m_token, m_channelName);
+        m_focusBridge->startAutoreleaseTimer(m_avsInterface, m_token, m_channelName);
     }
     m_focusBridge->sendOnFocusChanged(m_token, newFocus);
 }
 
-void GUIClient::startAutoreleaseTimer(const APLToken token, const std::string& channelName) {
+void GUIClient::startAutoreleaseTimer(
+    const std::string& avsInterface,
+    const GUIToken token,
+    const std::string& channelName) {
     std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::Timer> timer =
         std::make_shared<alexaClientSDK::avsCommon::utils::timing::Timer>();
     {
@@ -1269,12 +1344,14 @@ void GUIClient::startAutoreleaseTimer(const APLToken token, const std::string& c
         m_autoReleaseTimers[token] = timer;
     }
 
-    timer->start(AUTORELEASE_DURATION, [this, token, channelName] { autoRelease(token, channelName); });
+    timer->start(AUTORELEASE_DURATION, [this, avsInterface, token, channelName] {
+        autoRelease(avsInterface, token, channelName);
+    });
 }
 
-void GUIClient::autoRelease(const APLToken token, const std::string& channelName) {
+void GUIClient::autoRelease(const std::string& avsInterface, const GUIToken token, const std::string& channelName) {
     ACSDK_DEBUG5(LX("autoRelease").d("token", token).d("channelName", channelName));
-    m_executor.submit([this, token, channelName]() {
+    m_executor.submit([this, avsInterface, token, channelName]() {
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> focusObserver;
         std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::Timer> autoReleaseTimer;
         {
@@ -1285,11 +1362,11 @@ void GUIClient::autoRelease(const APLToken token, const std::string& channelName
                 return;
             }
         }
-        m_guiManager->handleFocusReleaseRequest(channelName, focusObserver);
+        m_guiManager->handleFocusReleaseRequest(avsInterface, channelName, focusObserver);
     });
 }
 
-void GUIClient::sendOnFocusChanged(const APLToken token, const alexaClientSDK::avsCommon::avs::FocusState state) {
+void GUIClient::sendOnFocusChanged(const GUIToken token, const alexaClientSDK::avsCommon::avs::FocusState state) {
     auto message = messages::FocusChangedMessage(token, state);
     sendMessage(message);
 
@@ -1382,7 +1459,14 @@ void GUIClient::initializeAllRenderers() {
         }
     };
 
+    // Create PlayerInfo APL Renderer
     m_aplClientBridge->initializeRenderer(RENDER_PLAYER_INFO_WINDOW_ID, {APLClient::Extensions::AudioPlayer::URI});
+
+#ifdef ENABLE_RTCSC
+    // Init LiveView extension and create renderer instance that uses it
+    m_aplLiveViewExtension = std::make_shared<Extensions::LiveView::AplLiveViewExtension>(shared_from_this());
+    m_aplClientBridge->initializeRenderer(LIVE_VIEW_UI_WINDOW_ID, {m_aplLiveViewExtension});
+#endif
 }
 
 void GUIClient::reportInvalidWindowIdRuntimeError(const std::string& errorMessage, const std::string& aplToken) {
@@ -1408,6 +1492,46 @@ void GUIClient::reportInvalidWindowIdRuntimeError(const std::string& errorMessag
     m_guiManager->handleRuntimeErrorEvent(aplToken, sb.GetString());
     ACSDK_WARN(LX("reportInvalidWindowIdRuntimeError").d("reported runtime error", std::string(sb.GetString())));
 }
+
+#ifdef ENABLE_RTCSC
+void GUIClient::renderCamera(
+    const std::string& payload,
+    smartScreenSDKInterfaces::AudioState microphoneAudioState,
+    smartScreenSDKInterfaces::ConcurrentTwoWayTalk concurrentTwoWayTalk) {
+    std::string liveViewControllerOptions;
+    if (m_liveViewControllerOptionsConfig) {
+        liveViewControllerOptions = m_liveViewControllerOptionsConfig.serialize();
+    }
+    auto message = messages::RenderCameraMessage(payload, liveViewControllerOptions);
+    sendMessage(message);
+}
+
+void GUIClient::onCameraStateChanged(smartScreenSDKInterfaces::CameraState cameraState) {
+    auto cameraStateStr = smartScreenSDKInterfaces::cameraStateToString(cameraState);
+    auto message = messages::CameraStateChangedMessage(cameraStateStr);
+    sendMessage(message);
+
+    if (m_aplLiveViewExtension) {
+        m_executor.submit([this, cameraStateStr]() { m_aplLiveViewExtension->setCameraState(cameraStateStr); });
+    }
+}
+
+void GUIClient::onFirstFrameRendered() {
+    m_executor.submit([this]() { executeCameraFirstFrameRendered(); });
+}
+
+void GUIClient::clearCamera() {
+    auto message = messages::ClearCameraMessage();
+    sendMessage(message);
+
+    if (m_aplLiveViewExtension) {
+        m_executor.submit([this]() {
+            m_aplLiveViewExtension->onCameraCleared();
+            m_aplClientBridge->clearDocument(LIVE_VIEW_UI_WINDOW_ID);
+        });
+    }
+}
+#endif
 
 }  // namespace gui
 }  // namespace sampleApp

@@ -14,6 +14,8 @@
  */
 'use strict';
 
+import {ContentType} from './ContentType';
+
 /**
  * Binding interface for JS Shim in AVS SDK.
  *
@@ -21,6 +23,6 @@
  * @interface IFocusBridge
  */
 export interface IFocusBridge {
-    acquireFocus(channelName : string, token : number) : void;
-    releaseFocus(channelName : string, token : number) : void;
+    acquireFocus(avsInterface : string, channelName : string, contentType : ContentType, token : number) : void;
+    releaseFocus(avsInterface : string, channelName : string, token : number) : void;
 }

@@ -20,6 +20,10 @@
 #include <memory>
 #include <vector>
 
+#ifdef ENABLE_PKCS11
+#include <acsdkCryptoInterfaces/CryptoFactoryInterface.h>
+#include <acsdkCryptoInterfaces/KeyStoreInterface.h>
+#endif
 #include <acsdkManufactory/Component.h>
 #include <AVSCommon/SDKInterfaces/AuthDelegateInterface.h>
 #include <AVSCommon/SDKInterfaces/ContextManagerInterface.h>
@@ -47,6 +51,10 @@ using SampleApplicationComponent = alexaClientSDK::acsdkManufactory::Component<
     std::shared_ptr<alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode>,
     std::shared_ptr<alexaClientSDK::avsCommon::utils::DeviceInfo>,
     std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface>,
+#ifdef ENABLE_PKCS11
+    std::shared_ptr<alexaClientSDK::acsdkCryptoInterfaces::CryptoFactoryInterface>,
+    std::shared_ptr<alexaClientSDK::acsdkCryptoInterfaces::KeyStoreInterface>,
+#endif
     std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface>>;
 
 using SampleApplicationOptionsComponent = alexaClientSDK::acsdkManufactory::Component<

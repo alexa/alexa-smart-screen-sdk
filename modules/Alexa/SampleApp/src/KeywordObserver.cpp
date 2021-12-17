@@ -33,6 +33,18 @@ static const std::string TAG("KeywordObserver");
 
 using namespace alexaClientSDK;
 
+std::shared_ptr<KeywordObserver> KeywordObserver::create(
+    std::shared_ptr<smartScreenClient::SmartScreenClient> client,
+    capabilityAgents::aip::AudioProvider audioProvider,
+    std::shared_ptr<alexaClientSDK::acsdkKWDImplementations::AbstractKeywordDetector> keywordDetector) {
+    auto keywordObserver = std::make_shared<KeywordObserver>(client, audioProvider);
+    if (keywordDetector) {
+        keywordDetector->addKeyWordObserver(keywordObserver);
+    }
+
+    return keywordObserver;
+}
+
 KeywordObserver::KeywordObserver(
     std::shared_ptr<smartScreenClient::SmartScreenClient> client,
     capabilityAgents::aip::AudioProvider audioProvider) :

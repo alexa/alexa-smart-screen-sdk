@@ -18,15 +18,35 @@ target_include_directories(SmartScreenClient PUBLIC
     "${ASDK_INCLUDE_DIRS}"
     "${SQLITE_INCLUDE_DIRS}")
 
+if (RTCSC)
+    target_include_directories(SmartScreenClient PUBLIC "${LiveViewControllerCapabilityAgent_SOURCE_DIR}/include")
+endif()
+
 if(BLUETOOTH_BLUEZ)
     target_link_libraries(SmartScreenClient
         BluetoothImplementationsBlueZ)
 endif()
 
-target_link_libraries(SmartScreenClient SmartScreenTemplateRunTime "${ASDK_LDFLAGS}" AlexaPresentation VisualCharacteristics)
+target_link_libraries(SmartScreenClient
+    SmartScreenTemplateRunTime
+    "${ASDK_LDFLAGS}"
+    AlexaPresentation
+    VisualCharacteristics
+    "${CURL_LIBRARIES}"
+    "${SQLITE_LDFLAGS}"
+    "${CRYPTO_LDFLAGS}"
+    "${GST_LDFLAGS}")
+
+if (RTCSC)
+    target_link_libraries(SmartScreenClient LiveViewControllerCapabilityAgent RtcscCapabilityAgent)
+endif()
 
 if (COMMS)
-    target_link_libraries(SmartScreenClient CallManager)
+    if (NOT MSVC)
+        target_link_libraries(SmartScreenClient CallManager)
+    else()
+        target_link_libraries(SmartScreenClient "${ASDK_LIB_DIR}/CallManager.lib")
+    endif()
 endif()
 
 if (CAPTIONS)

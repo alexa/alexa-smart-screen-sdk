@@ -28,8 +28,7 @@ import {
     IDeviceAppConfig,
     AudioInputInitiator,
     IGuiConfig,
-    IAPLRendererWindowConfig,
-    AplAudioPlayerExtensionUri
+    IAPLRendererWindowConfig
 } from './IDeviceAppConfig';
 import { IInteractionMode } from './visualCharacteristics/IInteractionMode';
 import { IVisualCharacteristics } from './visualCharacteristics/IVisualCharacteristics';
@@ -66,6 +65,18 @@ const InteractionModesKey : string = 'interactionModes';
 const TemplatesKey : string = 'templates';
 const DisplayKey : string = 'display';
 const VideoKey : string = 'video';
+
+/** APL Window ID for PlayerInfo */
+const RENDER_PLAYER_INFO_WINDOW_ID = 'renderPlayerInfo';
+
+/** APL Window ID for LiveView UI */
+const LIVE_VIEW_UI_WINDOW_ID = 'liveViewUI';
+
+/** Uri for AplAudioPlayerExtension */
+const AplAudioPlayerExtensionUri = 'aplext:audioplayer:10';
+
+/** Uri for AplLiveViewExtension */
+const AplLiveViewExtensionUri = 'aplext:liveview:10';
 
 /**
  * Resolves GUI app configuration into IDeviceAppConfig.
@@ -183,6 +194,20 @@ const extractVideo = (visualCharacteristicsNode : any) : IVideo => {
     }
 };
 
+const createRendererWindowConfigCopy = (sourceConfig : IAPLRendererWindowConfig,
+                                        windowId : string,
+                                        additionalExtensions : string[]) : IAPLRendererWindowConfig => {
+    const configCopy : IAPLRendererWindowConfig = JSON.parse(JSON.stringify(sourceConfig)) as IAPLRendererWindowConfig;
+    configCopy.id = windowId;
+    const supportedExtensions = configCopy.supportedExtensions || [];
+    for (let extension of additionalExtensions) {
+        if (!supportedExtensions.includes(extension)) {
+            supportedExtensions.push(extension);
+        }
+    }
+    return configCopy;
+};
+
 const createDeviceAppConfig = (
     guiConfig : IGuiConfig,
     screenWidth : number,
@@ -244,15 +269,16 @@ const createDeviceAppConfig = (
             deviceAppConfig.renderTemplateWindowId = windowConfig.id;
         }
 
-        // use default window config for render player info
+        // use default window config for render player info and liveView UI
         if (rendererWindowConfig.id === deviceAppConfig.defaultWindowId) {
-            deviceAppConfig.renderPlayerInfoWindowConfig = rendererWindowConfig;
-            // ensure that the player info window supports the Apl AudioPlayer Extension
-            let supportedExtensions = deviceAppConfig.renderPlayerInfoWindowConfig.supportedExtensions || [];
-            if (!supportedExtensions.includes(AplAudioPlayerExtensionUri)) {
-                supportedExtensions.push(AplAudioPlayerExtensionUri);
-            }
-            deviceAppConfig.renderPlayerInfoWindowConfig.supportedExtensions = supportedExtensions;
+            deviceAppConfig.renderPlayerInfoWindowConfig = createRendererWindowConfigCopy(
+                rendererWindowConfig,
+                RENDER_PLAYER_INFO_WINDOW_ID,
+                [AplAudioPlayerExtensionUri]);
+            deviceAppConfig.liveViewUIWindowConfig = createRendererWindowConfigCopy(
+                rendererWindowConfig,
+                LIVE_VIEW_UI_WINDOW_ID,
+                [AplLiveViewExtensionUri]);
         }
     }
 

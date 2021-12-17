@@ -123,6 +123,10 @@
 #include <System/RevokeAuthorizationHandler.h>
 #endif
 
+#ifdef ENABLE_RTCSC
+#include <LiveViewControllerCapabilityAgent/LiveViewControllerCapabilityAgent.h>
+#endif
+
 #include <AlexaPresentation/AlexaPresentation.h>
 #include <RegistrationManager/RegistrationManagerInterface.h>
 #include <RegistrationManager/RegistrationNotifierInterface.h>
@@ -155,6 +159,7 @@ public:
         std::shared_ptr<
             alexaClientSDK::acsdkApplicationAudioPipelineFactoryInterfaces::ApplicationAudioPipelineFactoryInterface>,
         std::shared_ptr<alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerInterface>,
+        std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothLocalInterface>,
         std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothNotifierInterface>,
         std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerRuntimeSetupInterface>,
         std::shared_ptr<alexaClientSDK::acsdkExternalMediaPlayer::ExternalMediaPlayer>,  /// Applications should not use
@@ -434,7 +439,7 @@ AudioInputProcessor.
         std::shared_ptr<alexaClientSDK::certifiedSender::MessageStorageInterface> messageStorage,
         std::shared_ptr<alexaClientSDK::acsdkNotificationsInterfaces::NotificationsStorageInterface>
             notificationsStorage,
-        std::unique_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
+        std::shared_ptr<alexaClientSDK::settings::storage::DeviceSettingStorageInterface> deviceSettingStorage,
         std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothStorageInterface> bluetoothStorage,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface> miscStorage,
         std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface>>
@@ -522,14 +527,25 @@ AudioInputProcessor.
     void forceExit();
 
     /**
-     * Clear any rendering card on screen and sends @c TemplateDismissed event to AVS.
+     * Clears all displayed presentations.
+     * Sends @c Alexa.Presentation.Dismissed event to AVS when clearing APL presentations.
      */
-    void clearCard();
+    void clearPresentations();
 
     /**
      * Clear displaying APL card on screen.
      */
     void clearAPLCard();
+
+    /**
+     * Forces display and focus of the active PlayerInfo card if available.
+     */
+    void forceDisplayPlayerInfoCard();
+
+    /**
+     * Clears the active PlayerInfo card (whether it is backgrounded or displayed)
+     */
+    void clearPlayerInfoCard();
 
     /**
      * Stops the foreground audio activity if there is one. This acts as a "stop" button that can be used to stop an
@@ -1022,6 +1038,20 @@ AudioInputProcessor.
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface> observer);
 
     /**
+     * Adds an observer to be notified when dtmf tones were sent.
+     *
+     * @param observer The observer to add.
+     */
+    void addDtmfObserver(std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DtmfObserverInterface> observer);
+
+    /**
+     * Removes an observer to be notified when dtmf tones were sent.
+     *
+     * @param observer The observer to remove.
+     */
+    void removeDtmfObserver(std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::DtmfObserverInterface> observer);
+
+    /**
      * Adds the provided FocusManagerObserver to be notified of all focus manager changes.
      *
      * @param observer The observer to be notified of focus manager changes.
@@ -1214,10 +1244,50 @@ AudioInputProcessor.
      */
     void releaseAllObserversOnDialogChannel();
 
+#ifdef ENABLE_RTCSC
+    /**
+     * Adds an observer to be notified of LiveViewController changes.
+     *
+     * @param observer The @c LiveViewControllerCapabilityAgentObserverInterface to add.
+     */
+    void addLiveViewControllerCapabilityAgentObserver(
+        std::shared_ptr<
+            alexaSmartScreenSDK::smartScreenSDKInterfaces::LiveViewControllerCapabilityAgentObserverInterface>
+            observer);
+
+    /**
+     * Removes an observer to be notified of LiveViewController changes.
+     *
+     * @param observer The @c LiveViewControllerCapabilityAgentObserverInterface to remove.
+     */
+    void removeLiveViewControllerCapabilityAgentObserver(
+        std::shared_ptr<
+            alexaSmartScreenSDK::smartScreenSDKInterfaces::LiveViewControllerCapabilityAgentObserverInterface>
+            observer);
+
+    /**
+     * Set microphone for live view experience.
+     * @param enabled whether microphone should be turned on in live view experiences or not.
+     */
+    void setCameraMicrophoneState(bool enabled);
+
+    /**
+     * Clear live view.
+     */
+    void clearLiveView();
+#endif
+
     /**
      * Destructor.
      */
     ~SmartScreenClient();
+
+    /**
+     * Gets the @c BluetoothLocalInterface for local applications that wish to invoke Bluetooth functionality.
+     *
+     * @return A shared_ptr to the @c BluetoothLocalInterface.
+     */
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothLocalInterface> getBluetoothLocal();
 
 private:
     /**
@@ -1367,6 +1437,9 @@ private:
     /// The alerts capability agent.
     std::shared_ptr<alexaClientSDK::acsdkAlertsInterfaces::AlertsCapabilityAgentInterface> m_alertsCapabilityAgent;
 
+    /// The bluetooth capability agent.
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothLocalInterface> m_bluetoothLocal;
+
     /// The bluetooth notifier.
     std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothNotifierInterface> m_bluetoothNotifier;
 
@@ -1413,6 +1486,13 @@ private:
     /// The VisualCharacteristics capability agent.
     std::shared_ptr<alexaSmartScreenSDK::smartScreenCapabilityAgents::visualCharacteristics::VisualCharacteristics>
         m_visualCharacteristics;
+
+#ifdef ENABLE_RTCSC
+    /// The LiveViewControllerCapabilityAgent capability agent.
+    std::shared_ptr<
+        alexaSmartScreenSDK::smartScreenCapabilityAgents::liveViewController::LiveViewControllerCapabilityAgent>
+        m_liveViewController;
+#endif
 
     /// The Equalizer capability agent.
     std::shared_ptr<alexaClientSDK::acsdkEqualizer::EqualizerCapabilityAgent> m_equalizerCapabilityAgent;

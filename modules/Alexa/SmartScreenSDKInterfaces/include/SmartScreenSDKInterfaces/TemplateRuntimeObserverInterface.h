@@ -46,10 +46,12 @@ public:
      * @note The payload may contain customer sensitive information and should be used with utmost care.
      * Failure to do so may result in exposing or mishandling of customer data.
      *
+     * @param token The token associated with this payload.
      * @param jsonPayload The payload of the RenderTemplate directive in structured JSON format.
      * @param focusState The @c FocusState of the channel used by TemplateRuntime interface.
      */
     virtual void renderTemplateCard(
+        const std::string& token,
         const std::string& jsonPayload,
         alexaClientSDK::avsCommon::avs::FocusState focusState) = 0;
 
@@ -66,12 +68,14 @@ public:
      * render the PlayerInfo display card based on the metadata provided in the payload in structured JSON
      * format.
      *
+     * @param token The token associated with this payload.
      * @param jsonPayload The payload of the RenderPlayerInfo directive in structured JSON format.
      * @param audioPlayerInfo Information on the @c AudioPlayer.
      * @param focusState The @c FocusState of the channel used by TemplateRuntime interface.
      * @param mediaProperties The @c MediaPropertiesInterface for the current @c AudioPlayer
      */
     virtual void renderPlayerInfoCard(
+        const std::string& token,
         const std::string& jsonPayload,
         smartScreenSDKInterfaces::AudioPlayerInfo audioPlayerInfo,
         alexaClientSDK::avsCommon::avs::FocusState focusState,

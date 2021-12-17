@@ -224,6 +224,13 @@
           }
         }
       }
-    ]
+    ],
+    "liveViewControllerOptions": {
+      "physicalMicButtonHint": {
+        "micButtonHintType": "Text",
+        "micButtonHintSource": "A"
+      },
+      "viewingDeviceMicUnsupported": false
+    }
   }
 }

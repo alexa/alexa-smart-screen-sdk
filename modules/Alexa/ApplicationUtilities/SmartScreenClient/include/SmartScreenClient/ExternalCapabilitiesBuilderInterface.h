@@ -30,6 +30,7 @@
 #include <AVSCommon/SDKInterfaces/ContextManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/DirectiveHandlerInterface.h>
 #include <AVSCommon/SDKInterfaces/DirectiveSequencerInterface.h>
+#include <AVSCommon/SDKInterfaces/Endpoints/EndpointRegistrationManagerInterface.h>
 #include <AVSCommon/SDKInterfaces/InternetConnectionMonitorInterface.h>
 #include <AVSCommon/SDKInterfaces/MessageSenderInterface.h>
 #include <AVSCommon/SDKInterfaces/SpeakerManagerInterface.h>
@@ -159,6 +160,7 @@ public:
 #endif
      * @param powerResourceManager Object to manage power resource.
      * @param softwareComponentReporter Object to report adapters' versions.
+     * @param endpointRegistrationManager Object to manage endpoints.
      * @return A list with all capabilities as well as objects that require explicit shutdown. Shutdown will be
      * performed in the reverse order of occurrence.
      */
@@ -191,7 +193,8 @@ public:
 #endif
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PowerResourceManagerInterface> powerResourceManager,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ComponentReporterInterface> softwareComponentReporter,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PlaybackRouterInterface> playbackRouter) = 0;
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PlaybackRouterInterface> playbackRouter,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointRegistrationManagerInterface>) = 0;
 };
 
 }  // namespace smartScreenClient

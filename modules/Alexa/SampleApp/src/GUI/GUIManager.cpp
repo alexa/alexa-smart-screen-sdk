@@ -131,7 +131,6 @@ GUIManager::GUIManager(
     m_isTapOccurring = false;
     m_isSpeakingOrListening = false;
     m_clearAlertChannelOnForegrounded = false;
-    m_clearPlayerInfoCardOnContentFocusLost = false;
     m_audioInputProcessorState = AudioInputProcessorObserverInterface::State::IDLE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME] = FocusState::NONE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME] = FocusState::NONE;
@@ -140,6 +139,12 @@ GUIManager::GUIManager(
         FocusState::NONE;
     m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME] = FocusState::NONE;
     m_interfaceHoldingAudioFocus = {};
+    m_asrProfile = alexaClientSDK::capabilityAgents::aip::ASRProfile::NEAR_FIELD;
+#ifdef ENABLE_RTCSC
+    m_cameraState = smartScreenSDKInterfaces::CameraState::UNKNOWN;
+    m_cameraMicrophoneAudioState = smartScreenSDKInterfaces::AudioState::UNKNOWN;
+    m_cameraConcurrentTwoWayTalk = smartScreenSDKInterfaces::ConcurrentTwoWayTalk::UNKNOWN;
+#endif
 
 #ifdef UWP_BUILD
     m_micWrapper = std::dynamic_pointer_cast<alexaSmartScreenSDK::sssdkCommon::NullMicrophone>(micWrapper);
@@ -148,11 +153,15 @@ GUIManager::GUIManager(
 #endif
 
     m_micWrapper->startStreamingMicrophoneData();
+
+    if (m_wakeWordAudioProvider) {
+        handleASRProfileChanged(m_wakeWordAudioProvider.profile);
+    }
 }
 
-void GUIManager::renderTemplateCard(const std::string& jsonPayload, FocusState focusState) {
+void GUIManager::renderTemplateCard(const std::string& token, const std::string& jsonPayload, FocusState focusState) {
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::RENDER_TEMPLATE;
-    m_guiClient->renderTemplateCard(jsonPayload, focusState);
+    m_guiClient->renderTemplateCard(token, jsonPayload, focusState);
 }
 
 void GUIManager::clearTemplateCard(const std::string& token) {
@@ -161,12 +170,13 @@ void GUIManager::clearTemplateCard(const std::string& token) {
 }
 
 void GUIManager::renderPlayerInfoCard(
+    const std::string& token,
     const std::string& jsonPayload,
     smartScreenSDKInterfaces::AudioPlayerInfo info,
     FocusState focusState,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::MediaPropertiesInterface> mediaProperties) {
     m_mediaProperties = mediaProperties;
-    m_guiClient->renderPlayerInfoCard(jsonPayload, info, focusState, mediaProperties);
+    m_guiClient->renderPlayerInfoCard(token, jsonPayload, info, focusState, mediaProperties);
 }
 
 void GUIManager::clearPlayerInfoCard(const std::string& token) {
@@ -190,9 +200,10 @@ void GUIManager::renderDocument(const std::string& jsonPayload, const std::strin
     m_guiClient->renderDocument(jsonPayload, token, windowId);
 }
 
-void GUIManager::clearDocument(const std::string& token, const bool focusCleared) {
+void GUIManager::clearDocument(const std::string& token) {
+    ACSDK_DEBUG5(LX(__func__).d("token", token));
     m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::NONE;
-    m_guiClient->clearDocument(token, focusCleared);
+    m_guiClient->clearDocument(token);
 }
 
 void GUIManager::executeCommands(const std::string& jsonPayload, const std::string& token) {
@@ -210,6 +221,7 @@ void GUIManager::handleTapToTalk() {
     ACSDK_DEBUG9(LX("handleTapToTalk"));
     m_executor
         .submit([this]() {
+            handleASRProfileChanged(m_tapToTalkAudioProvider.profile);
             if (!m_isMicOn) {
                 return;
             }
@@ -231,17 +243,47 @@ void GUIManager::handleTapToTalk() {
 void GUIManager::handleHoldToTalk() {
     ACSDK_DEBUG9(LX("handleHoldToTalk"));
     m_executor.submit([this]() {
+        handleASRProfileChanged(m_holdToTalkAudioProvider.profile);
         if (!m_isMicOn) {
             return;
         }
+        bool activeCameraWithMicrophone = false;
+
+#ifdef ENABLE_RTCSC
+        // Mic input is fully routed to active camera and not Alexa AIP when:
+        // - ASR Profile is CLOSE_TALK (physical remote mic input)
+        // - Camera is displayed
+        // - Camera is CONNECTED
+        // - Camera supports microphone
+        // - Camera supports Two-Way talk (concurrent or not)
+        activeCameraWithMicrophone =
+            (alexaClientSDK::capabilityAgents::aip::ASRProfile::CLOSE_TALK == m_asrProfile &&
+             NonPlayerInfoDisplayType::LIVE_VIEW == m_activeNonPlayerInfoDisplayType &&
+             smartScreenSDKInterfaces::CameraState::CONNECTED == m_cameraState &&
+             (smartScreenSDKInterfaces::AudioState::DISABLED != m_cameraMicrophoneAudioState &&
+              smartScreenSDKInterfaces::AudioState::UNKNOWN != m_cameraMicrophoneAudioState) &&
+             smartScreenSDKInterfaces::ConcurrentTwoWayTalk::UNKNOWN != m_cameraConcurrentTwoWayTalk);
+#endif
         if (!m_isHoldOccurring) {
-            if (m_ssClient->notifyOfHoldToTalkStart(m_holdToTalkAudioProvider).get()) {
-                m_isHoldOccurring = true;
-            }
+            // If we have no active 2-way talk camera, route mic input to Alexa AIP provider as usual.
+            m_isHoldOccurring =
+                activeCameraWithMicrophone || m_ssClient->notifyOfHoldToTalkStart(m_holdToTalkAudioProvider).get();
         } else {
             m_isHoldOccurring = false;
-            m_ssClient->notifyOfHoldToTalkEnd();
+            if (!activeCameraWithMicrophone) {
+                m_ssClient->notifyOfHoldToTalkEnd();
+            }
         }
+
+#ifdef ENABLE_RTCSC
+        // If we have an active 2-way camera, enable/disable its microphone.
+        if (activeCameraWithMicrophone) {
+            // Set camera mic state
+            handleSetCameraMicrophoneState(m_isHoldOccurring);
+            // Inform GUI of camera mic state
+            m_guiClient->handleCameraMicrophoneStateChanged(m_isHoldOccurring);
+        }
+#endif
     });
 }
 
@@ -346,6 +388,13 @@ void GUIManager::setMute(avsCommon::sdkInterfaces::ChannelVolumeInterface::Type 
         }
         future.get();
     });
+}
+
+void GUIManager::handleASRProfileChanged(alexaClientSDK::capabilityAgents::aip::ASRProfile asrProfile) {
+    if (asrProfile != m_asrProfile) {
+        m_asrProfile = asrProfile;
+        m_guiClient->handleASRProfileChanged(m_asrProfile);
+    }
 }
 
 void GUIManager::resetDevice() {
@@ -491,16 +540,14 @@ void GUIManager::handleVisualContext(const std::string& token, uint64_t stateReq
 }
 
 bool GUIManager::handleFocusAcquireRequest(
+    std::string avsInterface,
     std::string channelName,
-    std::shared_ptr<avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
-    std::string avsInterface) {
+    alexaClientSDK::avsCommon::avs::ContentType contentType,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
     return m_executor
-        .submit([this, channelName, channelObserver, avsInterface]() {
+        .submit([this, channelName, channelObserver, contentType, avsInterface]() {
             auto activity = alexaClientSDK::acl::FocusManagerInterface::Activity::create(
-                APL_INTERFACE,
-                channelObserver,
-                std::chrono::milliseconds::zero(),
-                avsCommon::avs::ContentType::MIXABLE);
+                avsInterface, channelObserver, std::chrono::milliseconds::zero(), contentType);
             bool focusAcquired = m_ssClient->getAudioFocusManager()->acquireChannel(channelName, activity);
             if (focusAcquired) {
                 m_interfaceHoldingAudioFocus = avsInterface;
@@ -511,15 +558,20 @@ bool GUIManager::handleFocusAcquireRequest(
 }
 
 bool GUIManager::handleFocusReleaseRequest(
+    std::string avsInterface,
     std::string channelName,
     std::shared_ptr<avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) {
     return m_executor
-        .submit([this, channelName, channelObserver]() {
-            bool focusReleased = m_ssClient->getAudioFocusManager()->releaseChannel(channelName, channelObserver).get();
-            if (focusReleased) {
-                m_interfaceHoldingAudioFocus.clear();
+        .submit([this, avsInterface, channelName, channelObserver]() {
+            if (avsInterface == m_interfaceHoldingAudioFocus) {
+                bool focusReleased =
+                    m_ssClient->getAudioFocusManager()->releaseChannel(channelName, channelObserver).get();
+                if (focusReleased) {
+                    m_interfaceHoldingAudioFocus.clear();
+                }
+                return focusReleased;
             }
-            return focusReleased;
+            return false;
         })
         .get();
 }
@@ -574,31 +626,44 @@ void GUIManager::executeBackNavigation() {
      * Back Navigation supports the following use cases:
      * 1. GUIClient managed back, for traversal of a UI client implemented backstack.
      * 2. Back from ALL other active audio channel(s) and /or visual card to audio content/PlayerInfo card.
-     * 3. Back from audio content content/PlayerInfo card to 'home' state.
+     * 3. Back from alert/dialog audio channels to active live view camera.
+     * 4. Back from audio content content/PlayerInfo card to 'home' state.
      */
 
     bool dialogChannelActive =
         FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::DIALOG_CHANNEL_NAME];
     bool alertChannelActive =
         FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::ALERT_CHANNEL_NAME];
+    bool contentChannelActive =
+        FocusState::NONE != m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::CONTENT_CHANNEL_NAME];
+    bool nonPlayerInfoActive = NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType;
 
     /**
-     * Always stop the foreground activity unless we're playing audio content, AND dialog and alerts aren't active,
-     * AND we are still presenting GUI over PlayerInfo.  In that case we should only clear the card.
+     * Always stop the foreground activity unless:
+     * - playing audio content,
+     * - AND dialog and alerts channels are NOT active,
+     * - AND displaying presentation over PlayerInfo.
+     * In that case back will handle clearing the presentation over PlayerInfo, but will persist active audio content.
      */
-    bool stopForegroundActivity =
-        !(PlayerActivity::PLAYING == m_playerActivityState &&
-          NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType && !dialogChannelActive &&
-          !alertChannelActive);
+    bool stopForegroundActivity = true;
+    if (PlayerActivity::PLAYING == m_playerActivityState && !dialogChannelActive && !alertChannelActive &&
+        NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType) {
+        stopForegroundActivity = false;
+    }
 
     /**
-     * Always clear the displayed card unless audio content is playing AND dialog or alerts are active without UI.
-     * In that case we should stop the foreground activity, but not clear the PlayerInfo card.
+     * Always clear the displayed presentations unless:
+     * - dialog OR alerts channel is active
+     * - AND audio content channel is active, but there is no NonPlayerInfoDisplay UI displayed,
+     * - OR live view camera is active
+     * In that case we should stop the foreground activity (the dialog or alert), but not clear the presentation.
      */
-    bool clearCard =
-        !(PlayerActivity::PLAYING == m_playerActivityState &&
-          NonPlayerInfoDisplayType::NONE == m_activeNonPlayerInfoDisplayType &&
-          (dialogChannelActive || alertChannelActive));
+    bool clearPresentations = true;
+    if ((dialogChannelActive || alertChannelActive) &&
+        ((contentChannelActive && !nonPlayerInfoActive) ||
+         (NonPlayerInfoDisplayType::LIVE_VIEW == m_activeNonPlayerInfoDisplayType))) {
+        clearPresentations = false;
+    }
 
     /**
      * Stopping foreground audio activity happens before we allow GUIClient to handle 'visual' back navigation.
@@ -619,24 +684,24 @@ void GUIManager::executeBackNavigation() {
      * This allows for things like backstack traversal if implemented by the client.
      */
     if (!m_guiClient->handleNavigationEvent(NavigationEvent::BACK)) {
-        /// Clear clout context unless waiting to clear Alert channel first
+        /// Clear cloud context unless waiting to clear Alert channel first
         if (!m_clearAlertChannelOnForegrounded) {
             m_ssClient->forceClearDialogChannelFocus();
         }
-        if (clearCard) {
-            /// Always stop active APL commands when clearing the card.
+        if (clearPresentations) {
+            /// Always stop active APL commands when clearing presentations.
             m_ssClient->clearActiveExecuteCommandsDirective();
-            m_ssClient->clearCard();
+            m_ssClient->clearPresentations();
+            /// Always attempt to clear the playerInfo card if there's nothing else displayed and visual focus has been
+            /// released
+            if (!contentChannelActive || !nonPlayerInfoActive) {
+                m_ssClient->clearPlayerInfoCard();
+            }
         }
     }
 }
 
 void GUIManager::executeExitNavigation() {
-    /// EXIT will immediately clear everything.
-    if (NonPlayerInfoDisplayType::NONE != m_activeNonPlayerInfoDisplayType) {
-        /// If we're presenting something over PlayerInfo, we need to separately clear PlayerInfo
-        m_clearPlayerInfoCardOnContentFocusLost = true;
-    }
     m_ssClient->forceExit();
 }
 
@@ -686,9 +751,18 @@ void GUIManager::provideState(const std::string& aplToken, const unsigned int st
 
 #ifdef ENABLE_COMMS
 void GUIManager::onCallStateInfoChange(const CallStateInfo& stateInfo) {
+    // Send call state information to GUI
     m_guiClient->sendCallStateInfo(stateInfo);
 }
 #endif
+
+void GUIManager::onDtmfTonesSent(
+    const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>& dtmfTones) {
+#ifdef ENABLE_COMMS
+    ACSDK_DEBUG(LX("onDtmfTonesSent"));
+    m_guiClient->notifyDtmfTonesSent(dtmfTones);
+#endif
+}
 
 void GUIManager::onCallStateChange(CallState callState) {
 }
@@ -749,14 +823,10 @@ void GUIManager::onFocusChanged(const std::string& channelName, FocusState newFo
             m_clearAlertChannelOnForegrounded = false;
         }
 
-        /// Handle use case to clear PlayerInfo when Content channel loses focus.
-        if (channelName == avsCommon::sdkInterfaces::FocusManagerInterface::CONTENT_CHANNEL_NAME &&
-            FocusState::NONE == newFocus && m_clearPlayerInfoCardOnContentFocusLost) {
-            if (FocusState::NONE !=
-                m_channelFocusStates[avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME]) {
-                m_ssClient->clearCard();
-            }
-            m_clearPlayerInfoCardOnContentFocusLost = false;
+        /// Handle use case to try and force display PlayerInfo if the visual channel is cleared.
+        if (channelName == avsCommon::sdkInterfaces::FocusManagerInterface::VISUAL_CHANNEL_NAME &&
+            FocusState::NONE == newFocus) {
+            m_ssClient->forceDisplayPlayerInfoCard();
         }
     });
 }
@@ -889,6 +959,47 @@ void GUIManager::handleDocumentTerminated(const std::string& token, bool failed)
         m_ssClient->stopForegroundActivity();
     }
 }
+
+#if ENABLE_RTCSC
+void GUIManager::handleSetCameraMicrophoneState(bool enabled) {
+    ACSDK_DEBUG5(LX(__func__));
+    m_ssClient->setCameraMicrophoneState(enabled);
+}
+
+void GUIManager::handleClearLiveView() {
+    m_ssClient->clearLiveView();
+}
+
+void GUIManager::renderCamera(
+    const std::string& payload,
+    smartScreenSDKInterfaces::AudioState microphoneAudioState,
+    smartScreenSDKInterfaces::ConcurrentTwoWayTalk concurrentTwoWayTalk) {
+    m_cameraMicrophoneAudioState = microphoneAudioState;
+    m_cameraConcurrentTwoWayTalk = concurrentTwoWayTalk;
+    m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::LIVE_VIEW;
+    m_guiClient->renderCamera(payload, microphoneAudioState, concurrentTwoWayTalk);
+    // Enable the camera mic on init if it is UNMUTED and supports TWO_WAY_TALK,
+    // AND the device is not using a CLOSE_TALK ASR Profile
+    bool micInitEnabled = alexaClientSDK::capabilityAgents::aip::ASRProfile::CLOSE_TALK != m_asrProfile &&
+                          smartScreenSDKInterfaces::AudioState::UNMUTED == m_cameraMicrophoneAudioState &&
+                          m_cameraConcurrentTwoWayTalk == smartScreenSDKInterfaces::ConcurrentTwoWayTalk::ENABLED;
+    m_guiClient->handleCameraMicrophoneStateChanged(micInitEnabled);
+}
+
+void GUIManager::onCameraStateChanged(smartScreenSDKInterfaces::CameraState cameraState) {
+    m_cameraState = cameraState;
+    m_guiClient->onCameraStateChanged(cameraState);
+}
+
+void GUIManager::onFirstFrameRendered() {
+    m_guiClient->onFirstFrameRendered();
+}
+
+void GUIManager::clearCamera() {
+    m_activeNonPlayerInfoDisplayType = NonPlayerInfoDisplayType::NONE;
+    m_guiClient->clearCamera();
+}
+#endif
 
 #ifdef UWP_BUILD
 void GUIManager::inputAudioFile(const std::string& audioFile) {

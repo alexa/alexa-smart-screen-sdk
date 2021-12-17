@@ -25,14 +25,12 @@ import {
 import {
     APLRendererWindow,
     WebsocketConnectionWrapper,
-    APLRendererWindowState,
-    WindowWebsocketClient
+    APLRendererWindowState
 } from './APLRendererWindow';
 import {
     resolveRenderPlayerInfo
 } from '../lib/displayCards/AVSDisplayCardHelpers';
-
-export const RENDER_PLAYER_INFO_WINDOW_ID = 'renderPlayerInfo';
+import {DisplayState} from 'apl-client';
 
 interface IPlayerInfoWindowProps {
     playerInfoMessage : IRenderPlayerInfoMessage;
@@ -49,6 +47,7 @@ interface IPlayerInfoWindowProps {
 interface IPlayerInfoWindowState {
     windowState : APLRendererWindowState;
     targetWindowId : string;
+    displayState : DisplayState;
 }
 
 export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IPlayerInfoWindowState> {
@@ -68,7 +67,8 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
 
         this.state = {
             windowState : APLRendererWindowState.INACTIVE,
-            targetWindowId : RENDER_PLAYER_INFO_WINDOW_ID
+            targetWindowId : this.props.windowConfig.id,
+            displayState : DisplayState.kDisplayStateHidden
         };
     }
 
@@ -115,7 +115,7 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
                 this.props.playerInfoMessage.payload.audioItemId) ||
             this.toggleControlsChanged(renderPlayerInfoMessage.payload.controls))) {
             const renderStaticDocumentMessage : IRenderStaticDocumentMessage =
-                resolveRenderPlayerInfo(renderPlayerInfoMessage, RENDER_PLAYER_INFO_WINDOW_ID);
+                resolveRenderPlayerInfo(renderPlayerInfoMessage, this.props.windowConfig.id);
             this.isRendering = true;
             this.client.sendMessage(renderStaticDocumentMessage);
 
@@ -136,11 +136,12 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
     public render() {
         // Create Player Info APL Window
         const playerInfo = <APLRendererWindow
-            id={RENDER_PLAYER_INFO_WINDOW_ID}
-            key={RENDER_PLAYER_INFO_WINDOW_ID}
+            id={this.windowConfig.id}
+            key={this.windowConfig.id}
             windowConfig={this.windowConfig}
             clearRenderer={APLRendererWindowState.INACTIVE === this.state.windowState}
             refreshRenderer={this.props.refreshRenderer}
+            displayState={this.state.displayState}
             client={this.client}
             focusManager={this.focusManager}
             activityTracker={this.activityTracker}
@@ -158,7 +159,8 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
                 this.handleRenderPlayerInfoMessage(nextProps.playerInfoMessage);
             } else {
                 this.setState({
-                    windowState : APLRendererWindowState.INACTIVE
+                    windowState : APLRendererWindowState.INACTIVE,
+                    displayState : DisplayState.kDisplayStateHidden
                 });
             }
         } else if (nextProps.targetWindowId === undefined &&
@@ -169,6 +171,12 @@ export class PlayerInfoWindow extends React.Component<IPlayerInfoWindowProps, IP
             && this.props.playerInfoMessage !== undefined
             && this.props.playerInfoMessage.audioPlayerState === 'STOPPED') {
             this.handleRenderPlayerInfoMessage(this.props.playerInfoMessage);
+        } else if (this.state.windowState === APLRendererWindowState.ACTIVE) {
+            this.setState({
+                displayState: nextProps.targetWindowId === this.windowConfig.id
+                    || nextProps.targetWindowId === undefined ?
+                    DisplayState.kDisplayStateForeground : DisplayState.kDisplayStateBackground
+            });
         }
     }
 }

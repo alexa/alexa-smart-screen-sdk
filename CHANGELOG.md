@@ -1,10 +1,25 @@
+### v2.9.0 released 12/16/2021:
+
+#### Breaking Changes
+* Decoupled APL Client Library and APL Core Engine build from Smart Screen SDK. Please follow new build instructions here [https://developer.amazon.com/en-US/docs/alexa/alexa-smart-screen-sdk/overview.html]
+
+#### Enhancements
+* Upgraded dependency to Device SDK 1.26.0 [https://github.com/alexa/avs-device-sdk/tree/v1.26.0]
+* Added support for APL 1.8 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
+* Generalized audio focus management to support additional AVS interfaces in addition to Alexa.Presentation.APL
+* Added support for window display state reporting to APL Renderer
+* Adopted APL version API to be able to dynamically obtain dependency APL version
+* Added additional validation logic for SmartScreenSDKConfig.json file
+* Upgraded websocketpp dependency from v0.8.1 to v0.8.2
+* Refreshed the package-lock.json with new dependencies. Note that users upgrading to this version will need to remove the existing node modules from modules/GUI/js/node_modules before the build.
+
 ### v2.8.0 released 09/07/2021:
 #### Breaking Changes
 * APL Client Library has been extracted into separate GitHub repo [https://github.com/alexa/apl-client-library/tree/v1.7.2]. Users will need to pull the APL Client Library to build the Smart Screen SDK.
 
 #### Enhancements
 * Upgraded dependency to Device SDK 1.25.0 [https://github.com/alexa/avs-device-sdk/tree/v1.25.0]
-* Added support for APL 1.7 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-latest-version.html]
+* Added support for APL 1.7 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-7.html]
 * Captions support for right-to-left languages
 * Upgraded node version requirement to 14.17.4
 * Upgraded typescript version to 3.4 and refreshed the package-lock.json with new dependencies. Note that users upgrading to this version will need to remove the existing node modules from modules/GUI/js/node_modules before the build.

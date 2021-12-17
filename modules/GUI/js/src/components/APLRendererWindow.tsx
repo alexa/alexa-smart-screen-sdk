@@ -21,16 +21,22 @@ import {
   IAPLWSOptions,
   AudioPlayer,
   IAudioEventListener,
-  IEnvironment
+  IEnvironment,
+  DisplayState
 } from 'apl-client';
 import {IClient} from '../lib/messages/client';
 import {IAPLCoreMessage, IAPLEventMessage} from '../lib/messages/messages';
-import {FocusManager} from '../lib/focus/FocusManager';
+import {IFocusManager} from '../lib/focus/IFocusManager';
 import {AVSAudioPlayer} from '../lib/media/AVSAudioPlayer';
 import {AVSVideoFactory} from '../lib/media/AVSVideo';
-import {ActivityTracker} from '../lib/activity/ActivityTracker';
-import { Timer } from '../lib/utils/timer';
-import { IAPLRendererWindowConfig } from '../lib/config/IDeviceAppConfig';
+import {IActivityTracker} from '../lib/activity/IActivityTracker';
+import {Timer} from '../lib/utils/timer';
+import {IAPLRendererWindowConfig} from '../lib/config/IDeviceAppConfig';
+import {ChannelName} from '../lib/focus/ChannelName';
+import {IChannelObserver} from '../lib/focus/IChannelObserver';
+import {FocusState} from '../lib/focus/FocusState';
+import {AVSInterface} from '../lib/focus/AVSInterface';
+import {ContentType} from '../lib/focus/ContentType';
 
 type VisibilityProperty = import('csstype').Property.Visibility;
 
@@ -47,14 +53,16 @@ export interface IAPLRendererWindowProps {
   id : string;
   windowConfig : IAPLRendererWindowConfig;
   clearRenderer : boolean;
+  displayState? : DisplayState;
   client : WebsocketConnectionWrapper;
   refreshRenderer : boolean;
-  focusManager : FocusManager;
-  activityTracker : ActivityTracker;
+  focusManager? : IFocusManager;
+  activityTracker? : IActivityTracker;
   onRendererInit?() : void;
   onRendererDestroyed?() : void;
   aplCoreMessageHandlerCallback :
       (windowId : string, aplCoreMessageHandler : (message : IAPLCoreMessage) => void) => void;
+  backgroundColorOverride? : string;
 }
 
 export class WebsocketConnectionWrapper extends APLClient {
@@ -130,6 +138,8 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
   protected rendererViewportDiv : any;
   protected client : WindowWebsocketClient;
   protected windowConfig : IAPLRendererWindowConfig;
+  protected focusManager : IFocusManager;
+  protected activityTracker : IActivityTracker;
   protected renderer : APLWSRenderer;
   protected windowFlexAlignItems : APLWindowFlexType;
   protected windowFlexJustifyContent : APLWindowFlexType;
@@ -140,11 +150,37 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
   protected windowInactiveTransitionInMS : number;
   protected audioPlayer : AVSAudioPlayer;
 
+  private defaultFocusManager : IFocusManager = {
+    acquireFocus(
+      avsInterface : AVSInterface,
+      channelName : ChannelName,
+      contentType : ContentType,
+      observer : IChannelObserver) : number {
+      observer.focusChanged(FocusState.FOREGROUND, undefined);
+      return undefined;
+    },
+    releaseFocus(token : number) {},
+    processFocusResponse(token : number, result : any) {},
+    processFocusChanged(token : number, focusStateString : string) {},
+    reset() {}
+  };
+
+  private defaultActivityTracker : IActivityTracker = {
+    reportInterrupted() {},
+    recordActive(name : string) : number {
+      return -1;
+    },
+    recordInactive(token : number) {},
+    reset() {}
+  };
+
   constructor(props : IAPLRendererWindowProps) {
     super(props);
     this.client = new WindowWebsocketClient(props.client);
     this.client.setWindowId(this.props.id);
     this.windowConfig = props.windowConfig;
+    this.focusManager = this.props.focusManager || this.defaultFocusManager;
+    this.activityTracker = this.props.activityTracker || this.defaultActivityTracker;
     this.rendererViewportDiv = React.createRef();
 
     const windowPosition = this.windowConfig.windowPosition || 'center';
@@ -240,7 +276,13 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
   }
 
   protected createAudioPlayer(eventListener : IAudioEventListener) : AudioPlayer {
-    this.audioPlayer = new AVSAudioPlayer(this.props.focusManager, this.props.activityTracker, eventListener);
+    this.audioPlayer = new AVSAudioPlayer(
+        AVSInterface.APL,
+        ChannelName.DIALOG,
+        ContentType.MIXABLE,
+        this.focusManager,
+        this.activityTracker,
+        eventListener);
     return this.audioPlayer;
   }
 
@@ -249,7 +291,7 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
 
     const environment : IEnvironment = {
       agentName: 'SmartScreenSDK',
-      agentVersion: '2.8',
+      agentVersion: '2.9',
       disallowVideo: this.windowConfig.disallowVideo,
       allowOpenUrl: this.windowConfig.allowOpenUrl,
       animationQuality: this.windowConfig.animationQuality
@@ -263,7 +305,7 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
       environment,
       audioPlayerFactory: this.createAudioPlayer.bind(this),
       client: this.client,
-      videoFactory: new AVSVideoFactory(this.props.focusManager, this.props.activityTracker),
+      videoFactory: new AVSVideoFactory(AVSInterface.APL, ContentType.MIXABLE, this.focusManager, this.activityTracker),
       supportedExtensions: this.windowConfig.supportedExtensions
     } as any;
 
@@ -278,6 +320,16 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
       rendererElement.style.width = `${this.renderer.context.getViewportWidth()}px`;
       rendererElement.style.height = `${this.renderer.context.getViewportHeight()}px`;
 
+      // Hack due to fact that APL Web Viewhost doesn't properly support setting background color
+      // tslint:disable-next-line:max-line-length
+      // https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-document.html#apl_document_background_property
+      // tslint:disable-next-line:max-line-length
+      // https://github.com/alexa/apl-viewhost-web/blob/master/js/apl-html/src/APLRenderer.ts#L518
+      // this.view.style.backgroundColor = backgroundColors[docTheme] will only ever set the bg color to black or white.
+      if (this.props.backgroundColorOverride) {
+        rendererElement.style.backgroundColor = this.props.backgroundColorOverride;
+      }
+
       // onRendererInit callback
       if (!this.props.clearRenderer && this.props.onRendererInit) {
         this.props.onRendererInit();
@@ -286,6 +338,10 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
         // Update state once we've rendered
         windowState : this.props.clearRenderer ? APLRendererWindowState.INACTIVE : APLRendererWindowState.ACTIVE
       });
+
+      if (!this.props.clearRenderer) {
+        this.displayStateChange(DisplayState.kDisplayStateForeground);
+      }
 
       this.client.sendMessage({
         type: 'renderComplete',
@@ -316,6 +372,8 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
         windowState : APLRendererWindowState.INACTIVE
       });
 
+      this.displayStateChange(DisplayState.kDisplayStateHidden);
+
       // Flush audioPlayer for this window before destroying renderer
       this.flushAudioPlayer();
 
@@ -339,10 +397,24 @@ export class APLRendererWindow extends React.Component<IAPLRendererWindowProps, 
     }
   }
 
+  public componentDidUpdate() {
+    if (this.props.displayState) {
+      this.displayStateChange(this.props.displayState);
+    }
+  }
+
   public componentWillUnmount() {
-    this.props.activityTracker.reset();
-    this.props.focusManager.reset();
+    this.activityTracker.reset();
+    this.focusManager.reset();
     this.destroyRenderer();
     this.client.removeAllListeners();
+  }
+
+  private displayStateChange (displayState : DisplayState) {
+    if (this.renderer) {
+      this.renderer.onDisplayStateChange({
+        displayState
+      });
+    }
   }
 }

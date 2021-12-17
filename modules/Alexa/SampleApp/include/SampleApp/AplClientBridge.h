@@ -213,6 +213,16 @@ public:
     void initializeRenderer(const std::string& windowId, std::set<std::string> supportedExtensions);
 
     /**
+     *  Initialize empty client renderer and load corresponding supported extensions
+     *  @param windowId id of the window to be created
+     *  @param supportedExtensions Set of APL Extensions to register with this window
+     */
+    void initializeRenderer(
+        const std::string& windowId,
+        const std::unordered_set<std::shared_ptr<APLClient::Extensions::AplCoreExtensionInterface>>&
+            supportedExtensions);
+
+    /**
      * Returns a shared pointer to the @c AplClientRenderer holding root-context for a given aplToken
      * Note:- This is not a thread safe method, avoid calling this method outside @c executor context
      *
@@ -229,6 +239,12 @@ public:
      * @return the instance of @c APLClientRenderer if found, else nullptr
      */
     std::shared_ptr<APLClient::AplClientRenderer> getAplClientRendererFromWindowId(const std::string& windowId);
+
+    /**
+     * Get the max supported APL version as string
+     * @return Max supported APL version as string
+     */
+    std::string getMaxSupportedAPLVersion();
 
     /**
      * Sets the @TelemetrySink to @c AplConfiguration. This sink will be used by @c APLClient

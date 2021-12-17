@@ -17,6 +17,11 @@
 #define ALEXA_SMART_SCREEN_SDK_SAMPLEAPP_INCLUDE_SAMPLEAPP_EXTERNALCAPABILITIESBUILDER_H_
 
 #include <AVSCommon/Utils/DeviceInfo.h>
+
+#if ENABLE_RTCSC
+#include <RTCSessionController/Interfaces/RtcscCapabilityAgentInterface.h>
+#endif
+
 #include <SmartScreenClient/ExternalCapabilitiesBuilderInterface.h>
 
 namespace alexaSmartScreenSDK {
@@ -87,7 +92,9 @@ public:
 #endif
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PowerResourceManagerInterface> powerResourceManager,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ComponentReporterInterface> softwareComponentReporter,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PlaybackRouterInterface> playbackRouter) override;
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PlaybackRouterInterface> playbackRouter,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointRegistrationManagerInterface>
+            endpointRegistrationManager) override;
     /// @}
 
 private:
@@ -105,6 +112,10 @@ private:
 
     /// When GUI is enabled, this will hold the visual focus manager.
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerInterface> m_visualFocusManager;
+
+#ifdef ENABLE_RTCSC
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::RtcscCapabilityAgentInterface> m_rtcscCapabilityAgent;
+#endif
 };
 
 }  // namespace sampleApp

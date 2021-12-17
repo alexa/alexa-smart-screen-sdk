@@ -16,6 +16,7 @@
 import { ActivityEvent } from '../activity/ActivityEvent';
 import { JSLogLevel } from 'apl-client';
 import { NavigationEvent } from './NavigationEvent';
+import { ContentType } from '../focus/ContentType';
 
 /**
  * Enumerates the different states of the Alexa service.
@@ -60,6 +61,19 @@ export enum CallState {
     CALL_DISCONNECTED = 'CALL_DISCONNECTED',
     /// No current call state to be relayed to the user.
     NONE = 'NONE'
+}
+
+export enum CameraState {
+    /// The camera is connecting.
+    CONNECTING = 'CONNECTING',
+    /// The camera connected.
+    CONNECTED = 'CONNECTED',
+    /// The camera disconnected.
+    DISCONNECTED = 'DISCONNECTED',
+    /// The camera encountered an error.
+    ERROR = 'ERROR',
+    /// Guard for unknown state.
+    UNKNOWN = 'UNKNOWN'
 }
 
 export type AudioPlayerState =
@@ -113,6 +127,11 @@ export type InboundMessageType =
     | 'renderCaptions'
     | 'doNotDisturbSettingChanged'
     | 'callStateChange'
+    | 'renderCamera'
+    | 'cameraStateChanged'
+    | 'clearCamera'
+    | 'dtmfTonesSent'
+    | 'videoCallingConfig'
     | 'localeChange';
 
 export interface IBaseInboundMessage {
@@ -123,18 +142,26 @@ export interface IInitRequest extends IBaseInboundMessage {
     smartScreenSDKVersion : string;
 }
 
+export interface IVideoCallingConfigMessage extends IBaseInboundMessage {
+    videoCallingConfig : string;
+}
+
 export interface ICallStateChangeMessage extends IBaseInboundMessage {
     callState : CallState;
-    callType : string;
-    previousSipUserAgentState : string;
-    currentSipUserAgentState : string;
-    displayName : string;
-    endpointLabel : string;
-    inboundCalleeName : string;
-    callProviderType : string;
-    inboundRingtoneUrl : string;
-    outboundRingbackUrl : string;
-    isDropIn : boolean;
+    callType? : string;
+    previousSipUserAgentState? : string;
+    currentSipUserAgentState? : string;
+    displayName? : string;
+    endpointLabel? : string;
+    inboundCalleeName? : string;
+    callProviderType? : string;
+    inboundRingtoneUrl? : string;
+    outboundRingbackUrl? : string;
+    isDropIn? : boolean;
+}
+
+export interface IDtmfTonesSentMessage extends IBaseInboundMessage {
+    dtmfTones : string;
 }
 
 export interface IAlexaStateChangedMessage extends IBaseInboundMessage {
@@ -157,7 +184,7 @@ export interface IAuthorizationChangeMessage extends IBaseInboundMessage {
 
 export interface IOnFocusChangedMessage extends IBaseInboundMessage {
     token : number;
-    channelState : string;
+    focusState : string;
 }
 
 export interface IFocusResponseMessage extends IBaseInboundMessage {
@@ -166,10 +193,12 @@ export interface IFocusResponseMessage extends IBaseInboundMessage {
 }
 
 export interface IRenderTemplateMessage extends IBaseInboundMessage {
+    token : string;
     payload : any;
 }
 
 export interface IRenderPlayerInfoMessage extends IBaseInboundMessage {
+    token : string;
     payload : any;
     audioPlayerState : AudioPlayerState;
     audioOffset : number;
@@ -191,6 +220,15 @@ export interface IClearDocumentMessage extends IBaseInboundMessage {
 
 export interface IRenderCaptionsMessage extends IBaseInboundMessage {
     payload : any;
+}
+
+export interface IRenderCameraMessage extends IBaseInboundMessage {
+    payload : any;
+    liveViewControllerOptions : any;
+}
+
+export interface ICameraStateChangedMessage extends IBaseInboundMessage {
+    cameraState : CameraState;
 }
 
 export interface IDoNotDisturbSettingChangedMessage extends IBaseInboundMessage {
@@ -221,7 +259,8 @@ export type OutboundMessageType =
     | 'stopCall'
     | 'enableLocalVideo'
     | 'disableLocalVideo'
-    | 'sendDtmf';
+    | 'sendDtmf'
+    | 'cameraFirstFrameRendered';
 
 export interface IBaseOutboundMessage {
     type : OutboundMessageType;
@@ -229,7 +268,6 @@ export interface IBaseOutboundMessage {
 
 export interface IInitResponse extends IBaseOutboundMessage {
     isSupported : boolean;
-    APLMaxVersion : string;
 }
 
 export interface IDeviceWindowStateMessage extends IBaseOutboundMessage {
@@ -238,11 +276,14 @@ export interface IDeviceWindowStateMessage extends IBaseOutboundMessage {
 
 export interface IFocusAcquireRequestMessage extends IBaseOutboundMessage {
     token : number;
+    avsInterface : string;
     channelName : string;
+    contentType : ContentType;
 }
 
 export interface IFocusReleaseRequestMessage extends IBaseOutboundMessage {
     token : number;
+    avsInterface : string;
     channelName : string;
 }
 
@@ -296,12 +337,14 @@ export const createRenderStaticDocumentMessage = (
         supportedViewports
     };
 
-    return {
+    const message : IRenderStaticDocumentMessage = {
         type : 'renderStaticDocument',
         token,
         windowId,
         payload
     };
+
+    return message;
 };
 
 export const createExecuteCommandsMessage = (

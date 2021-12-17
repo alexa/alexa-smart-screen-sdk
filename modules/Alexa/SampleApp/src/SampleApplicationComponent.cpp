@@ -14,6 +14,10 @@
  */
 
 #include <acsdkCore/CoreComponent.h>
+#ifdef ENABLE_PKCS11
+#include <acsdkCrypto/CryptoFactory.h>
+#include <acsdkPkcs11/KeyStoreFactory.h>
+#endif
 #include <acsdkManufactory/ComponentAccumulator.h>
 #include <acsdkShared/SharedComponent.h>
 #include <ContextManager/ContextManager.h>
@@ -101,6 +105,10 @@ SampleApplicationComponent getComponent(
         .addRetainedFactory(getCreateLocaleAssetsManagerInterface(requiresShutdownList))
         .addRetainedFactory(contextManager::ContextManager::createContextManagerInterface)
         .addRetainedFactory(avsCommon::utils::DeviceInfo::createFromConfiguration)
+#ifdef ENABLE_PKCS11
+        .addRetainedFactory(acsdkPkcs11::createKeyStore)
+        .addRetainedFactory(acsdkCrypto::createCryptoFactory)
+#endif
         .addRetainedFactory(registrationManager::CustomerDataManagerFactory::createCustomerDataManagerInterface);
 }
 

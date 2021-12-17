@@ -324,7 +324,7 @@ public:
     MOCK_METHOD3(
         dataSourceUpdate,
         void(const std::string& sourceType, const std::string& jsonPayload, const std::string& token));
-    MOCK_METHOD2(clearDocument, void(const std::string& token, const bool focusCleared));
+    MOCK_METHOD1(clearDocument, void(const std::string& token));
     MOCK_METHOD1(interruptCommandSequence, void(const std::string& token));
     MOCK_METHOD4(
         onPresentationSessionChanged,
@@ -934,7 +934,7 @@ TEST_F(AlexaPresentationTest, testAPLClearCard) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
 
-    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(1);
+    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(1);
 
     // Expect a call to getContext as part of sending APL_DISMISSED event.
     EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
@@ -1003,7 +1003,7 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
         .Times(Exactly(1))
         .WillRepeatedly(InvokeWithoutArgs([this] { m_AlexaPresentation->recordRenderComplete(); }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(Exactly(1));
     EXPECT_CALL(*m_mockVisualStateProvider, provideState(_, _));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
@@ -1059,7 +1059,7 @@ TEST_F(AlexaPresentationTest, testAPLTimeout) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD_2, "APL_TOKEN_2", WINDOW_ID)).Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(Exactly(1));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
         std::future<bool> returnValue = releaseChannelSuccess->get_future();
@@ -1109,7 +1109,7 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsGUIActive) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_, _)).Times(0);
+    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(0);
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
     m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
@@ -1141,7 +1141,7 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsGUIInactive) {
         .Times(Exactly(1))
         .WillRepeatedly(InvokeWithoutArgs([this] { m_AlexaPresentation->recordRenderComplete(); }));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(1);
+    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(1);
     EXPECT_CALL(*m_mockVisualStateProvider, provideState(_, _));
     EXPECT_CALL(*m_mockFocusManager, releaseChannel(_, _)).Times(Exactly(1)).WillOnce(InvokeWithoutArgs([this] {
         auto releaseChannelSuccess = std::make_shared<std::promise<bool>>();
@@ -1202,7 +1202,7 @@ TEST_F(AlexaPresentationTest, testAPLIdleRespectsDialogUXWhenGUIInactive) {
 
     EXPECT_CALL(*m_mockGui, renderDocument(DOCUMENT_APL_PAYLOAD, "APL_TOKEN", WINDOW_ID)).Times(Exactly(1));
     EXPECT_CALL(*m_mockDirectiveHandlerResult, setCompleted()).Times(Exactly(1));
-    EXPECT_CALL(*m_mockGui, clearDocument(_, _)).Times(0);
+    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(0);
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive, std::move(m_mockDirectiveHandlerResult));
     m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
@@ -1291,7 +1291,7 @@ TEST_F(AlexaPresentationTest, testAPLFollowedByAPL) {
     m_executor->waitForSubmittedTasks();
 
     // clearDocument() is going to be called for the 2nd APL card because it's cleared by timeout.
-    EXPECT_CALL(*m_mockGui, clearDocument(_, true)).Times(Exactly(1));
+    EXPECT_CALL(*m_mockGui, clearDocument(_)).Times(Exactly(1));
     // Expect a call to getContext.
     EXPECT_CALL(*m_mockContextManager, getContext(_, _, _))
         .WillOnce(Invoke([this](

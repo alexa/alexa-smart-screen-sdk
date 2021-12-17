@@ -69,7 +69,7 @@ This message provides the GUI Client with Focus state changes on corresponding c
 {
     type: 'onFocusChanged',
     token: number,
-    channelState: string
+    focusState: string
 }
 ``` 
 
@@ -87,7 +87,7 @@ This message provides the GUI Client with the result of [focusAcquireRequest](#f
 
 ## requestAuthorization
 
-Tis message provides the GUI Client with information to present to the user to complete CBL device authorization.
+This message provides the GUI Client with information to present to the user to complete CBL device authorization.
 
 See : https://developer.amazon.com/docs/alexa-voice-service/setup-authentication.html#code-based-screens
 
@@ -102,7 +102,7 @@ See : https://developer.amazon.com/docs/alexa-voice-service/setup-authentication
 
 ## authorizationChange
 
-Tis message provides the GUI Client with information about changes to the state of authorization.
+This message provides the GUI Client with information about changes to the state of authorization.
 
 ```javascript
 type AuthorizationState =
@@ -240,6 +240,7 @@ enum CallState {
 ```
 
 ## LocaleChange
+
 This message is sent to the client when the Alexa locale settings change as a result of a [config](https://developer.amazon.com/en-US/docs/alexa/avs-device-sdk/alexa-client-sdk-config-json.html#parameters) setting or [SetLocales](https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/system.html#setlocales) directive.
 The payload is an array of supported locales. On devices that support [multi-locale](https://developer.amazon.com/en-US/docs/alexa/alexa-voice-service/system.html#localecombinations) mode, the first locale in the array is the primary locale.  In single-locale scenarios the locales array will only contain one locale.
 ```javascript
@@ -248,6 +249,66 @@ type LocaleType = 'de-DE', 'en-AU', 'en-CA', 'en-GB', 'en-IN', 'en-US', 'es-ES',
 {
     type: 'localeChange',
     locales: LocaleType[]    
+}
+```
+
+## CameraFirstFrameRendered
+This message is sent to the GUI to inform it that the first frame of the active live view camera has been rendered.
+```javascript
+{
+    type: 'cameraFirstFrameRendered'
+}
+```
+
+## RenderCamera
+This message is sent to the client to start rendering the live camera stream.
+
+`liveViewControllerOptions` - optional live view UI control defined in the [SmartScreenSDKConfig](config/SmartScreenSDKConfig.md).
+```javascript
+{
+    type: 'renderCamera',
+    payload: {},
+    liveViewControllerOptions: {}
+}
+```
+
+## ClearCamera
+This message is sent to the client to stop rendering the live camera stream.
+```javascript
+{
+    type: 'clearCamera'
+}
+```
+
+## CameraStateChanged
+This message is sent to the client to change the state of the live camera stream.
+```javascript
+{
+    type: 'cameraStateChanged',
+    cameraState: string
+}
+```
+
+## videoCallingConfig
+
+This message is sent to the client to provide the comms video calling configuration.
+
+```javascript
+{
+    type: 'videoCallingConfig',
+    payload: {}
+}
+```
+
+
+## dtmfTonesSent
+
+This message instructs the client to render DTMF tones in keypad.
+
+```javascript
+{
+  type: 'dtmfTonesSent',
+  dtmfTones: string
 }
 ```
 
@@ -278,24 +339,27 @@ This message is sent as a response to a [guiConfiguration](#guiconfiguration) me
 
 ## focusAcquireRequest
 
-This message is sent from FocusManager in order to request acquisition of a channel.
+This message is sent from FocusManager in order to request acquisition of a channel with defined Content Type status for a given AVS Interface.
 
 ```javascript
 {
     type: 'focusAcquireRequest',
-    token: number,
-    channelName: string
+    token: number,    
+    avsInterface: string,
+    channelName: string,
+    contentType: string
 }
 ``` 
 
 ## focusReleaseRequest
 
-This message is sent from FocusManager in order to request release of the previously acquired channel.
+This message is sent from FocusManager in order to request release of the previously acquired channel for the given AVS Interface.
 
 ```javascript
 {
     type: 'focusReleaseRequest',
-    token: number,
+    token: number,    
+    avsInterface: string,
     channelName: string
 }
 ``` 
@@ -417,6 +481,16 @@ This message is sent to the SDK to toggle the on/off for displaying captions
 ```javascript
 {
     type: 'toggleCaptions'
+}
+```
+
+## setCameraMicrophoneState
+
+This message is sent to the SDK to inform it that the microphone state should be changed
+```javascript
+{
+    type: 'setCameraMicrophoneState',
+    enabled: boolean
 }
 ```
 

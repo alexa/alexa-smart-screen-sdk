@@ -58,6 +58,7 @@
 #include <acsdkApplicationAudioPipelineFactoryInterfaces/ApplicationAudioPipelineFactoryInterface.h>
 #include <acsdkAudioPlayerInterfaces/AudioPlayerInterface.h>
 #include <acsdkBluetoothInterfaces/BluetoothDeviceConnectionRulesProviderInterface.h>
+#include <acsdkBluetoothInterfaces/BluetoothLocalInterface.h>
 #include <acsdkBluetoothInterfaces/BluetoothNotifierInterface.h>
 #include <acsdkBluetoothInterfaces/BluetoothStorageInterface.h>
 #include <acsdkDeviceSetupInterfaces/DeviceSetupInterface.h>
@@ -87,6 +88,7 @@ using SmartScreenClientComponent = alexaClientSDK::acsdkManufactory::Component<
         alexaClientSDK::acsdkApplicationAudioPipelineFactoryInterfaces::ApplicationAudioPipelineFactoryInterface>,
     std::shared_ptr<alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerInterface>,
     std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothNotifierInterface>,
+    std::shared_ptr<alexaClientSDK::acsdkBluetoothInterfaces::BluetoothLocalInterface>,
     std::shared_ptr<alexaClientSDK::acsdkEqualizerInterfaces::EqualizerRuntimeSetupInterface>,
     std::shared_ptr<alexaClientSDK::acsdkExternalMediaPlayer::ExternalMediaPlayer>,
     std::shared_ptr<alexaClientSDK::acsdkExternalMediaPlayerInterfaces::ExternalMediaPlayerInterface>,

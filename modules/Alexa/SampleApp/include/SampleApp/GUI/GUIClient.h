@@ -25,7 +25,6 @@
 #undef DEBUG
 #undef TRUE
 #undef FALSE
-#include <apl/content/content.h>
 #pragma pop_macro("DEBUG")
 #pragma pop_macro("TRUE")
 #pragma pop_macro("FALSE")
@@ -50,9 +49,6 @@
 #include <AVSCommon/Utils/Timing/Timer.h>
 #include <RegistrationManager/RegistrationObserverInterface.h>
 
-#include <apl/action/action.h>
-#include <apl/engine/rootcontext.h>
-
 #include <SmartScreenSDKInterfaces/ActivityEvent.h>
 #include <SmartScreenSDKInterfaces/AudioPlayerInfo.h>
 #include <SmartScreenSDKInterfaces/GUIClientInterface.h>
@@ -67,6 +63,10 @@
 
 #include "SampleApp/AplClientBridge.h"
 #include "SampleApp/SampleApplicationReturnCodes.h"
+#ifdef ENABLE_RTCSC
+#include "SampleApp/Extensions/LiveView/AplLiveViewExtension.h"
+#include "SampleApp/Extensions/LiveView/AplLiveViewExtensionObserverInterface.h"
+#endif
 
 #include <RegistrationManager/CustomerDataHandler.h>
 
@@ -89,10 +89,13 @@ class GUIClient
         , public alexaClientSDK::registrationManager::CustomerDataHandler
         , public std::enable_shared_from_this<GUIClient>
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::RenderCaptionsInterface
+#ifdef ENABLE_RTCSC
+        , public Extensions::LiveView::AplLiveViewExtensionObserverInterface
+#endif
         , public sampleApp::DoNotDisturbSettingObserver {
 public:
     /// Alias for GUI provided token.
-    using APLToken = uint64_t;
+    using GUIToken = uint64_t;
 
     /**
      * Create a @c GUIClient
@@ -110,10 +113,13 @@ public:
 
     // @name TemplateRuntimeObserverInterface Functions
     /// @{
-    void renderTemplateCard(const std::string& jsonPayload, alexaClientSDK::avsCommon::avs::FocusState focusState)
-        override;
+    void renderTemplateCard(
+        const std::string& token,
+        const std::string& jsonPayload,
+        alexaClientSDK::avsCommon::avs::FocusState focusState) override;
     void clearTemplateCard(const std::string& token) override;
     void renderPlayerInfoCard(
+        const std::string& token,
         const std::string& jsonPayload,
         smartScreenSDKInterfaces::AudioPlayerInfo info,
         alexaClientSDK::avsCommon::avs::FocusState focusState,
@@ -125,7 +131,7 @@ public:
     /// @{
     void interruptCommandSequence(const std::string& token) override;
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
-    void clearDocument(const std::string& token, const bool focusCleared) override;
+    void clearDocument(const std::string& token) override;
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
     void dataSourceUpdate(const std::string& sourceType, const std::string& jsonPayload, const std::string& token)
         override;
@@ -141,6 +147,25 @@ public:
         std::shared_ptr<alexaClientSDK::avsCommon::utils::metrics::MetricRecorderInterface> metricRecorder) override;
     /// @}
 
+#ifdef ENABLE_RTCSC
+    /// @name LiveViewControllerCapabilityAgentObserverInterface methods.
+    /// @{
+    void renderCamera(
+        const std::string& payload,
+        smartScreenSDKInterfaces::AudioState microphoneAudioState,
+        smartScreenSDKInterfaces::ConcurrentTwoWayTalk concurrentTwoWayTalk) override;
+    void onCameraStateChanged(smartScreenSDKInterfaces::CameraState cameraState) override;
+    void onFirstFrameRendered() override;
+    void clearCamera() override;
+    /// @}
+
+    /// @name AplLiveViewExtensionObserverInterface methods
+    /// @{
+    void handleCameraExitRequest() override;
+    void handleChangeCameraMicStateRequest(bool micOn) override;
+    /// }
+#endif
+
     // @name VisualStateProviderInterface Functions
     /// @{
     void provideState(const std::string& aplToken, const unsigned int stateRequestToken) override;
@@ -151,17 +176,28 @@ public:
     void setGUIManager(
         std::shared_ptr<alexaSmartScreenSDK::smartScreenSDKInterfaces::GUIServerInterface> guiManager) override;
     bool acquireFocus(
+        std::string avsInterface,
         std::string channelName,
+        alexaClientSDK::avsCommon::avs::ContentType contentType,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) override;
     bool releaseFocus(
+        std::string avsInterface,
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) override;
 #ifdef ENABLE_COMMS
     void sendCallStateInfo(const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo&
                                callStateInfo) override;
+    void notifyDtmfTonesSent(
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>& dtmfTones)
+        override;
 #endif
     void sendMessage(smartScreenSDKInterfaces::MessageInterface& message) override;
     bool handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::NavigationEvent event) override;
+    void handleASRProfileChanged(alexaClientSDK::capabilityAgents::aip::ASRProfile asrProfile) override;
+
+#ifdef ENABLE_RTCSC
+    void handleCameraMicrophoneStateChanged(bool enabled) override;
+#endif
     /// @}
 
     /// @name MessagingServerInterface Functions
@@ -220,15 +256,11 @@ public:
     /// @}
 
     /**
-     * @return Returns the max APL version supported.
-     */
-    std::string getMaxAPLVersion();
-
-    /**
      * Sets the APL Client Bridge
      * @param aplClientBridge The APL Client bridge
+     * @param aplVersionChanged True if the APL Client version has changed from last run.
      */
-    void setAplClientBridge(std::shared_ptr<AplClientBridge> aplClientBridge);
+    void setAplClientBridge(std::shared_ptr<AplClientBridge> aplClientBridge, bool aplVersionChanged);
 
     /// @name RenderCaptionsInterface Function
     /// @{
@@ -254,14 +286,16 @@ private:
         /**
          * Constructor.
          *
+         * @param avsInterface Name of related AVS Interface.
          * @param token Requester token.
          * @param focusBridge FocusBridge to perform operations through.
          * @param channelName Name of related channel.
          */
         ProxyFocusObserver(
-            const APLToken token,
+            std::string avsInterface,
+            GUIToken token,
             std::shared_ptr<GUIClient> focusBridge,
-            const std::string& channelName);
+            std::string channelName);
 
         /// @name ChannelObserverInterface Functions
         /// @{
@@ -271,8 +305,11 @@ private:
         ///@}
 
     private:
+        /// AVS Interface Name
+        const std::string m_avsInterface;
+
         /// Related requester token.
-        APLToken m_token;
+        GUIToken m_token;
 
         /// Parent FocusBridge.
         std::shared_ptr<GUIClient> m_focusBridge;
@@ -287,7 +324,6 @@ private:
     GUIClient(
         std::shared_ptr<MessagingServerInterface> serverImplementation,
         const std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface>& miscStorage,
-        const std::string& APLMaxVersion,
         const std::shared_ptr<alexaClientSDK::registrationManager::CustomerDataManagerInterface> customerDataManager);
 
     /// Server worker thread.
@@ -302,12 +338,32 @@ private:
     /// Send viewport characteristic and GUI app config data in structured JSON format.
     void executeSendGuiConfiguration();
 
+#ifdef ENABLE_RTCSC
+    /// Process setCameraMicrophoneState message received from the client.
+    void executeSetCameraMicrophoneState(rapidjson::Document& message);
+
+    /// Process cameraFirstFrameRendered message received from the client.
+    void executeCameraFirstFrameRendered();
+#endif
+
+#ifdef ENABLE_COMMS
     /**
      * Handle SendCallStateInfo event.
+     * @param callStateInfo The call state information.
      */
-#ifdef ENABLE_COMMS
     void executeSendCallStateInfo(
         const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo& callStateInfo);
+
+    /**
+     * Send videoCallingConfig message.
+     */
+    void executeSendVideoCallingConfig();
+
+    /**
+     * Send DtmfTonesSent message.
+     */
+    void executeNotifyDtmfTonesSent(
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>& dtmfTones);
 #endif
 
     /**
@@ -407,12 +463,16 @@ private:
 
     /// Internal function to execute @see processFocusAcquireRequest
     void executeFocusAcquireRequest(
-        const APLToken token,
+        const GUIToken token,
+        const std::string& avsInterface,
         const std::string& channelName,
-        const std::string& avsInterface);
+        alexaClientSDK::avsCommon::avs::ContentType contentType);
 
     /// Internal function to execute @see processFocusReleaseRequest
-    void executeFocusReleaseRequest(const APLToken token, const std::string& channelName);
+    void executeFocusReleaseRequest(
+        const GUIToken token,
+        const std::string& avsInterface,
+        const std::string& channelName);
 
     /**
      * Send focus response.
@@ -420,23 +480,26 @@ private:
      * @param token Requester token.
      * @param result Result of focus operation.
      */
-    void executeSendFocusResponse(const APLToken token, const bool result);
+    void executeSendFocusResponse(const GUIToken token, const bool result);
 
     /**
      * Starting timer to release channel in situations when focus operation result or
      * onFocusChanged event was not received by GUI so it will not know if it needs to release it.
      *
-     * @param token The APL token.
+     * @param avsInterface The AVS Interface to release.
+     * @param token Requester token.
      * @param channelName The channel to release.
      */
-    void startAutoreleaseTimer(const APLToken token, const std::string& channelName);
+    void startAutoreleaseTimer(const std::string& avsInterface, const GUIToken token, const std::string& channelName);
 
     /**
      * Handle autoRelease.
+     *
+     * @param avsInterface The AVS Interface to release.
      * @param token Requester token.
      * @param channelName Channel name.
      */
-    void autoRelease(const APLToken token, const std::string& channelName);
+    void autoRelease(const std::string& avsInterface, const GUIToken token, const std::string& channelName);
 
     /**
      * Send focus change event notification.
@@ -444,19 +507,7 @@ private:
      * @param token Requester token.
      * @param state Resulting channel state.
      */
-    void sendOnFocusChanged(const APLToken token, const alexaClientSDK::avsCommon::avs::FocusState state);
-
-    /**
-     * Process FocusManager focus acquire request from APL.
-     *
-     * @param token Operation token - unique per acquire/release request pair.
-     * @param channelName Name of channel to acquire.
-     * @param avsInterface AVS interface to report as owner of channel.
-     */
-    void executeProcessFocusAcquireRequest(
-        const APLToken token,
-        const std::string& channelName,
-        const std::string& avsInterface);
+    void sendOnFocusChanged(const GUIToken token, const alexaClientSDK::avsCommon::avs::FocusState state);
 
     /**
      * Sends a GUI Message to the server.
@@ -473,21 +524,25 @@ private:
 
     /**
      * An internal function handling audio focus requests in the executor thread.
+     * @param avsInterface The AVS Interface requesting focus.
      * @param channelName The channel to be requested.
+     * @param contentType The type of content acquiring focus.
      * @param channelObserver the channelObserver to be notified.
-     * @param avsInterface AVS interface to report as owner of channel.
      */
     bool executeAcquireFocus(
+        std::string avsInterface,
         std::string channelName,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
-        std::string avsInterface);
+        alexaClientSDK::avsCommon::avs::ContentType contentType,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver);
 
     /**
      * An internal function handling release audio focus requests in the executor thread.
+     * @param avsInterface The avsInterface to be released.
      * @param channelName The channel to be released.
      * @param channelObserver the channelObserver to be notified.
      */
     bool executeReleaseFocus(
+        std::string avsInterface,
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver);
 
@@ -588,14 +643,8 @@ private:
     /// The Listener to receive the messages
     std::shared_ptr<smartScreenSDKInterfaces::MessageListenerInterface> m_messageListener;
 
-    /// APL max supported version
-    std::string m_APLMaxVersion;
-
     /// Has the user logged out.
     std::atomic_bool m_shouldRestart;
-
-    /// Persistent storage handle.
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::storage::MiscStorageInterface> m_miscStorage;
 
     /// Server observer
     std::shared_ptr<smartScreenSDKInterfaces::MessagingServerObserverInterface> m_observer;
@@ -616,12 +665,12 @@ private:
     /// Mutex for requester maps.
     std::mutex m_mapMutex;
 
-    /// A map of APL side focus observers (proxies).
-    std::map<APLToken, std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface>>
+    /// A map of GUI side focus observers (proxies).
+    std::map<GUIToken, std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface>>
         m_focusObservers;
 
     /// Autorelease timers for case when client not received channel state change message.
-    std::map<APLToken, std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::Timer>> m_autoReleaseTimers;
+    std::map<GUIToken, std::shared_ptr<alexaClientSDK::avsCommon::utils::timing::Timer>> m_autoReleaseTimers;
 
     /// GUI log bridge to be used to handle log events.
     GUILogBridge m_rendererLogBridge;
@@ -637,6 +686,14 @@ private:
 
     /// List of all supported windowIds
     std::set<std::string> m_reportedWindowIds;
+
+#ifdef ENABLE_RTCSC
+    /// @c AplLiveViewExtensionPtr for handling liveView APL UI interactions.
+    Extensions::LiveView::AplLiveViewExtensionPtr m_aplLiveViewExtension;
+
+    /// @c ConfigurationNode for LiveViewController UI Config
+    alexaClientSDK::avsCommon::utils::configuration::ConfigurationNode m_liveViewControllerOptionsConfig;
+#endif
 };
 
 }  // namespace gui

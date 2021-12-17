@@ -21,6 +21,7 @@
 #include <AVSCommon/AVS/CapabilitySemantics/CapabilitySemantics.h>
 #include <AVSCommon/AVS/Initialization/InitializationParametersBuilder.h>
 #include <AVSCommon/SDKInterfaces/PowerResourceManagerInterface.h>
+#include <AVSCommon/SDKInterfaces/Storage/MiscStorageInterface.h>
 #include <AVSCommon/Utils/LibcurlUtils/HttpPost.h>
 #include <AVSCommon/Utils/LibcurlUtils/LibcurlHTTP2ConnectionFactory.h>
 #include <AVSCommon/Utils/UUIDGeneration/UUIDGeneration.h>
@@ -38,7 +39,7 @@
 #ifdef AUTH_MANAGER
 #include <acsdkAuthorization/AuthorizationManager.h>
 #include <acsdkAuthorization/LWA/LWAAuthorizationAdapter.h>
-#include <acsdkAuthorization/LWA/SQLiteLWAAuthorizationStorage.h>
+#include <acsdkAuthorization/LWA/LWAAuthorizationStorage.h>
 #include <acsdkAuthorizationInterfaces/AuthorizationManagerInterface.h>
 #include <acsdkSampleApplicationCBLAuthRequester/SampleApplicationCBLAuthRequester.h>
 #endif
@@ -57,7 +58,7 @@
 #endif
 
 #ifdef KWD
-#include <KWDProvider/KeywordDetectorProvider.h>
+#include <acsdkKWDProvider/KWDProvider/KeywordDetectorProvider.h>
 #endif
 
 #ifdef PORTAUDIO
@@ -184,6 +185,8 @@ std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ApplicationMediaInterf
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
+using namespace alexaClientSDK::avsCommon::sdkInterfaces::storage;
+
 /**
  * WebSocket interface to listen on.
  * WARNING: If this is changed to listen on a publicly accessible interface then additional
@@ -258,6 +261,15 @@ static const std::string MAX_NUMBER_OF_CONCURRENT_DOWNLOAD_CONFIGURATION_KEY = "
 
 // The default value for the maximum number of concurrent downloads.
 static const int DEFAULT_MAX_NUMBER_OF_CONCURRENT_DOWNLOAD = 5;
+
+/// Misc Storage app component name.
+static const std::string MISC_STORAGE_APP_COMPONENT_NAME("SmartScreenSampleApp");
+
+/// Misc Storage APL table name.
+static const std::string MISC_STORAGE_APL_TABLE_NAME("APL");
+
+/// Storage key name for APLMaxVersion entry.
+static const std::string APL_MAX_VERSION_DB_KEY("APLMaxVersion");
 
 using namespace alexaClientSDK;
 using namespace alexaClientSDK::acsdkExternalMediaPlayer;
@@ -723,11 +735,10 @@ buildModeControllerAttributes(
 
 std::unique_ptr<SampleApplication> SampleApplication::create(
     const std::vector<std::string>& configFiles,
-    const std::string& pathToInputFolder,
     const std::string& logLevel,
     std::shared_ptr<avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics) {
     auto clientApplication = std::unique_ptr<SampleApplication>(new SampleApplication);
-    if (!clientApplication->initialize(configFiles, pathToInputFolder, logLevel, diagnostics)) {
+    if (!clientApplication->initialize(configFiles, logLevel, diagnostics)) {
         ACSDK_CRITICAL(LX("Failed to initialize SampleApplication"));
         return nullptr;
     }
@@ -790,6 +801,10 @@ SampleApplication::~SampleApplication() {
     m_sdkInit.reset();
 }
 
+std::shared_ptr<smartScreenClient::SmartScreenClient> SampleApplication::getSmartScreenClient() {
+    return m_client;
+}
+
 bool SampleApplication::createMediaPlayersForAdapters(
     const std::shared_ptr<avsCommon::sdkInterfaces::HTTPContentFetcherInterfaceFactoryInterface>&
         httpContentFetcherFactory,
@@ -816,7 +831,6 @@ bool SampleApplication::createMediaPlayersForAdapters(
 
 bool SampleApplication::initialize(
     const std::vector<std::string>& configFiles,
-    const std::string& pathToInputFolder,
     const std::string& logLevel,
     std::shared_ptr<avsCommon::sdkInterfaces::diagnostics::DiagnosticsInterface> diagnostics) {
     avsCommon::utils::logger::Level logLevelValue = avsCommon::utils::logger::Level::UNKNOWN;
@@ -890,7 +904,13 @@ bool SampleApplication::initialize(
         std::shared_ptr<avsCommon::utils::configuration::ConfigurationNode>,
         std::shared_ptr<avsCommon::utils::DeviceInfo>,
         std::shared_ptr<registrationManager::CustomerDataManagerInterface>,
+#ifdef ENABLE_PKCS11
+        std::shared_ptr<acsdkCryptoInterfaces::CryptoFactoryInterface>,
+        std::shared_ptr<acsdkCryptoInterfaces::KeyStoreInterface>,
+#endif
         std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>::create(sampleAppComponent);
+
+    auto metricRecorder = manufactory->get<std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>();
 
     m_sdkInit = manufactory->get<std::shared_ptr<avsCommon::avs::initialization::AlexaClientSDKInit>>();
     if (!m_sdkInit) {
@@ -947,6 +967,15 @@ bool SampleApplication::initialize(
     // Creating the misc DB object to be used by various components.
     std::shared_ptr<alexaClientSDK::storage::sqliteStorage::SQLiteMiscStorage> miscStorage =
         alexaClientSDK::storage::sqliteStorage::SQLiteMiscStorage::create(config);
+
+    if (!miscStorage->isOpened() && !miscStorage->open()) {
+        ACSDK_DEBUG3(LX("openStorage").m("Couldn't open misc database. Creating."));
+
+        if (!miscStorage->createDatabase()) {
+            ACSDK_ERROR(LX("openStorageFailed").m("Could not create misc database."));
+            return false;
+        }
+    }
 
     /*
      * Creating Equalizer specific implementations
@@ -1097,8 +1126,8 @@ bool SampleApplication::initialize(
     auto audioFactory = std::make_shared<alexaClientSDK::applicationUtilities::resources::audio::AudioFactory>();
 
     // Creating the alert storage object to be used for rendering and storing alerts.
-    auto alertStorage =
-        alexaClientSDK::acsdkAlerts::storage::SQLiteAlertStorage::create(config, audioFactory->alerts());
+    auto alertStorage = alexaClientSDK::acsdkAlerts::storage::SQLiteAlertStorage::create(
+        config, audioFactory->alerts(), metricRecorder);
 
     // Creating the message storage object to be used for storing message to be sent later.
     auto messageStorage = alexaClientSDK::certifiedSender::SQLiteMessageStorage::create(config);
@@ -1131,7 +1160,7 @@ bool SampleApplication::initialize(
     std::string websocketInterface;
     sampleAppConfig.getString(WEBSOCKET_INTERFACE_KEY, &websocketInterface, DEFAULT_WEBSOCKET_INTERFACE);
 
-    int websocketPortNumber;
+    int websocketPortNumber = DEFAULT_WEBSOCKET_PORT;
     sampleAppConfig.getInt(WEBSOCKET_PORT_KEY, &websocketPortNumber, DEFAULT_WEBSOCKET_PORT);
 
     // Create the websocket server that handles communications with websocket clients
@@ -1189,7 +1218,7 @@ bool SampleApplication::initialize(
         miscStorage,
         customerDataManager);
 
-    int maxNumberOfConcurrentDownloads;
+    int maxNumberOfConcurrentDownloads = DEFAULT_MAX_NUMBER_OF_CONCURRENT_DOWNLOAD;
     sampleAppConfig.getInt(
         MAX_NUMBER_OF_CONCURRENT_DOWNLOAD_CONFIGURATION_KEY,
         &maxNumberOfConcurrentDownloads,
@@ -1202,8 +1231,54 @@ bool SampleApplication::initialize(
 
     auto parameters = AplClientBridgeParameter{maxNumberOfConcurrentDownloads};
     m_aplClientBridge = AplClientBridge::create(contentDownloadManager, m_guiClient, parameters);
+    APLVersion = m_aplClientBridge->getMaxSupportedAPLVersion();
 
-    m_guiClient->setAplClientBridge(m_aplClientBridge);
+    bool aplTableExists = false;
+    if (!miscStorage->tableExists(MISC_STORAGE_APP_COMPONENT_NAME, MISC_STORAGE_APL_TABLE_NAME, &aplTableExists)) {
+        ACSDK_ERROR(LX("openStorageFailed").m("Could not get apl table information from misc database."));
+        return false;
+    }
+
+    if (!aplTableExists) {
+        ACSDK_DEBUG3(LX("openStorage").d("apl table doesn't exist", MISC_STORAGE_APL_TABLE_NAME));
+        if (!miscStorage->createTable(
+                MISC_STORAGE_APP_COMPONENT_NAME,
+                MISC_STORAGE_APL_TABLE_NAME,
+                MiscStorageInterface::KeyType::STRING_KEY,
+                MiscStorageInterface::ValueType::STRING_VALUE)) {
+            ACSDK_ERROR(LX("openStorageFailed")
+                            .d("reason", "Could not create table")
+                            .d("table", MISC_STORAGE_APL_TABLE_NAME)
+                            .d("component", MISC_STORAGE_APP_COMPONENT_NAME));
+            return false;
+        }
+    }
+
+    std::string APLDBVersion;
+    if (!miscStorage->get(
+            MISC_STORAGE_APP_COMPONENT_NAME, MISC_STORAGE_APL_TABLE_NAME, APL_MAX_VERSION_DB_KEY, &APLDBVersion)) {
+        ACSDK_ERROR(LX("getAPLMaxVersionFromStorageFailed").d("reason", "storage failure"));
+    }
+    ACSDK_DEBUG3(LX(__func__).d("APLDBVersion", APLDBVersion));
+    if (APLDBVersion.empty()) {
+        ACSDK_INFO(LX("no APL version saved").d("reason", "couldn't find saved APLDBVersion"));
+    }
+
+    bool aplVersionChanged = false;
+    if (APLVersion != APLDBVersion) {
+        // Empty value does not constitute version change, and should not result in app reset.
+        if (!APLDBVersion.empty()) {
+            aplVersionChanged = true;
+        }
+        if (!miscStorage->put(
+                MISC_STORAGE_APP_COMPONENT_NAME, MISC_STORAGE_APL_TABLE_NAME, APL_MAX_VERSION_DB_KEY, APLVersion)) {
+            ACSDK_ERROR(LX("saveAPLMaxVersionInStorage").m("Could not set new value"));
+        } else {
+            ACSDK_DEBUG1(LX("saveAPLMaxVersionInStorage").m("succeeded"));
+        }
+    }
+
+    m_guiClient->setAplClientBridge(m_aplClientBridge, aplVersionChanged);
 
     /*
      * Create the presentation layer for the captions.
@@ -1235,8 +1310,6 @@ bool SampleApplication::initialize(
         deviceInfo);
     m_guiClient->setObserver(userInterfaceManager);
 
-    APLVersion = m_guiClient->getMaxAPLVersion();
-
     /*
      * Supply a SALT for UUID generation, this should be as unique to each individual device as possible
      */
@@ -1255,8 +1328,22 @@ bool SampleApplication::initialize(
     m_shutdownRequiredList.push_back(m_authManager);
     authDelegate = m_authManager;
 #else
+
+#ifdef ENABLE_PKCS11
+    auto cryptoFactory = manufactory->get<std::shared_ptr<acsdkCryptoInterfaces::CryptoFactoryInterface>>();
+    auto keyStore = manufactory->get<std::shared_ptr<acsdkCryptoInterfaces::KeyStoreInterface>>();
+
     // Creating the AuthDelegate - this component takes care of LWA and authorization of the client.
-    auto authDelegateStorage = authorization::cblAuthDelegate::SQLiteCBLAuthDelegateStorage::create(config);
+    auto authDelegateStorage =
+        authorization::cblAuthDelegate::SQLiteCBLAuthDelegateStorage::createCBLAuthDelegateStorageInterface(
+            configPtr, cryptoFactory, keyStore);
+#else
+    // Creating the AuthDelegate - this component takes care of LWA and authorization of the client.
+    auto authDelegateStorage =
+        authorization::cblAuthDelegate::SQLiteCBLAuthDelegateStorage::createCBLAuthDelegateStorageInterface(
+            configPtr, nullptr, nullptr);
+#endif
+
     authDelegate = authorization::cblAuthDelegate::CBLAuthDelegate::create(
         config, customerDataManager, std::move(authDelegateStorage), userInterfaceManager, nullptr, deviceInfo);
 #endif
@@ -1433,44 +1520,20 @@ bool SampleApplication::initialize(
      */
 
     // Creating tap to talk audio provider
-    bool tapAlwaysReadable = true;
-    bool tapCanOverride = true;
-    bool tapCanBeOverridden = true;
-
-    alexaClientSDK::capabilityAgents::aip::AudioProvider tapToTalkAudioProvider(
-        sharedDataStream,
-        *compatibleAudioFormat,
-        alexaClientSDK::capabilityAgents::aip::ASRProfile::NEAR_FIELD,
-        tapAlwaysReadable,
-        tapCanOverride,
-        tapCanBeOverridden);
+    alexaClientSDK::capabilityAgents::aip::AudioProvider tapToTalkAudioProvider =
+        alexaClientSDK::capabilityAgents::aip::AudioProvider::AudioProvider::TapAudioProvider(
+            sharedDataStream, *compatibleAudioFormat);
 
     // Creating hold to talk audio provider
-    bool holdAlwaysReadable = false;
-    bool holdCanOverride = true;
-    bool holdCanBeOverridden = false;
-
-    alexaClientSDK::capabilityAgents::aip::AudioProvider holdToTalkAudioProvider(
-        sharedDataStream,
-        *compatibleAudioFormat,
-        alexaClientSDK::capabilityAgents::aip::ASRProfile::CLOSE_TALK,
-        holdAlwaysReadable,
-        holdCanOverride,
-        holdCanBeOverridden);
+    alexaClientSDK::capabilityAgents::aip::AudioProvider holdToTalkAudioProvider =
+        alexaClientSDK::capabilityAgents::aip::AudioProvider::AudioProvider::HoldAudioProvider(
+            sharedDataStream, *compatibleAudioFormat);
 
     // Creating wake word audio provider, if necessary
 #ifdef KWD
-    bool wakeAlwaysReadable = true;
-    bool wakeCanOverride = false;
-    bool wakeCanBeOverridden = true;
-
-    alexaClientSDK::capabilityAgents::aip::AudioProvider wakeWordAudioProvider(
-        sharedDataStream,
-        *compatibleAudioFormat,
-        alexaClientSDK::capabilityAgents::aip::ASRProfile::NEAR_FIELD,
-        wakeAlwaysReadable,
-        wakeCanOverride,
-        wakeCanBeOverridden);
+    alexaClientSDK::capabilityAgents::aip::AudioProvider wakeWordAudioProvider =
+        alexaClientSDK::capabilityAgents::aip::AudioProvider::WakeAudioProvider(
+            sharedDataStream, *compatibleAudioFormat);
 #endif  // KWD
 
 #ifdef PORTAUDIO
@@ -1526,13 +1589,11 @@ bool SampleApplication::initialize(
         alexaClientSDK::capabilityAgents::aip::AudioProvider::null());
 #endif  // KWD
 
-    auto metricRecorder = manufactory->get<std::shared_ptr<avsCommon::utils::metrics::MetricRecorderInterface>>();
-
     /*
      * Creating the SmartScreenClient - this component serves as an out-of-box default object that instantiates and
      * "glues" together all the modules.
      */
-    std::shared_ptr<smartScreenClient::SmartScreenClient> client = smartScreenClient::SmartScreenClient::create(
+    m_client = smartScreenClient::SmartScreenClient::create(
         deviceInfo,
         customerDataManager,
         m_externalMusicProviderMediaPlayersMap,
@@ -1605,62 +1666,67 @@ bool SampleApplication::initialize(
         capabilityAgents::aip::AudioProvider::null(),
         m_guiManager,
         APLVersion);
-    if (!client) {
+    if (!m_client) {
         ACSDK_CRITICAL(LX("Failed to create default SDK client!"));
         return false;
     }
 
-    client->addSpeakerManagerObserver(userInterfaceManager);
+    m_client->addSpeakerManagerObserver(userInterfaceManager);
 
-    client->addNotificationsObserver(userInterfaceManager);
+    m_client->addNotificationsObserver(userInterfaceManager);
 
-    client->addTemplateRuntimeObserver(m_guiManager);
-    client->addAlexaPresentationObserver(m_guiManager);
-    client->addAlexaDialogStateObserver(m_guiManager);
-    client->addAudioPlayerObserver(m_guiManager);
-    client->addAudioPlayerObserver(m_aplClientBridge);
-    client->addExternalMediaPlayerObserver(m_aplClientBridge);
-    client->addCallStateObserver(m_guiManager);
-    client->addFocusManagersObserver(m_guiManager);
-    client->addAudioInputProcessorObserver(m_guiManager);
-    m_guiManager->setClient(client);
+    m_client->addTemplateRuntimeObserver(m_guiManager);
+    m_client->addAlexaPresentationObserver(m_guiManager);
+
+#ifdef ENABLE_RTCSC
+    m_client->addLiveViewControllerCapabilityAgentObserver(m_guiManager);
+#endif
+
+    m_client->addAlexaDialogStateObserver(m_guiManager);
+    m_client->addAudioPlayerObserver(m_guiManager);
+    m_client->addAudioPlayerObserver(m_aplClientBridge);
+    m_client->addExternalMediaPlayerObserver(m_aplClientBridge);
+    m_client->addCallStateObserver(m_guiManager);
+    m_client->addDtmfObserver(m_guiManager);
+    m_client->addFocusManagersObserver(m_guiManager);
+    m_client->addAudioInputProcessorObserver(m_guiManager);
+    m_guiManager->setClient(m_client);
     m_guiClient->setGUIManager(m_guiManager);
 
 #ifdef KWD
-    // This observer is notified any time a keyword is detected and notifies the DefaultClient to start recognizing.
-    auto keywordObserver = std::make_shared<KeywordObserver>(client, wakeWordAudioProvider);
-
     m_keywordDetector = alexaClientSDK::kwd::KeywordDetectorProvider::create(
         sharedDataStream,
         *compatibleAudioFormat,
-        {keywordObserver},
+        std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::KeyWordObserverInterface>>(),
         std::unordered_set<
-            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::KeyWordDetectorStateObserverInterface>>(),
-        pathToInputFolder);
+            std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::KeyWordDetectorStateObserverInterface>>());
     if (!m_keywordDetector) {
         ACSDK_CRITICAL(LX("Failed to create keyword detector!"));
     }
+
+    // This observer is notified any time a keyword is detected and notifies the DefaultClient to start recognizing.
+    auto keywordObserver = KeywordObserver::create(m_client, wakeWordAudioProvider, m_keywordDetector);
 #endif
 
 #ifdef ENABLE_CAPTIONS
     std::vector<std::shared_ptr<MediaPlayerInterface>> captionableMediaSources = m_audioMediaPlayerPool;
     captionableMediaSources.emplace_back(m_speakMediaPlayer);
-    client->addCaptionPresenter(captionPresenter);
+    m_client->addCaptionPresenter(captionPresenter);
 #ifndef UWP_BUILD
-    client->setCaptionMediaPlayers(captionableMediaSources);
+    m_client->setCaptionMediaPlayers(captionableMediaSources);
 #endif
 #endif
 
 #ifdef ENABLE_ENDPOINT_CONTROLLERS
     // Default Endpoint
-    if (!addControllersToDefaultEndpoint(client->getDefaultEndpointBuilder())) {
+    if (!addControllersToDefaultEndpoint(m_client->getDefaultEndpointBuilder())) {
         ACSDK_CRITICAL(LX("Failed to add controllers to default endpoint!"));
         return false;
     }
 
     // Peripheral Endpoint
     std::shared_ptr<avsCommon::sdkInterfaces::endpoints::EndpointBuilderInterface> peripheralEndpointBuilder =
-        client->createEndpointBuilder();
+        m_client->createEndpointBuilder();
     if (!peripheralEndpointBuilder) {
         ACSDK_CRITICAL(LX("Failed to create peripheral endpoint Builder!"));
         return false;
@@ -1690,29 +1756,43 @@ bool SampleApplication::initialize(
         return false;
     }
 
-    client->registerEndpoint(std::move(peripheralEndpoint));
+    m_client->registerEndpoint(std::move(peripheralEndpoint));
 #endif
 
 #ifdef ENABLE_REVOKE_AUTH
     // Creating the revoke authorization observer.
-    auto revokeObserver =
-        std::make_shared<alexaSmartScreenSDK::sampleApp::RevokeAuthorizationObserver>(client->getRegistrationManager());
-    client->addRevokeAuthorizationObserver(revokeObserver);
+    auto revokeObserver = std::make_shared<alexaSmartScreenSDK::sampleApp::RevokeAuthorizationObserver>(
+        m_client->getRegistrationManager());
+    m_client->addRevokeAuthorizationObserver(revokeObserver);
 #endif  // ENABLE_REVOKE_AUTH
 
     authDelegate->addAuthObserver(m_guiClient);
-    client->addRegistrationObserver(m_guiClient);
+    m_client->addRegistrationObserver(m_guiClient);
     m_capabilitiesDelegate->addCapabilitiesObserver(m_guiClient);
 
 #ifdef AUTH_MANAGER
-    m_authManager->setRegistrationManager(client->getRegistrationManager());
+    m_authManager->setRegistrationManager(m_client->getRegistrationManager());
+
+#ifdef ENABLE_PKCS11
+    auto cryptoFactory = manufactory->get<std::shared_ptr<acsdkCryptoInterfaces::CryptoFactoryInterface>>();
+    auto keyStore = manufactory->get<std::shared_ptr<acsdkCryptoInterfaces::KeyStoreInterface>>();
 
     auto httpPost = avsCommon::utils::libcurlUtils::HttpPost::createHttpPostInterface();
     m_lwaAdapter = acsdkAuthorization::lwa::LWAAuthorizationAdapter::create(
         configPtr,
         std::move(httpPost),
         deviceInfo,
-        acsdkAuthorization::lwa::SQLiteLWAAuthorizationStorage::createLWAAuthorizationStorageInterface(configPtr));
+        acsdkAuthorization::lwa::LWAAuthorizationStorage::createLWAAuthorizationStorageInterface(
+            configPtr, "", cryptoFactory, keyStore));
+#else
+    auto httpPost = avsCommon::utils::libcurlUtils::HttpPost::createHttpPostInterface();
+    m_lwaAdapter = acsdkAuthorization::lwa::LWAAuthorizationAdapter::create(
+        configPtr,
+        std::move(httpPost),
+        deviceInfo,
+        acsdkAuthorization::lwa::LWAAuthorizationStorage::createLWAAuthorizationStorageInterface(
+            configPtr, "", nullptr, nullptr));
+#endif
 
     if (!m_lwaAdapter) {
         ACSDK_CRITICAL(LX("Failed to create LWA Adapter!"));
@@ -1734,7 +1814,7 @@ bool SampleApplication::initialize(
         return false;
     }
 
-    client->connect();
+    m_client->connect();
 
     return true;
 }

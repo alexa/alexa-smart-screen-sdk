@@ -256,36 +256,6 @@ void TemplateRuntime::onDialogUXStateChanged(DialogUXStateObserverInterface::Dia
     });
 }
 
-void TemplateRuntime::renderDocument(
-    const std::string& jsonPayload,
-    const std::string& token,
-    const std::string& windowId) {
-    m_activeNonPlayerInfoType = NonPlayerInfoDisplayType::ALEXA_PRESENTATION;
-}
-
-void TemplateRuntime::clearDocument(const std::string& token, const bool focusCleared) {
-    if (focusCleared) {
-        m_executor->submit([this]() { executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType::ALEXA_PRESENTATION); });
-    }
-}
-
-void TemplateRuntime::executeCommands(const std::string& jsonPayload, const std::string& token) {
-}
-void TemplateRuntime::dataSourceUpdate(
-    const std::string& sourceType,
-    const std::string& jsonPayload,
-    const std::string& token) {
-}
-void TemplateRuntime::interruptCommandSequence(const std::string& token) {
-}
-
-void TemplateRuntime::onPresentationSessionChanged(
-    const std::string& id,
-    const std::string& skillId,
-    const std::vector<smartScreenSDKInterfaces::GrantedExtension>& grantedExtensions,
-    const std::vector<smartScreenSDKInterfaces::AutoInitializedExtension>& autoInitializedExtensions) {
-}
-
 void TemplateRuntime::addObserver(
     std::shared_ptr<smartScreenSDKInterfaces::TemplateRuntimeObserverInterface> observer) {
     ACSDK_DEBUG5(LX("addObserver"));
@@ -557,8 +527,10 @@ void TemplateRuntime::executeAudioPlayerInfoUpdates(
     }
 
     const auto& currentRenderPlayerInfoCardsProvider = context.mediaProperties;
-    if (m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].audioPlayerState == state &&
-        m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].audioItemId == context.audioItemId) {
+    auto isStateUpdated = m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].audioPlayerState != state;
+    auto isAudioItemUpdated =
+        m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].audioItemId != context.audioItemId;
+    if (!isStateUpdated && !isAudioItemUpdated) {
         /*
          * The AudioPlayer notification is chatty during audio playback as it will frequently toggle between
          * BUFFER_UNDERRUN and PLAYER state.  So we filter out the callbacks if the notification are with the
@@ -566,11 +538,13 @@ void TemplateRuntime::executeAudioPlayerInfoUpdates(
          */
         return;
     }
+    auto isStoppedFromPlaying =
+        PlayerActivity::PLAYING == m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].audioPlayerState &&
+        PlayerActivity::STOPPED == state;
 
-    auto isStateUpdated = (m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].audioPlayerState != state);
     m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].audioPlayerState = state;
     m_audioPlayerInfo[currentRenderPlayerInfoCardsProvider].offset = context.offset;
-    if (m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].audioItemId != context.audioItemId) {
+    if (isAudioItemUpdated) {
         m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].audioItemId = context.audioItemId;
         m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].directive.reset();
         // iterate from front to back (front is most recent)
@@ -610,11 +584,30 @@ void TemplateRuntime::executeAudioPlayerInfoUpdates(
             return;
         }
 
-        // Don't render the card if it's not displayed and state changed to STOPPED.
-        if (state != alexaClientSDK::avsCommon::avs::PlayerActivity::STOPPED ||
-            m_state == smartScreenSDKInterfaces::State::DISPLAYING) {
-            executeDisplayCardEvent(m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].directive);
+        auto playerInfoDirective = m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].directive;
+
+        if (isStoppedFromPlaying && m_playerInfoCardToken.empty()) {
+            /**
+             * If we're stopping playback after clearing the card, don't display it again.
+             */
+            return;
+        } else if (
+            m_playerInfoCardToken.empty() ||
+            m_playerInfoCardToken != m_audioItemsInExecution[currentRenderPlayerInfoCardsProvider].audioItemId) {
+            /**
+             * Only acquire visual focus for displaying the card if we're not presenting one already or
+             * audio item has changed.
+             * Otherwise, assume focus, or that TemplateRuntime will reacquire it when the holding interface clears.
+             */
+            executeDisplayCardEvent(playerInfoDirective);
+            return;
         }
+
+        /**
+         * Default is to just updated PlayerInfo card without reacquiring visual focus
+         */
+        m_lastDisplayedDirective = playerInfoDirective;
+        executeRenderPlayerInfoCallbacks(false);
     }
 }
 
@@ -637,8 +630,9 @@ void TemplateRuntime::executeRenderPlayerInfoCallbacks(bool isClearCard) {
         for (auto& observer : m_observers) {
             observer->clearPlayerInfoCard(m_playerInfoCardToken);
         }
-        m_playerInfoCardToken = "";
+        m_playerInfoCardToken.clear();
     } else {
+        executeAudioPlayerStartTimer(m_playerActivityState);
         if (!m_activeRenderPlayerInfoCardsProvider) {
             ACSDK_ERROR(
                 LX("executeRenderPlayerInfoCallbacksFailed").d("reason", "nullActiveRenderPlayerInfoCardsProvider"));
@@ -650,8 +644,10 @@ void TemplateRuntime::executeRenderPlayerInfoCallbacks(bool isClearCard) {
         }
         auto payload =
             m_audioItemsInExecution[m_activeRenderPlayerInfoCardsProvider].directive->directive->getPayload();
+        m_playerInfoCardToken = m_audioItemsInExecution[m_activeRenderPlayerInfoCardsProvider].audioItemId;
         for (auto& observer : m_observers) {
             observer->renderPlayerInfoCard(
+                m_playerInfoCardToken,
                 payload,
                 m_audioPlayerInfo[m_activeRenderPlayerInfoCardsProvider],
                 m_focus,
@@ -665,14 +661,15 @@ void TemplateRuntime::executeRenderTemplateCallbacks(bool isClearCard) {
     for (auto& observer : m_observers) {
         if (isClearCard) {
             executeNonPlayerInfoCardCleared(NonPlayerInfoDisplayType::RENDER_TEMPLATE);
-            if (!m_nonPlayerInfoCardToken.empty()) {
-                observer->clearTemplateCard(m_nonPlayerInfoCardToken);
+            if (!m_renderTemplateCardToken.empty()) {
+                observer->clearTemplateCard(m_renderTemplateCardToken);
             }
-
-            m_nonPlayerInfoCardToken = "";
+            m_renderTemplateCardToken.clear();
         } else {
             m_activeNonPlayerInfoType = NonPlayerInfoDisplayType::RENDER_TEMPLATE;
-            observer->renderTemplateCard(m_lastDisplayedDirective->directive->getPayload(), m_focus);
+            m_renderTemplateCardToken = m_lastDisplayedDirective->directive->getMessageId();
+            observer->renderTemplateCard(
+                m_renderTemplateCardToken, m_lastDisplayedDirective->directive->getPayload(), m_focus);
         }
     }
 }
@@ -690,6 +687,21 @@ void TemplateRuntime::executeDisplayCard() {
 
 void TemplateRuntime::clearCard() {
     m_executor->submit([this]() { executeClearCardEvent(); });
+}
+
+void TemplateRuntime::forceDisplayPlayerInfoCard() {
+    m_executor->submit([this]() {
+        if (m_lastDisplayedDirective && RENDER_PLAYER_INFO == m_lastDisplayedDirective->directive->getName()) {
+            executeDisplayCardEvent(m_lastDisplayedDirective);
+        }
+    });
+}
+
+void TemplateRuntime::forceClearPlayerInfoCard() {
+    m_executor->submit([this]() {
+        m_lastDisplayedDirective = nullptr;
+        executeRenderPlayerInfoCallbacks(true);
+    });
 }
 
 void TemplateRuntime::executeClearCard() {
@@ -730,10 +742,8 @@ void TemplateRuntime::executeRestartTimer(std::chrono::milliseconds timeout) {
 }
 
 void TemplateRuntime::executeStartTimer(std::chrono::milliseconds timeout) {
-    if (smartScreenSDKInterfaces::State::DISPLAYING == m_state) {
-        ACSDK_DEBUG3(LX("executeStartTimer").d("timeoutInMilliseconds", timeout.count()));
-        m_clearDisplayTimer.start(timeout, [this] { m_executor->submit([this] { executeClearCardEvent(); }); });
-    }
+    ACSDK_DEBUG3(LX("executeStartTimer").d("timeoutInMilliseconds", timeout.count()));
+    m_clearDisplayTimer.start(timeout, [this] { m_executor->submit([this] { executeClearCardEvent(); }); });
 }
 
 void TemplateRuntime::executeStopTimer() {
@@ -947,17 +957,6 @@ void TemplateRuntime::executeCardClearedEvent() {
 std::unordered_set<std::shared_ptr<alexaClientSDK::avsCommon::avs::CapabilityConfiguration>> TemplateRuntime::
     getCapabilityConfigurations() {
     return m_capabilityConfigurations;
-}
-
-void TemplateRuntime::processPresentationResult(const std::string& token) {
-    if (!m_lastDisplayedDirective || m_activeNonPlayerInfoType == NonPlayerInfoDisplayType::ALEXA_PRESENTATION) return;
-
-    const std::string displayedDirectiveName = m_lastDisplayedDirective->directive->getName();
-    if (RENDER_TEMPLATE == displayedDirectiveName) {
-        m_nonPlayerInfoCardToken = token;
-    } else if (RENDER_PLAYER_INFO == displayedDirectiveName) {
-        m_playerInfoCardToken = token;
-    }
 }
 
 }  // namespace templateRuntime

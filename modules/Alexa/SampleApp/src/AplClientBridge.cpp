@@ -87,6 +87,23 @@ void AplClientBridge::initializeRenderer(const std::string& windowId, std::set<s
     });
 }
 
+void AplClientBridge::initializeRenderer(
+    const std::string& windowId,
+    const std::unordered_set<std::shared_ptr<APLClient::Extensions::AplCoreExtensionInterface>>& supportedExtensions) {
+    ACSDK_DEBUG9(LX(__func__));
+    m_executor.submit([this, windowId, supportedExtensions] {
+        if (!windowId.empty()) {
+            auto aplClientRenderer = m_aplClientBinding->createRenderer(windowId);
+            aplClientRenderer->addExtensions(supportedExtensions);
+            m_aplClientRendererMap[windowId] = aplClientRenderer;
+        }
+    });
+}
+
+std::string AplClientBridge::getMaxSupportedAPLVersion() {
+    return m_executor.submit([this] { return m_aplClientBinding->getAPLVersionReported(); }).get();
+}
+
 void AplClientBridge::sendMessage(const std::string& token, const std::string& payload) {
     ACSDK_DEBUG9(LX(__func__));
     std::string newPayload = payload;

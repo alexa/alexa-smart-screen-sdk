@@ -22,6 +22,7 @@
 #include <acsdkAudioPlayerInterfaces/AudioPlayerObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/AuthObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/CallStateObserverInterface.h>
+#include <AVSCommon/SDKInterfaces/DtmfObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/CapabilitiesObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/FocusManagerObserverInterface.h>
@@ -29,6 +30,10 @@
 
 #include <AlexaPresentation/AlexaPresentation.h>
 #include <TemplateRuntimeCapabilityAgent/TemplateRuntime.h>
+
+#ifdef ENABLE_RTCSC
+#include <SmartScreenSDKInterfaces/LiveViewControllerCapabilityAgentObserverInterface.h>
+#endif
 
 #include <SmartScreenClient/SmartScreenClient.h>
 #include <SmartScreenSDKInterfaces/ActivityEvent.h>
@@ -62,6 +67,7 @@ class GUIManager
         : public alexaClientSDK::avsCommon::sdkInterfaces::AuthObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::CapabilitiesObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface
+        , public alexaClientSDK::avsCommon::sdkInterfaces::DtmfObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::DialogUXStateObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::AudioInputProcessorObserverInterface
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::VisualStateProviderInterface
@@ -70,6 +76,9 @@ class GUIManager
         , public alexaSmartScreenSDK::smartScreenSDKInterfaces::TemplateRuntimeObserverInterface
         , public alexaClientSDK::acsdkAudioPlayerInterfaces::AudioPlayerObserverInterface
         , public alexaClientSDK::avsCommon::sdkInterfaces::FocusManagerObserverInterface
+#ifdef ENABLE_RTCSC
+        , public alexaSmartScreenSDK::smartScreenSDKInterfaces::LiveViewControllerCapabilityAgentObserverInterface
+#endif
         , public alexaClientSDK::avsCommon::utils::RequiresShutdown {
 public:
     /**
@@ -98,12 +107,15 @@ public:
 
     /// @name TemplateRuntimeObserverInterface Functions
     /// @{
-    void renderTemplateCard(const std::string& jsonPayload, alexaClientSDK::avsCommon::avs::FocusState focusState)
-        override;
+    void renderTemplateCard(
+        const std::string& token,
+        const std::string& jsonPayload,
+        alexaClientSDK::avsCommon::avs::FocusState focusState) override;
 
     void clearTemplateCard(const std::string& token) override;
 
     void renderPlayerInfoCard(
+        const std::string& token,
         const std::string& jsonPayload,
         smartScreenSDKInterfaces::AudioPlayerInfo info,
         alexaClientSDK::avsCommon::avs::FocusState focusState,
@@ -117,7 +129,7 @@ public:
 
     void renderDocument(const std::string& jsonPayload, const std::string& token, const std::string& windowId) override;
 
-    void clearDocument(const std::string& token, const bool focusCleared) override;
+    void clearDocument(const std::string& token) override;
 
     void executeCommands(const std::string& jsonPayload, const std::string& token) override;
 
@@ -195,11 +207,13 @@ public:
     void handleRuntimeErrorEvent(const std::string& token, std::string payload) override;
 
     bool handleFocusAcquireRequest(
+        std::string avsInterface,
         std::string channelName,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
-        std::string avsInterface) override;
+        alexaClientSDK::avsCommon::avs::ContentType contentType,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) override;
 
     bool handleFocusReleaseRequest(
+        std::string avsInterface,
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) override;
 
@@ -244,6 +258,11 @@ public:
     void sendDtmf(alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone dtmfTone) override;
 
     void handleLocaleChange() override;
+
+#ifdef ENABLE_RTCSC
+    void handleSetCameraMicrophoneState(bool enabled) override;
+    void handleClearLiveView() override;
+#endif
     /// }
 
     /// @name FocusManagerObserverInterface methods
@@ -277,6 +296,12 @@ public:
         alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallState newCallState) override;
     /// @}
 
+    /// @name DtmfObserverInterface methods.
+    /// @{
+    void onDtmfTonesSent(const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>&
+                             dtmfTones) override;
+    /// @}
+
     /**
      * Set smart screen client
      * @param client The input smart screen client
@@ -299,6 +324,19 @@ public:
      * @param Pointer to the observer
      */
     void setDoNotDisturbSettingObserver(std::shared_ptr<sampleApp::DoNotDisturbSettingObserver> doNotDisturbObserver);
+
+#ifdef ENABLE_RTCSC
+    /// @name LiveViewControllerCapabilityAgentObserverInterface methods.
+    /// @{
+    void renderCamera(
+        const std::string& payload,
+        smartScreenSDKInterfaces::AudioState microphoneAudioState,
+        smartScreenSDKInterfaces::ConcurrentTwoWayTalk concurrentTwoWayTalk) override;
+    void onCameraStateChanged(smartScreenSDKInterfaces::CameraState cameraState) override;
+    void onFirstFrameRendered() override;
+    void clearCamera() override;
+    /// @}
+#endif
 
 #ifdef UWP_BUILD
     void inputAudioFile(const std::string& audioFile);
@@ -366,6 +404,12 @@ private:
      * Should be called after a user wishes to set mute.
      */
     void setMute(alexaClientSDK::avsCommon::sdkInterfaces::ChannelVolumeInterface::Type type, bool mute);
+
+    /**
+     * Handles a change in active @c ASRProfile for the device.
+     * @param asrProfile the active ASR profile.
+     */
+    void handleASRProfileChanged(alexaClientSDK::capabilityAgents::aip::ASRProfile asrProfile);
 
     /**
      * Reset the device and remove any customer data.
@@ -437,6 +481,17 @@ private:
     /// Whether the microphone is currently turned on.
     bool m_isMicOn;
 
+#ifdef ENABLE_RTCSC
+    /// State of the active live view camera
+    smartScreenSDKInterfaces::CameraState m_cameraState;
+
+    /// State of the active live view camera microphone
+    smartScreenSDKInterfaces::AudioState m_cameraMicrophoneAudioState;
+
+    /// Two-Way Talk support for the active live view camera.
+    smartScreenSDKInterfaces::ConcurrentTwoWayTalk m_cameraConcurrentTwoWayTalk;
+#endif
+
     /// The microphone managing object.
 #ifdef UWP_BUILD
     std::shared_ptr<alexaSmartScreenSDK::sssdkCommon::NullMicrophone> m_micWrapper;
@@ -461,9 +516,6 @@ private:
     /// Utility flag used for clearing Alert Channel when Foregrounded.
     bool m_clearAlertChannelOnForegrounded;
 
-    /// Utility flag used for clearing PlayerInfo card on Content Channel focus lost.
-    bool m_clearPlayerInfoCardOnContentFocusLost;
-
     /// Object that manages settings callbacks.
     std::shared_ptr<alexaClientSDK::settings::SettingCallbacks<alexaClientSDK::settings::DeviceSettingsManager>>
         m_callbacks;
@@ -476,6 +528,9 @@ private:
 
     /// The interface holding audio focus.
     std::string m_interfaceHoldingAudioFocus;
+
+    /// The active ASR profile.
+    alexaClientSDK::capabilityAgents::aip::ASRProfile m_asrProfile;
 };
 
 }  // namespace gui

@@ -20,6 +20,9 @@ import { IFocusBridge } from './IFocusBridge';
 import { IChannelObserver } from './IChannelObserver';
 import { ChannelName } from './ChannelName';
 import { FocusState } from './FocusState';
+import { IFocusManager } from './IFocusManager';
+import { AVSInterface } from './AVSInterface';
+import { ContentType } from './ContentType';
 
 /**
  * Simple data structure to hold information about focus requestor.
@@ -28,7 +31,9 @@ import { FocusState } from './FocusState';
  * @export
  */
 export interface IRequesterInfo {
+    avsInterface : AVSInterface;
     channelName : ChannelName;
+    contentType : ContentType;
     channelObserver : IChannelObserver;
     focusResource? : IFocusResource;
     resourcePromise? : Promise<void>;
@@ -41,7 +46,7 @@ export interface IRequesterInfo {
  * @class
  * @exports
  */
-export class FocusManager {
+export class FocusManager implements IFocusManager {
     private tokenToInfoMap : Map<number, IRequesterInfo> = new Map();
     private currentToken = 0;
     private focusBridge : IFocusBridge;
@@ -56,26 +61,32 @@ export class FocusManager {
     /**
      * Acquire channel from AVS SDK.
      *
+     * @param avsInterface Name of the avs interface to report as having focus.
      * @param channelName Name of the channel to acquire.
+     * @param contentType Type of content acquiring focus.
      * @param observer Channel state observer.
-     * @returns Assigned requestor token.
+     * @returns Assigned requester token.
      */
-    public acquireFocus(channelName : ChannelName, observer : IChannelObserver) : number {
+    public acquireFocus(
+        avsInterface : AVSInterface,
+        channelName : ChannelName,
+        contentType : ContentType,
+        observer : IChannelObserver) : number {
         const token = this.currentToken++;
-        this.tokenToInfoMap.set(token, {channelName, channelObserver : observer});
-        this.focusBridge.acquireFocus(channelName, token);
+        this.tokenToInfoMap.set(token, {avsInterface, channelName, contentType, channelObserver : observer});
+        this.focusBridge.acquireFocus(avsInterface, channelName, contentType, token);
         return token;
     }
 
     /**
      * Release channel to AVS SDK. It will use same observer that was provided to acquireFocus to report result.
      *
-     * @param token Requestor token received while acquiring channel.
+     * @param token Requester token received while acquiring channel.
      */
     public releaseFocus(token : number) {
         const requesterInfo : IRequesterInfo = this.tokenToInfoMap.get(token);
         if (requesterInfo) {
-            this.focusBridge.releaseFocus(requesterInfo.channelName, token);
+            this.focusBridge.releaseFocus(requesterInfo.avsInterface, requesterInfo.channelName, token);
         } else {
             console.warn(`releaseFocus request failed for non-existing token. token: ${token}`);
         }
@@ -94,8 +105,8 @@ export class FocusManager {
     /**
      * Process AVS SDK Channel state change.
      *
-     * @param token Requestor token.
-     * @param focusStateString Acquired or released channel state.
+     * @param token Requester token.
+     * @param focusStateString Acquired or released channel focus state.
      */
     public processFocusChanged(
       token : number,
@@ -111,7 +122,7 @@ export class FocusManager {
             }
         } else {
             console.warn(`processFocusChanged. token: ${token}` +
-                'received change for non-existing requestor.');
+                'received change for non-existing requester.');
         }
     }
 

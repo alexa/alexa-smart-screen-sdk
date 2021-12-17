@@ -17,6 +17,7 @@
 #define ALEXA_SMART_SCREEN_SDK_SMARTSCREENSDKINTERFACES_INCLUDE_SMARTSCREENSDKINTERFACES_GUISERVERINTERFACE_H_
 
 #include <AVSCommon/AVS/CapabilityAgent.h>
+#include <AVSCommon/AVS/ContentType.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/CallManagerInterface.h>
 
@@ -119,22 +120,26 @@ public:
     /**
      * Handle focus acquire requests.
      *
-     * @param channelName channelName to be requested.
+     * @param avsInterface The AVS Interface requesting focus.
+     * @param channelName The channel to be requested.
+     * @param contentType The type of content acquiring focus.
      * @param channelObserver the channelObserver to be notified.
-     * @param avsInterface AVS interface to report as owner of channel.
      */
     virtual bool handleFocusAcquireRequest(
+        std::string avsInterface,
         std::string channelName,
-        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver,
-        std::string avsInterface) = 0;
+        alexaClientSDK::avsCommon::avs::ContentType contentType,
+        std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) = 0;
 
     /**
      * Handle focus release requests.
      *
+     * @param avsInterface The avsInterface to be released.
      * @param channelName channelName to be released.
      * @param channelObserver the channelObserver to be notified.
      */
     virtual bool handleFocusReleaseRequest(
+        std::string avsInterface,
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) = 0;
 
@@ -265,6 +270,19 @@ public:
      * Handle Locale Change
      */
     virtual void handleLocaleChange() = 0;
+
+#ifdef ENABLE_RTCSC
+    /**
+     * Handle setting microphone state for live view use cases
+     * @param enabled whether microphone should be turned on for live view experiences or not.
+     */
+    virtual void handleSetCameraMicrophoneState(bool enabled) = 0;
+
+    /**
+     * Handles clearing the live view.
+     */
+    virtual void handleClearLiveView() = 0;
+#endif
 };
 
 }  // namespace smartScreenSDKInterfaces

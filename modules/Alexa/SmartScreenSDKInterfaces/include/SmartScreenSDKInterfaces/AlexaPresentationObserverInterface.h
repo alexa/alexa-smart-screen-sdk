@@ -98,9 +98,8 @@ public:
      * the client should call clearDocument().
      *
      * @param token The token of the document to clear.
-     * @param focusCleared Whether the cleared card results in the @c AlexaPresentation CA losing focus.
      */
-    virtual void clearDocument(const std::string& token, const bool focusCleared) = 0;
+    virtual void clearDocument(const std::string& token) = 0;
 
     /**
      * Used to notify the observer that rendering has been aborted, e.g. because a check failed or an error

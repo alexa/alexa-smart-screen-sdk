@@ -16,6 +16,8 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_SSSDKCOMMON_INCLUDE_SSSDKCOMMON_CONFIGVALIDATOR_H_
 #define ALEXA_SMART_SCREEN_SDK_SSSDKCOMMON_INCLUDE_SSSDKCOMMON_CONFIGVALIDATOR_H_
 
+#include <unordered_map>
+
 #include <AVSCommon/Utils/Logger/Logger.h>
 
 #include <rapidjson/document.h>

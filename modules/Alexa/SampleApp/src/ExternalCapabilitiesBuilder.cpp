@@ -40,6 +40,11 @@
 #define COMMS_NAMESPACE "com.amazon.avs-comms-adapter"
 #endif
 
+#ifdef ENABLE_RTCSC
+#include <RTCSessionController/RtcscCapabilityAgent.h>
+#include <RTCSessionController/Interfaces/RtcscCapabilityAgentInterface.h>
+#endif
+
 namespace alexaSmartScreenSDK {
 namespace sampleApp {
 
@@ -125,7 +130,9 @@ ExternalCapabilitiesBuilder::buildCapabilities(
 #endif
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PowerResourceManagerInterface> powerResourceManager,
     std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ComponentReporterInterface> softwareComponentReporter,
-    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PlaybackRouterInterface> playbackRouter) {
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::PlaybackRouterInterface> playbackRouter,
+    std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::endpoints::EndpointRegistrationManagerInterface>
+        endpointRegistrationManager) {
     ACSDK_DEBUG5(LX(__func__));
     std::pair<
         std::list<ExternalCapabilitiesBuilder::Capability>,
@@ -251,6 +258,29 @@ ExternalCapabilitiesBuilder::buildCapabilities(
     requireShutdownObjects.push_back(mrmCapabilityAgent);
 
 #endif  // // ENABLE_MRM
+
+#ifdef ENABLE_RTCSC
+    ACSDK_DEBUG5(LX("RtcscCapabilityAgent being created"));
+    if (!alexaClientSDK::capabilityAgents::rtcscCapabilityAgent::RtcscCapabilityAgent::create(
+            messageSender, contextManager, exceptionSender)) {
+        ACSDK_ERROR(LX("initializeFailed").d("reason", "unableToCreate RtcscCapabilityAgent"));
+        return retValue;
+    }
+
+    auto rtcscCapabilityAgent =
+        alexaClientSDK::capabilityAgents::rtcscCapabilityAgent::RtcscCapabilityAgent::getInstance();
+
+    m_rtcscCapabilityAgent = rtcscCapabilityAgent;
+
+    Capability rtcscCapabilityAgentCapability;
+    auto rtcscCapabilityAgentConfigurations = rtcscCapabilityAgent->getCapabilityConfigurations();
+    rtcscCapabilityAgentCapability.directiveHandler = std::move(rtcscCapabilityAgent);
+    for (auto& configurationPtr : rtcscCapabilityAgentConfigurations) {
+        rtcscCapabilityAgentCapability.configuration = *configurationPtr;
+        capabilities.push_back(rtcscCapabilityAgentCapability);
+    }
+    requireShutdownObjects.push_back(m_rtcscCapabilityAgent);
+#endif
 
     retValue.first.swap(capabilities);
     retValue.second.swap(requireShutdownObjects);

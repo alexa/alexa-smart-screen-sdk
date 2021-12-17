@@ -16,14 +16,15 @@
 'use strict';
 
 import { ActivityEvent } from './ActivityEvent';
+import { IActivityTracker } from './IActivityTracker';
 
 /**
  * GUI activity tracker. Tracks components that is currently active and sends corresponding events.
- * See https://wiki.labcollab.net/confluence/display/Doppler/APL+Renderer+Idle+Handling
+ * See https://github.com/alexa/alexa-smart-screen-sdk/blob/master/modules/GUI/SDK-GUI-API.md#activityevent
  * @export
  * @class
  */
-export class ActivityTracker {
+export class ActivityTracker implements IActivityTracker {
     /// Interface to send out interaction state changed events.
     private activityEventCallback : (event : ActivityEvent) => void;
 

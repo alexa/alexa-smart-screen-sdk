@@ -16,9 +16,14 @@
 #ifndef ALEXA_SMART_SCREEN_SDK_SMARTSCREENSDKINTERFACES_INCLUDE_SMARTSCREENSDKINTERFACES_GUICLIENTINTERFACE_H
 #define ALEXA_SMART_SCREEN_SDK_SMARTSCREENSDKINTERFACES_INCLUDE_SMARTSCREENSDKINTERFACES_GUICLIENTINTERFACE_H
 
+#include <AIP/ASRProfile.h>
 #include <AVSCommon/AVS/FocusState.h>
 #include <AVSCommon/SDKInterfaces/CallStateObserverInterface.h>
 #include <AVSCommon/SDKInterfaces/ChannelObserverInterface.h>
+
+#ifdef ENABLE_RTCSC
+#include "LiveViewControllerCapabilityAgentObserverInterface.h"
+#endif
 
 #include "AlexaPresentationObserverInterface.h"
 #include "AudioPlayerInfo.h"
@@ -37,6 +42,9 @@ namespace smartScreenSDKInterfaces {
 class GUIClientInterface
         : public virtual AlexaPresentationObserverInterface
         , public virtual TemplateRuntimeObserverInterface
+#ifdef ENABLE_RTCSC
+        , public virtual LiveViewControllerCapabilityAgentObserverInterface
+#endif
         , public virtual VisualStateProviderInterface {
 public:
     /**
@@ -53,19 +61,25 @@ public:
 
     /**
      * Request audio focus.
+     * @param avsInterface The AVS Interface requesting focus.
      * @param channelName The channel to be requested.
+     * @param contentType The type of content acquiring focus.
      * @param channelObserver the channelObserver to be notified.
      */
     virtual bool acquireFocus(
+        std::string avsInterface,
         std::string channelName,
+        alexaClientSDK::avsCommon::avs::ContentType contentType,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) = 0;
 
     /**
      * Release audio focus.
+     * @param avsInterface The AVS Interface releasing focus.
      * @param channelName The channel to be released.
      * @param channelObserver the channelObserver to be notified.
      */
     virtual bool releaseFocus(
+        std::string avsInterface,
         std::string channelName,
         std::shared_ptr<alexaClientSDK::avsCommon::sdkInterfaces::ChannelObserverInterface> channelObserver) = 0;
 
@@ -76,6 +90,9 @@ public:
 #ifdef ENABLE_COMMS
     virtual void sendCallStateInfo(
         const alexaClientSDK::avsCommon::sdkInterfaces::CallStateObserverInterface::CallStateInfo& callStateInfo) = 0;
+
+    virtual void notifyDtmfTonesSent(
+        const std::vector<alexaClientSDK::avsCommon::sdkInterfaces::CallManagerInterface::DTMFTone>& dtmfTones) = 0;
 #endif
 
     /**
@@ -90,6 +107,21 @@ public:
      * @return True if the event was successfully handled by the client.
      */
     virtual bool handleNavigationEvent(alexaSmartScreenSDK::smartScreenSDKInterfaces::NavigationEvent event) = 0;
+
+    /**
+     * Informs GUIClient of active ASRProfile used for audio input.
+     * @param asrProfile the active ASRProfile
+     */
+    virtual void handleASRProfileChanged(alexaClientSDK::capabilityAgents::aip::ASRProfile asrProfile) = 0;
+
+#ifdef ENABLE_RTCSC
+    /**
+     * Informs GUIClient of changes to camera microphone state not initiated by GUI interactions.
+     * (i.e. physical microphone button ingress)
+     * @param enabled true if camera microphone has been enabled and is unmuted.
+     */
+    virtual void handleCameraMicrophoneStateChanged(bool enabled) = 0;
+#endif
 };
 
 }  // namespace smartScreenSDKInterfaces
