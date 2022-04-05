@@ -296,6 +296,7 @@ export class LiveViewCameraWindow extends React.Component<ILiveViewCameraWindowP
         if (!event || event.type !== 'pause') {
             this.releaseFocusAndRecordInactive();
             if (this.videoRef.current && this.state.firstFrameRendered) {
+                this.videoRef.current.srcObject = null;
                 this.videoRef.current.load();
             }
         }

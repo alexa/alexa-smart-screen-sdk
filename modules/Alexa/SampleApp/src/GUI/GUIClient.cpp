@@ -35,8 +35,11 @@ static const std::string MESSAGE_TYPE_INIT_RESPONSE("initResponse");
 /// The message type for Tap To Talk.
 static const std::string MESSAGE_TYPE_TAP_TO_TALK("tapToTalk");
 
-/// The message type for Hold To Talk.
-static const std::string MESSAGE_TYPE_HOLD_TO_TALK("holdToTalk");
+/// The message type for Hold To Talk start.
+static const std::string MESSAGE_TYPE_HOLD_TO_TALK_START("holdToTalkStart");
+
+/// The message type for Hold To Talk end.
+static const std::string MESSAGE_TYPE_HOLD_TO_TALK_END("holdToTalkEnd");
 
 /// The message type for Focus acquire request.
 static const std::string MESSAGE_TYPE_FOCUS_ACQUIRE_REQUEST("focusAcquireRequest");
@@ -331,8 +334,11 @@ GUIClient::GUIClient(
         m_captionManager{SmartScreenCaptionStateManager(miscStorage)} {
     m_messageHandlers.emplace(
         MESSAGE_TYPE_TAP_TO_TALK, [this](rapidjson::Document& payload) { executeHandleTapToTalk(payload); });
+    m_messageHandlers.emplace(MESSAGE_TYPE_HOLD_TO_TALK_START, [this](rapidjson::Document& payload) {
+        executeHandleHoldToTalkStart(payload);
+    });
     m_messageHandlers.emplace(
-        MESSAGE_TYPE_HOLD_TO_TALK, [this](rapidjson::Document& payload) { executeHandleHoldToTalk(payload); });
+        MESSAGE_TYPE_HOLD_TO_TALK_END, [this](rapidjson::Document& payload) { executeHandleHoldToTalkEnd(payload); });
     m_messageHandlers.emplace(MESSAGE_TYPE_FOCUS_ACQUIRE_REQUEST, [this](rapidjson::Document& payload) {
         executeHandleFocusAcquireRequest(payload);
     });
@@ -608,8 +614,12 @@ void GUIClient::executeHandleTapToTalk(rapidjson::Document& message) {
     m_guiManager->handleTapToTalk();
 }
 
-void GUIClient::executeHandleHoldToTalk(rapidjson::Document& message) {
-    m_guiManager->handleHoldToTalk();
+void GUIClient::executeHandleHoldToTalkStart(rapidjson::Document& message) {
+    m_guiManager->handleHoldToTalk(true);
+}
+
+void GUIClient::executeHandleHoldToTalkEnd(rapidjson::Document& message) {
+    m_guiManager->handleHoldToTalk(false);
 }
 
 void GUIClient::executeHandleAcceptCall(rapidjson::Document& message) {

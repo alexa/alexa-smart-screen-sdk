@@ -99,25 +99,30 @@ bool WebSocketServer::start() {
     }
 #endif
 
-    websocketpp::lib::error_code errorCode;
+    try {
+        websocketpp::lib::error_code errorCode;
 
-    m_webSocketServer.start_accept(errorCode);
-    if (errorCode) {
-        ACSDK_ERROR(LX("server::start_accept")
-                        .d("errorCode", errorCode.value())
-                        .d("errorCategory", errorCode.category().name()));
-        return false;
+        m_webSocketServer.start_accept(errorCode);
+        if (errorCode) {
+            ACSDK_ERROR(LX("server::start_accept")
+                            .d("errorCode", errorCode.value())
+                            .d("errorCategory", errorCode.category().name()));
+            return false;
+        }
+
+        auto endpoint = m_webSocketServer.get_local_endpoint(errorCode);
+        if (errorCode) {
+            ACSDK_ERROR(LX("server::get_local_endpoint")
+                            .d("errorCode", errorCode.value())
+                            .d("errorCategory", errorCode.category().name()));
+            return false;
+        }
+
+        ACSDK_INFO(
+            LX("Listening for websocket connections").d("interface", endpoint.address()).d("port", endpoint.port()));
+    } catch (const std::bad_weak_ptr& e) {
+        ACSDK_ERROR(LX("std::bad_weak_ptr").d("reason", e.what()));
     }
-
-    auto endpoint = m_webSocketServer.get_local_endpoint(errorCode);
-    if (errorCode) {
-        ACSDK_ERROR(LX("server::get_local_endpoint")
-                        .d("errorCode", errorCode.value())
-                        .d("errorCategory", errorCode.category().name()));
-        return false;
-    }
-
-    ACSDK_INFO(LX("Listening for websocket connections").d("interface", endpoint.address()).d("port", endpoint.port()));
 
     m_webSocketServer.run();
 

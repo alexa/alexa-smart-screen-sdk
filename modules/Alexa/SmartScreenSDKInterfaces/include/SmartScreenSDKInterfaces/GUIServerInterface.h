@@ -38,8 +38,9 @@ public:
 
     /**
      * Handle HoldToTalk event.
+     * @param start @c true if holdToTalk is being started, @c false otherwise.
      */
-    virtual void handleHoldToTalk() = 0;
+    virtual void handleHoldToTalk(bool start) = 0;
 
     /**
      * Toggles the microphone state if the Sample App was built with wake word. When the microphone is turned off, the
@@ -156,10 +157,13 @@ public:
      * Handle ExecuteCommands result message.
      *
      * @param token the execute command result token.
-     * @param result the execute command result.
-     * @param error the execute command error message.
+     * @param event the command execution event.
+     * @param message the execute command completion message.
      */
-    virtual void handleExecuteCommandsResult(std::string token, bool result, std::string error) = 0;
+    virtual void handleExecuteCommandsResult(
+        const std::string& token,
+        const std::string& event,
+        const std::string& message) = 0;
 
     /**
      * Handle activityEvent message.

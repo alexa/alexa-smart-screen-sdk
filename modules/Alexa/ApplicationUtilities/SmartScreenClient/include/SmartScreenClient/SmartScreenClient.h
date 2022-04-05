@@ -1137,11 +1137,11 @@ AudioInputProcessor.
 
     /**
      * Handle execute command result.
-     * @param token The token.
-     * @param result The execute command result.
-     * @param error The error.
+     * @param token the execute command result token.
+     * @param event the command execution event.
+     * @param message the execute command completion message.
      */
-    void handleExecuteCommandsResult(const std::string& token, bool result, std::string error);
+    void handleExecuteCommandsResult(const std::string& token, const std::string& event, const std::string& message);
 
     /**
      * Handle activity event.

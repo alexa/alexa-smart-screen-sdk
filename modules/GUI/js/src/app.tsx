@@ -78,7 +78,7 @@ const HOST = 'localhost';
 const PORT = 8933;
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.9';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.9.1';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;
@@ -341,8 +341,8 @@ export class App extends React.Component<any, IAppState> {
 
         switch (this.deviceAppConfig.audioInputInitiator) {
             case AudioInputInitiator.PRESS_AND_HOLD : {
-                this.talkButtonDownMessage = 'holdToTalk';
-                this.talkButtonUpMessage = 'holdToTalk';
+                this.talkButtonDownMessage = 'holdToTalkStart';
+                this.talkButtonUpMessage = 'holdToTalkEnd';
                 break;
             }
             case AudioInputInitiator.TAP : {

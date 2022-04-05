@@ -374,11 +374,18 @@ private:
     void executeHandleTapToTalk(rapidjson::Document& message);
 
     /**
-     * Handle HoldToTalk event.
+     * Handle HoldToTalkStart event.
      *
      * @param message A complete message object with header and payload.
      */
-    void executeHandleHoldToTalk(rapidjson::Document& message);
+    void executeHandleHoldToTalkStart(rapidjson::Document& message);
+
+    /**
+     * Handle HoldToTalkEnd event.
+     *
+     * @param message A complete message object with header and payload.
+     */
+    void executeHandleHoldToTalkEnd(rapidjson::Document& message);
 
     /**
      * Handle focus acquire requests.

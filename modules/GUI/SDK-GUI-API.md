@@ -387,7 +387,7 @@ See : https://developer.amazon.com/docs/alexa-voice-service/speechrecognizer.htm
 }
 ```
 
-## holdToTalk
+## holdToTalkStart
 
 This message instructs the SDK to open up the microphone and listen for an utterance using the `PRESS_AND_HOLD` initiator.
 
@@ -395,7 +395,19 @@ See : https://developer.amazon.com/docs/alexa-voice-service/speechrecognizer.htm
 
 ```javascript
 {
-  type: 'holdToTalk'
+  type: 'holdToTalkStart'
+}
+```
+
+## holdToTalkEnd
+
+This message instructs the SDK to close the microphone that was opened previously with `PRESS_AND_HOLD` initiator.
+
+See : https://developer.amazon.com/docs/alexa-voice-service/speechrecognizer.html#initiator
+
+```javascript
+{
+  type: 'holdToTalkEnd'
 }
 ```
 

@@ -51,6 +51,7 @@
 #include <SmartScreenSDKInterfaces/DisplayCardState.h>
 #include <SmartScreenSDKInterfaces/VisualStateProviderInterface.h>
 
+#include "AplCommandsExecutionEvent.h"
 #include "TimeoutType.h"
 
 namespace alexaSmartScreenSDK {
@@ -248,11 +249,14 @@ public:
     /**
      * Process result of ExecuteCommands directive.
      *
-     * @param token request token
-     * @param result rendering result (true on executed, false on exception).
-     * @param error error message provided in case if result is false
+     * @param token the execute command result token.
+     * @param event the @c AplCommandExecution event received from the runtime.
+     * @param message the execute command completion message.
      */
-    void processExecuteCommandsResult(const std::string& token, const bool result, const std::string& error);
+    void processExecuteCommandsResult(
+        const std::string& token,
+        AplCommandExecutionEvent event,
+        const std::string& message);
 
     /**
      * Process activity change event from GUI Client.

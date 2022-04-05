@@ -82,7 +82,10 @@ public:
 
     void onSendEvent(const std::string& token, const std::string& event) override;
 
-    void onCommandExecutionComplete(const std::string& token, bool result) override;
+    void onCommandExecutionComplete(
+        const std::string& token,
+        APLClient::AplCommandExecutionEvent event,
+        const std::string& message) override;
 
     void onRenderDocumentComplete(const std::string& token, bool result, const std::string& error) override;
 

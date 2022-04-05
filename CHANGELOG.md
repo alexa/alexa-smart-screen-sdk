@@ -1,5 +1,12 @@
-### v2.9.0 released 12/16/2021:
+### v2.9.1 released 04/05/2022:
+#### Bug fixes
+* Fixed hold-to-talk event handling logic in the native layer to keep it in sync with GUI
 
+#### Enhancements
+* Upgraded dependency to APL Client Library 1.8.3
+* Upgraded nanoid version to 3.2.0, minimist version to 1.2.6 and refreshed the package-lock.json with new dependencies. Note that users upgrading to this version will need to remove the existing node modules from modules/GUI/js/node_modules before the build.
+
+### v2.9.0 released 12/16/2021:
 #### Breaking Changes
 * Decoupled APL Client Library and APL Core Engine build from Smart Screen SDK. Please follow new build instructions here [https://developer.amazon.com/en-US/docs/alexa/alexa-smart-screen-sdk/overview.html]
 
@@ -82,7 +89,6 @@
 * Fixed a regression introduced in 2.4 wherein keyboard events no longer interrupted TTS and APL activity
 
 ### v2.4.0 released 11/09/2020:
- 
 #### Enhancements
 * Upgraded dependency to Device SDK 1.21.0 [https://github.com/alexa/avs-device-sdk/tree/v1.21.0]
 * Added DND Support
@@ -92,7 +98,6 @@
 * Fixed an issue where the sample app automatically goes into the listening mode when prompted by a skill
 
 ### v2.3.0 released 09/24/2020:
- 
 #### Enhancements
 * Upgraded dependency to Device SDK 1.20.1 [https://github.com/alexa/avs-device-sdk/tree/v1.20.1]
 * Support for APL 1.4 [https://developer.amazon.com/en-US/docs/alexa/alexa-presentation-language/apl-changes-1-4.html]
@@ -107,7 +112,6 @@
 * Fixed import content failure cache update
 
 ### v2.2.0 released 07/13/2020:
-
 #### Enhancements
 * Upgraded dependency to Device SDK 1.20.0
 * Optimization for APL package import latency
@@ -131,7 +135,6 @@
 * The AVS Device SDK must be built with an additional flag: `-DRAPIDJSON_MEM_OPTIMIZATION=OFF`
 
 ### v2.1.0 released 06/02/2020:
-
 #### Enhancements
 * Upgraded dependency to Device SDK 1.19.1
 * Provided a reference implementation for rendering of captions
@@ -156,7 +159,6 @@
 * Progress bar on Now Playing display card does not reflect the actual audio offset when such information is not provided in RenderPlayerInfo directive 
 
 ### v2.0.2 released 04/14/2020:
-
 #### Bug fixes
 * Added support for Raspbian Buster.
 * Upgrade dependency on Device SDK 1.19
@@ -174,7 +176,6 @@
 * The build option ENABLE_CAPTIONS does not enable captions. Enabling it will cause undefined behaviour during a build.
 
 ### v2.0.1 released 11/26/2019:
-
 #### Bug Fixes
 * Fixed segfault is situation when bad Misc DB path was provided in configuration.
 * Fixed situation where video playback controls were unresponsive on some skills.
@@ -185,7 +186,6 @@
 * In rare cases button presses could trigger repeat speech.
 
 ### v2.0 released 11/16/2019:
-
 Initial public release
 
 #### Known Issues

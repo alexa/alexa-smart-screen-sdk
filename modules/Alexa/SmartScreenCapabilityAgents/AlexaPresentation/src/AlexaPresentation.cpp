@@ -1414,32 +1414,37 @@ void AlexaPresentation::processRenderDocumentResult(
 
 void AlexaPresentation::processExecuteCommandsResult(
     const std::string& token,
-    const bool result,
-    const std::string& error) {
-    m_executor->submit([this, token, result, error]() {
-        ACSDK_DEBUG3(LX("processExecuteCommandsResultExecutor").d("token", token).d("result", result));
+    AplCommandExecutionEvent event,
+    const std::string& message) {
+    m_executor->submit([this, token, event, message]() {
+        ACSDK_DEBUG3(LX("processExecuteCommandsResultExecutor")
+                         .d("token", token)
+                         .d("event", commandExecutionEventToString(event)));
 
-        bool isSuccess = result;
-        if (token.empty()) {
-            ACSDK_ERROR(LX("processExecuteCommandsResultExecutorFailed").d("reason", "token is empty"));
-            isSuccess = false;
-        } else if (token != m_lastExecuteCommandTokenAndDirective.first) {
-            ACSDK_ERROR(LX("processExecuteCommandsResultExecutorFailed")
-                            .d("reason", "asked to process missing directive")
-                            .d("messageId", token));
-            isSuccess = false;
-        } else if (!m_lastExecuteCommandTokenAndDirective.second) {
-            ACSDK_ERROR(LX("processExecuteCommandsResultExecutorFailed")
-                            .d("reason", "directive to handle is null")
-                            .d("messageId", token));
-            isSuccess = false;
+        bool isFailed = AplCommandExecutionEvent::FAILED == event;
+        std::string failureMessage;
+        if (isFailed) {
+            failureMessage = message;
+        } else {
+            // If runtime had no failures, ensure that this was still a valid directive
+            if (token.empty()) {
+                isFailed = true;
+                failureMessage = "token is empty";
+            } else if (token != m_lastExecuteCommandTokenAndDirective.first) {
+                isFailed = true;
+                failureMessage = "asked to process missing directive";
+            } else if (!m_lastExecuteCommandTokenAndDirective.second) {
+                isFailed = true;
+                failureMessage = "directive to handle is null";
+            }
         }
 
-        if (isSuccess) {
-            setHandlingCompleted(m_lastExecuteCommandTokenAndDirective.second);
-        } else {
+        if (isFailed) {
+            ACSDK_ERROR(LX("processExecuteCommandsResultExecutorFailed").d("token", token).d("reason", failureMessage));
             sendExceptionEncounteredAndReportFailed(
-                m_lastExecuteCommandTokenAndDirective.second, "Commands execution failed: " + error);
+                m_lastExecuteCommandTokenAndDirective.second, "Commands execution failed: " + failureMessage);
+        } else {
+            setHandlingCompleted(m_lastExecuteCommandTokenAndDirective.second);
         }
 
         m_lastExecuteCommandTokenAndDirective.first.clear();

@@ -150,9 +150,14 @@ void AplClientBridge::onSendEvent(const std::string& token, const std::string& e
     m_executor.submit([this, token, event] { m_guiManager->handleUserEvent(token, event); });
 }
 
-void AplClientBridge::onCommandExecutionComplete(const std::string& token, bool result) {
+void AplClientBridge::onCommandExecutionComplete(
+    const std::string& token,
+    APLClient::AplCommandExecutionEvent event,
+    const std::string& message) {
     ACSDK_DEBUG9(LX(__func__));
-    m_executor.submit([this, token, result] { m_guiManager->handleExecuteCommandsResult(token, result, ""); });
+    m_executor.submit([this, token, event, message] {
+        m_guiManager->handleExecuteCommandsResult(token, APLClient::commandExecutionEventToString(event), message);
+    });
 }
 
 void AplClientBridge::onRenderDocumentComplete(const std::string& token, bool result, const std::string& error) {
@@ -362,6 +367,11 @@ void AplClientBridge::executeCommands(const std::string& jsonPayload, const std:
         auto aplClientRenderer = getAplClientRendererFromAplToken(token);
         if (aplClientRenderer) {
             aplClientRenderer->executeCommands(jsonPayload, token);
+        } else {
+            m_guiManager->handleExecuteCommandsResult(
+                token,
+                APLClient::commandExecutionEventToString(APLClient::AplCommandExecutionEvent::FAILED),
+                "No document renderer instance for token.");
         }
     });
 }

@@ -178,7 +178,7 @@ public:
     /// @{
     void handleTapToTalk() override;
 
-    void handleHoldToTalk() override;
+    void handleHoldToTalk(bool start) override;
 
     void handleMicrophoneToggle() override;
 
@@ -219,7 +219,8 @@ public:
 
     void handleRenderDocumentResult(std::string token, bool result, std::string error) override;
 
-    void handleExecuteCommandsResult(std::string token, bool result, std::string error) override;
+    void handleExecuteCommandsResult(const std::string& token, const std::string& event, const std::string& message)
+        override;
 
     void handleActivityEvent(
         alexaSmartScreenSDK::smartScreenSDKInterfaces::ActivityEvent event,
@@ -468,9 +469,6 @@ private:
 
     /// The wake word audio provider.
     alexaClientSDK::capabilityAgents::aip::AudioProvider m_wakeWordAudioProvider;
-
-    /// Whether a hold is currently occurring.
-    bool m_isHoldOccurring;
 
     /// Whether a tap is currently occurring.
     bool m_isTapOccurring;

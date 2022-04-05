@@ -58,6 +58,7 @@
 #include <acsdkBluetooth/BluetoothMediaInputTransformer.h>
 #endif
 
+#include <AlexaPresentation/AplCommandsExecutionEvent.h>
 #include <SDKComponent/SDKComponent.h>
 
 #include "SmartScreenClient/DefaultClientComponent.h"
@@ -1942,8 +1943,14 @@ void SmartScreenClient::handleRenderDocumentResult(const std::string& token, boo
     m_alexaPresentation->processRenderDocumentResult(token, result, error);
 }
 
-void SmartScreenClient::handleExecuteCommandsResult(const std::string& token, bool result, std::string error) {
-    m_alexaPresentation->processExecuteCommandsResult(token, result, error);
+void SmartScreenClient::handleExecuteCommandsResult(
+    const std::string& token,
+    const std::string& event,
+    const std::string& message) {
+    m_alexaPresentation->processExecuteCommandsResult(
+        token,
+        alexaSmartScreenSDK::smartScreenCapabilityAgents::alexaPresentation::stringToCommandExecutionEvent(event),
+        message);
 }
 
 void SmartScreenClient::handleActivityEvent(

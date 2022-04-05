@@ -127,7 +127,6 @@ GUIManager::GUIManager(
         m_playerActivityState{PlayerActivity::FINISHED} {
     m_guiClient = guiClient;
     m_isMicOn = true;
-    m_isHoldOccurring = false;
     m_isTapOccurring = false;
     m_isSpeakingOrListening = false;
     m_clearAlertChannelOnForegrounded = false;
@@ -240,14 +239,19 @@ void GUIManager::handleTapToTalk() {
         ;
 }
 
-void GUIManager::handleHoldToTalk() {
-    ACSDK_DEBUG9(LX("handleHoldToTalk"));
-    m_executor.submit([this]() {
+void GUIManager::handleHoldToTalk(bool start) {
+    ACSDK_DEBUG9(LX(__func__).d("start", start));
+    m_executor.submit([this, start]() {
         handleASRProfileChanged(m_holdToTalkAudioProvider.profile);
         if (!m_isMicOn) {
             return;
         }
         bool activeCameraWithMicrophone = false;
+
+        // Set the value of @c isHoldOccurring to what UI thinks it should be.
+        // There could be circumstances where the user applications might fall out
+        // of sync with SDK about the status of hold-to-talk.
+        bool isHoldOccurring = !start;
 
 #ifdef ENABLE_RTCSC
         // Mic input is fully routed to active camera and not Alexa AIP when:
@@ -264,12 +268,12 @@ void GUIManager::handleHoldToTalk() {
               smartScreenSDKInterfaces::AudioState::UNKNOWN != m_cameraMicrophoneAudioState) &&
              smartScreenSDKInterfaces::ConcurrentTwoWayTalk::UNKNOWN != m_cameraConcurrentTwoWayTalk);
 #endif
-        if (!m_isHoldOccurring) {
+        if (!isHoldOccurring) {
             // If we have no active 2-way talk camera, route mic input to Alexa AIP provider as usual.
-            m_isHoldOccurring =
+            isHoldOccurring =
                 activeCameraWithMicrophone || m_ssClient->notifyOfHoldToTalkStart(m_holdToTalkAudioProvider).get();
         } else {
-            m_isHoldOccurring = false;
+            isHoldOccurring = false;
             if (!activeCameraWithMicrophone) {
                 m_ssClient->notifyOfHoldToTalkEnd();
             }
@@ -279,9 +283,9 @@ void GUIManager::handleHoldToTalk() {
         // If we have an active 2-way camera, enable/disable its microphone.
         if (activeCameraWithMicrophone) {
             // Set camera mic state
-            handleSetCameraMicrophoneState(m_isHoldOccurring);
+            handleSetCameraMicrophoneState(isHoldOccurring);
             // Inform GUI of camera mic state
-            m_guiClient->handleCameraMicrophoneStateChanged(m_isHoldOccurring);
+            m_guiClient->handleCameraMicrophoneStateChanged(isHoldOccurring);
         }
 #endif
     });
@@ -580,9 +584,12 @@ void GUIManager::handleRenderDocumentResult(std::string token, bool result, std:
     m_executor.submit([this, result, token, error]() { m_ssClient->handleRenderDocumentResult(token, result, error); });
 }
 
-void GUIManager::handleExecuteCommandsResult(std::string token, bool result, std::string error) {
+void GUIManager::handleExecuteCommandsResult(
+    const std::string& token,
+    const std::string& event,
+    const std::string& message) {
     m_executor.submit(
-        [this, token, result, error]() { m_ssClient->handleExecuteCommandsResult(token, result, error); });
+        [this, token, event, message]() { m_ssClient->handleExecuteCommandsResult(token, event, message); });
 }
 
 void GUIManager::handleActivityEvent(smartScreenSDKInterfaces::ActivityEvent event, const std::string& source) {

@@ -39,6 +39,7 @@
 #include <SmartScreenSDKInterfaces/VisualStateProviderInterface.h>
 
 #include "AlexaPresentation/AlexaPresentation.h"
+#include "AlexaPresentation/AplCommandsExecutionEvent.h"
 
 namespace alexaSmartScreenSDK {
 namespace smartScreenCapabilityAgents {
@@ -869,7 +870,7 @@ TEST_F(AlexaPresentationTest, testExecuteCommandAfterMismatchedAPLCard) {
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive1, std::move(m_mockDirectiveHandlerResult));
     m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID);
-    m_AlexaPresentation->processExecuteCommandsResult(MESSAGE_ID, true, "");
+    m_AlexaPresentation->processExecuteCommandsResult(MESSAGE_ID, AplCommandExecutionEvent::RESOLVED, "");
     m_executor->waitForSubmittedTasks();
 }
 
@@ -911,7 +912,7 @@ TEST_F(AlexaPresentationTest, testExecuteCommandAfterRightAPL) {
 
     m_AlexaPresentation->CapabilityAgent::preHandleDirective(directive1, std::move(m_mockDirectiveHandlerResult));
     m_AlexaPresentation->CapabilityAgent::handleDirective(MESSAGE_ID_2);
-    m_AlexaPresentation->processExecuteCommandsResult("APL_TOKEN", true, "");
+    m_AlexaPresentation->processExecuteCommandsResult("APL_TOKEN", AplCommandExecutionEvent::RESOLVED, "");
     m_executor->waitForSubmittedTasks();
 }
 
