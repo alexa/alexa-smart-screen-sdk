@@ -78,7 +78,7 @@ const HOST = 'localhost';
 const PORT = 8933;
 
 /// The minimum SmartScreenSDK version required for this runtime.
-const SMART_SCREEN_SDK_MIN_VERSION = '2.9.1';
+const SMART_SCREEN_SDK_MIN_VERSION = '2.9.2';
 
 /// Indicates whether the SDK has built with WebSocket SSL Disabled.
 declare const DISABLE_WEBSOCKET_SSL : boolean;

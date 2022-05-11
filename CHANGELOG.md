@@ -1,3 +1,7 @@
+### v2.9.2 released 05/11/2022:
+#### Enhancements
+* Upgraded async version to 2.6.4. Note that users upgrading to this version will need to remove the existing node modules from modules/GUI/js/node_modules before the build.
+
 ### v2.9.1 released 04/05/2022:
 #### Bug fixes
 * Fixed hold-to-talk event handling logic in the native layer to keep it in sync with GUI
