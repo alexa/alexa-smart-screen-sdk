@@ -1,3 +1,8 @@
+### v2.9.3 released 10/20/2022:
+#### Enhancements
+* Upgraded webpack version to 5.61.0 and refreshed the package-lock.json with new dependencies. Note that users upgrading to this version will need to remove the existing node modules from modules/GUI/js/node_modules before the build.
+* Updated wording in the Security Requirements section of the README.md file.
+
 ### v2.9.2 released 05/11/2022:
 #### Enhancements
 * Upgraded async version to 2.6.4. Note that users upgrading to this version will need to remove the existing node modules from modules/GUI/js/node_modules before the build.
