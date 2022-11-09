@@ -11,6 +11,20 @@
         <img src="https://img.shields.io/github/issues/alexa/alexa-smart-screen-sdk" /></a>
 </p>
 
+## Announcement
+
+> The new [Alexa Voice Service (AVS) Device SDK version 3.0](https://github.com/alexa/avs-device-sdk) and the [Alexa Smart Screen Web Components version 1.0](https://github.com/alexa/alexa-smart-screen-web-components) are now available!
+
+> If you’re new: The AVS Device SDK version 3.0 and the Alexa Smart Screen Web Components have replaced the Alexa Smart Screen SDK.
+
+> For current users of the Alexa Smart Screen SDK: Please consider upgrading to the AVS Device SDK version 3.0 and Alexa Smart Screen Web components.
+
+The AVS Device SDK version 3.0 combines the Alexa Smart Screen SDK and the AVS Device SDK into one. It also adds several new features including [Video Device Control](https://developer.amazon.com/en-US/docs/alexa/avs-device-sdk/video-device-control.html) for integrating [Video Skill Kit](https://developer.amazon.com/en-US/docs/alexa/video/video-skill-api-reference.html) capabilities into your device. To begin, see [Get Started with Alexa Voice Service Device SDK](https://developer.amazon.com/en-US/docs/alexa/avs-device-sdk/overview.html).
+
+The Alexa Smart Screen Web Components library is a separate Node.js library for smart screen device makers who build web apps that interact with the [AVS Device SDK](https://github.com/alexa/avs-device-sdk). For an overview, see [About Alexa Smart Screen Web Components](https://developer.amazon.com/en-US/docs/alexa/web-components/wc-about-web-components.html).
+
+---
+
 The [Alexa Smart Screen SDK](https://developer.amazon.com/alexa-voice-service/alexa-smart-screen-sdk) extends the [AVS Device SDK](https://developer.amazon.com/alexa-voice-service/sdk) to support development for screen-based Alexa Built-in products. This SDK enables device makers to build screen-based products that complement Alexa voice responses with rich visual experiences. 
 
 The Alexa Smart Screen SDK package in this GitHub repo includes:
@@ -19,8 +33,8 @@ The Alexa Smart Screen SDK package in this GitHub repo includes:
 * A GUI web app that handles presentation of Alexa visual responses
 
 The Alexa Smart Screen SDK depends on the following additional GitHub repos:
-* [AVS Device SDK](https://github.com/alexa/avs-device-sdk/wiki)
-* [APL Client Library](https://github.com/alexa/apl-client-library)
+* [AVS Device SDK](https://github.com/alexa/avs-device-sdk/tree/v1.26.0)
+* [APL Client Library](https://github.com/alexa/apl-client-library/tree/v1.8.3)
 
 ## Note on APL Client Library
 
