@@ -25,7 +25,7 @@
     "tslint": "^5.11.0",
     "tslint-loader": "^3.6.0",
     "typescript": "^3.6.3",
-    "webpack": "^5.61.0"
+    "webpack": "^5.76.0"
   },
   "devDependencies": {
     "css-loader": "^5.2.4",
