@@ -1,1 +1,0 @@
-// RTCSC Adapter Stub

@@ -1,6 +1,0 @@
-{
-  "name": "@amzn/rtcmedia_browser_adapter",
-  "version": "0.1.0",
-  "description": "rtc adapter stub",
-  "main": "rtcsc-adapter-stub.js"
-}
