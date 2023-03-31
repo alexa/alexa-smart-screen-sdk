@@ -11,3 +11,5 @@ Alexa Smart Screen Web Components library is a node.js framework for commercial 
 <b>For reference:</b><br>
 [What's New in Alexa Voice Service Device SDK](https://developer.amazon.com/docs/alexa/avs-device-sdk/what-is-new.html)<br>
 [Upgrade from Alexa Smart Screen SDK 2.x to AVS Device SDK 3.x](https://developer.amazon.com/docs/alexa/avs-device-sdk/upgrade-guide.html)
+
+[![No Maintenance Intended](http://unmaintained.tech/badge.svg)](http://unmaintained.tech/)
